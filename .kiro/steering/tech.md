@@ -20,6 +20,8 @@
 - **Charts**: Recharts
 - **Date Handling**: date-fns with react-day-picker
 - **Utilities**: clsx, tailwind-merge, class-variance-authority
+- **Canvas**: Custom infinite canvas with React Context + useReducer
+- **IDs**: nanoid for unique shape identifiers
 
 ## Package Manager
 
@@ -52,6 +54,9 @@ Required environment variables:
 
 - `@/*` - Root directory
 - `@/components` - Components directory
+- `@/contexts` - React Context providers
 - `@/lib` - Library utilities
+- `@/lib/canvas` - Canvas utilities and reducers
 - `@/hooks` - Custom React hooks
 - `@/components/ui` - UI components
+- `@/types` - TypeScript type definitions

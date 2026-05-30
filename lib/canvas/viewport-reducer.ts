@@ -10,6 +10,9 @@ export type ViewportAction =
   | { type: "SET_TRANSLATE"; payload: Point }
   | { type: "SET_SCALE"; payload: { scale: number; originScreen?: Point } }
   | { type: "ZOOM_BY"; payload: { factor: number; originScreen: Point } }
+  | { type: "ZOOM_IN" }
+  | { type: "ZOOM_OUT" }
+  | { type: "SET_ZOOM"; payload: number }
   | { type: "WHEEL_ZOOM"; payload: { deltaY: number; originScreen: Point } }
   | { type: "WHEEL_PAN"; payload: { dx: number; dy: number } }
   | { type: "PAN_START"; payload: { screen: Point; mode?: ViewportMode } }
@@ -97,6 +100,24 @@ export function viewportReducer(
         translate: { x: t.x, y: t.y },
       };
     }
+
+    case "ZOOM_IN":
+      return {
+        ...state,
+        scale: clamp(state.scale * 1.2, state.minScale, state.maxScale),
+      };
+
+    case "ZOOM_OUT":
+      return {
+        ...state,
+        scale: clamp(state.scale / 1.2, state.minScale, state.maxScale),
+      };
+
+    case "SET_ZOOM":
+      return {
+        ...state,
+        scale: clamp(action.payload, state.minScale, state.maxScale),
+      };
 
     case "WHEEL_ZOOM": {
       const { deltaY, originScreen } = action.payload;

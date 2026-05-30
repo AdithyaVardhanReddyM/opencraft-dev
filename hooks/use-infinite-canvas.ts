@@ -38,6 +38,8 @@ export interface UseInfiniteCanvasReturn {
   getDraftShape: () => DraftShape | null;
   getFreeDrawPoints: () => readonly Point[];
   setIsSidebarOpen: (open: boolean) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
 }
 
 export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
@@ -793,6 +795,14 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
 
   const getFreeDrawPoints = (): readonly Point[] => freeDrawPointsRef.current;
 
+  const zoomIn = (): void => {
+    dispatchViewport({ type: "ZOOM_IN" });
+  };
+
+  const zoomOut = (): void => {
+    dispatchViewport({ type: "ZOOM_OUT" });
+  };
+
   return {
     viewport,
     shapes: shapesList,
@@ -809,5 +819,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     getDraftShape,
     getFreeDrawPoints,
     setIsSidebarOpen,
+    zoomIn,
+    zoomOut,
   };
 }

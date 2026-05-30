@@ -2,7 +2,9 @@
 
 import { CanvasProvider } from "@/contexts/CanvasContext";
 import { useInfiniteCanvas } from "@/hooks/use-infinite-canvas";
-import type { Tool } from "@/types/canvas";
+import { Toolbar } from "@/components/canvas/Toolbar";
+import { ZoomBar } from "@/components/canvas/ZoomBar";
+import { HistoryPill } from "@/components/canvas/HistoryPill";
 
 function CanvasContent() {
   const {
@@ -18,41 +20,43 @@ function CanvasContent() {
     selectTool,
     getDraftShape,
     getFreeDrawPoints,
+    zoomIn,
+    zoomOut,
   } = useInfiniteCanvas();
 
   const draftShape = getDraftShape();
   const freeDrawPoints = getFreeDrawPoints();
 
-  const tools: Tool[] = [
-    "select",
-    "frame",
-    "rect",
-    "ellipse",
-    "freedraw",
-    "arrow",
-    "line",
-    "text",
-    "eraser",
-  ];
+  // TODO: Implement undo/redo functionality
+  const handleUndo = () => {
+    console.log("Undo action - to be implemented");
+  };
+
+  const handleRedo = () => {
+    console.log("Redo action - to be implemented");
+  };
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-background">
+    <div className="relative h-screen w-full overflow-hidden bg-accent">
       {/* Toolbar */}
-      <div className="absolute left-4 top-4 z-10 flex gap-2 rounded-lg border border-border bg-card p-2 shadow-lg">
-        {tools.map((tool) => (
-          <button
-            key={tool}
-            onClick={() => selectTool(tool)}
-            className={`rounded px-3 py-2 text-sm font-medium transition-colors ${
-              currentTool === tool
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-accent"
-            }`}
-          >
-            {tool.charAt(0).toUpperCase() + tool.slice(1)}
-          </button>
-        ))}
-      </div>
+      <Toolbar currentTool={currentTool} onToolSelect={selectTool} />
+
+      {/* Zoom Bar */}
+      <ZoomBar
+        scale={viewport.scale}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        minScale={viewport.minScale}
+        maxScale={viewport.maxScale}
+      />
+
+      {/* History Pill */}
+      <HistoryPill
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={false}
+        canRedo={false}
+      />
 
       {/* Canvas */}
       <div
@@ -298,14 +302,6 @@ function CanvasContent() {
             />
           )}
         </svg>
-      </div>
-
-      {/* Info panel */}
-      <div className="absolute bottom-4 right-4 rounded-lg border border-border bg-card p-3 text-sm shadow-lg">
-        <div>Zoom: {(viewport.scale * 100).toFixed(0)}%</div>
-        <div>Tool: {currentTool}</div>
-        <div>Shapes: {shapes.length}</div>
-        <div>Selected: {Object.keys(selectedShapes).length}</div>
       </div>
     </div>
   );
