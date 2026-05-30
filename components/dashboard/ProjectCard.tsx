@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Image from "next/image";
 import { Layers, Trash2, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -9,22 +9,13 @@ import { formatRelativeTime } from "@/lib/date-utils";
 import { Project } from "@/types/project";
 import { DeleteProjectDialog } from "@/components/dashboard/DeleteProjectDialog";
 import { Id } from "@/convex/_generated/dataModel";
+import { generateGradientThumbnail } from "@/lib/gradient-utils";
 
 interface ProjectCardProps {
   project: Project;
   isDeleting?: boolean;
   onOptimisticDelete?: (projectId: Id<"projects">) => void;
 }
-
-// Gradient options for project cards
-const gradients = [
-  "from-violet-500/20 via-purple-500/20 to-fuchsia-500/20",
-  "from-blue-500/20 via-cyan-500/20 to-teal-500/20",
-  "from-orange-500/20 via-red-500/20 to-pink-500/20",
-  "from-green-500/20 via-emerald-500/20 to-teal-500/20",
-  "from-yellow-500/20 via-orange-500/20 to-red-500/20",
-  "from-indigo-500/20 via-purple-500/20 to-pink-500/20",
-];
 
 export function ProjectCard({
   project,
@@ -34,9 +25,10 @@ export function ProjectCard({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
-  // Select gradient based on project ID for consistency
-  const gradientIndex = project.projectNumber % gradients.length;
-  const gradient = gradients[gradientIndex];
+  // Generate consistent gradient based on project number
+  const gradientThumbnail = useMemo(() => {
+    return generateGradientThumbnail(project.projectNumber);
+  }, [project.projectNumber]);
 
   const handleCardClick = () => {
     // Placeholder for navigation - will be implemented in future tasks
@@ -51,7 +43,7 @@ export function ProjectCard({
   return (
     <>
       <Card
-        className={`overflow-hidden py-0 cursor-pointer transition-all duration-300 hover:border-primary/50 hover:shadow-lg group relative ${
+        className={`overflow-hidden py-0 cursor-pointer transition-all duration-300 hover:border-primary hover:shadow-xl hover:shadow-primary/10 group relative ${
           isDeleting ? "opacity-0 scale-95" : "opacity-100 scale-100"
         }`}
         onClick={handleCardClick}
@@ -71,7 +63,7 @@ export function ProjectCard({
           <Trash2 className="size-4" />
         </Button>
 
-        {/* Gradient Thumbnail with Icon */}
+        {/* Gradient Thumbnail */}
         <div className="relative aspect-video overflow-hidden">
           {project.thumbnail ? (
             <Image
@@ -81,11 +73,24 @@ export function ProjectCard({
               className="object-cover"
             />
           ) : (
-            <div
-              className={`w-full h-full bg-linear-to-br ${gradient} flex items-center justify-center`}
-            >
-              <Layers className="size-10 text-foreground/30" />
-            </div>
+            <>
+              <Image
+                src={gradientThumbnail}
+                alt={project.name}
+                fill
+                className="object-cover"
+              />
+              {/* Logo overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Image
+                  src="/unitset_logo.svg"
+                  alt="Unit Set"
+                  width={80}
+                  height={80}
+                  className="object-contain opacity-30"
+                />
+              </div>
+            </>
           )}
           {/* Fade overlay at bottom */}
           <div className="absolute bottom-0 left-0 right-0 h-8 bg-linear-to-t from-card via-card/50 to-transparent pointer-events-none" />

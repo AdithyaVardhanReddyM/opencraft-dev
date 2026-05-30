@@ -6,6 +6,7 @@ import { UserButton } from "@clerk/nextjs";
 import { ProjectFilters } from "@/components/dashboard/ProjectFilters";
 import { ProjectSortOption } from "@/types/project";
 import { Separator } from "@/components/ui/separator";
+import { ModeToggle } from "../mode-toggle";
 
 interface DashboardHeaderProps {
   sortBy: ProjectSortOption;
@@ -36,14 +37,17 @@ export function DashboardHeader({
             />
           </Link>
 
-          {/* User Button from Clerk */}
-          <UserButton
-            appearance={{
-              elements: {
-                avatarBox: "size-9",
-              },
-            }}
-          />
+          <div className="flex items-center space-x-3">
+            <ModeToggle />
+
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: "ring-2 ring-primary",
+                },
+              }}
+            />
+          </div>
         </div>
       </div>
 

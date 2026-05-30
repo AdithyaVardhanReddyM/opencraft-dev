@@ -10,7 +10,7 @@ interface NewProjectCardProps {
 export function NewProjectCard({ onClick }: NewProjectCardProps) {
   return (
     <Card
-      className="overflow-hidden cursor-pointer transition-all duration-300 hover:border-primary hover:shadow-primary/20 hover:shadow-lg border-2 border-dashed border-border group"
+      className="overflow-hidden cursor-pointer transition-all duration-300 hover:border-primary hover:shadow-xl hover:shadow-primary/10 border-2 border-dashed border-border group"
       onClick={onClick}
     >
       <CardContent className="flex flex-col items-center justify-center h-full min-h-[280px] p-6">
