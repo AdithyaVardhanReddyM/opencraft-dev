@@ -1,0 +1,22 @@
+{
+  "enabled": true,
+  "name": "Update Documentation",
+  "description": "Automatically updates README.md and agent steering documentation files (tech.md, structure.md, product.md, etc.) when project structure, dependencies, or key configuration files change",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "package.json",
+      "tsconfig.json",
+      "next.config.ts",
+      "app/**/*",
+      "components/**/*",
+      "convex/**/*",
+      ".kiro/**/*.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the recent file changes and determine if README.md or any agent steering documentation files in .kiro need to be updated. Check if:\n1. README.md needs updates for new features, setup instructions, or project structure changes\n2. tech.md needs updates for new dependencies, libraries, or technology stack changes\n3. structure.md needs updates for new directories, architectural patterns, or file organization changes\n4. product.md needs updates for new features or product capabilities\n5. Any other .md files in .kiro need updates based on the changes\n\nIf updates are needed, modify the appropriate documentation files to reflect the current state of the project. Ensure documentation is accurate, clear, and helpful for developers and AI agents working on the project."
+  }
+}
