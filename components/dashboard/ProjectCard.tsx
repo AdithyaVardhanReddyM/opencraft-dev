@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Layers, Trash2, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -22,6 +23,7 @@ export function ProjectCard({
   isDeleting = false,
   onOptimisticDelete,
 }: ProjectCardProps) {
+  const router = useRouter();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -31,8 +33,7 @@ export function ProjectCard({
   }, [project.projectNumber]);
 
   const handleCardClick = () => {
-    // Placeholder for navigation - will be implemented in future tasks
-    console.log("Navigate to project:", project._id);
+    router.push(`/dashboard/${project._id}/canvas`);
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
