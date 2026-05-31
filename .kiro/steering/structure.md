@@ -17,6 +17,8 @@
   globals.css          - Global styles and Tailwind imports
 
 /components            - React components
+  /canvas              - Canvas UI components (toolbar, zoom bar, bounding box, etc.)
+    /shapes            - Shape rendering components (Frame, Rectangle, Ellipse, etc.)
   /dashboard           - Dashboard-specific components (project cards, filters, etc.)
   /ui                  - shadcn/ui components (accordion, button, card, etc.)
   ConvexClientProvider.tsx - Convex + Clerk integration

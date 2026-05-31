@@ -51,7 +51,7 @@ export function Toolbar({ currentTool, onToolSelect }: ToolbarProps) {
               onClick={() => onToolSelect(tool.id)}
               aria-label={tool.label}
               aria-pressed={isActive}
-              className={`flex h-9 w-9 items-center justify-center rounded-md transition-colors ${
+              className={`flex h-9 w-9 items-center justify-center rounded-md transition-colors outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0 ${
                 isActive
                   ? "bg-primary text-primary-foreground"
                   : "bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground"

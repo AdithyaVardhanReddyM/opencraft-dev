@@ -9,7 +9,7 @@ export const Arrow = ({ shape }: { shape: ArrowShape }) => {
     shape.endY - shape.startY,
     shape.endX - shape.startX
   );
-  const arrowHeadSize = 12;
+  const arrowHeadSize = 10;
 
   return (
     <svg

@@ -1,4 +1,5 @@
 import type { Point, Shape } from "@/types/canvas";
+import { getTextShapeDimensions } from "./text-utils";
 
 // Hit testing thresholds
 const FREEDRAW_HIT_THRESHOLD = 5;
@@ -48,8 +49,31 @@ export function distanceToLineSegment(
 export function isPointInShape(point: Point, shape: Shape): boolean {
   switch (shape.type) {
     case "frame":
-    case "rect":
-    case "ellipse":
+    case "rect": {
+      const isInside =
+        point.x >= shape.x &&
+        point.x <= shape.x + shape.w &&
+        point.y >= shape.y &&
+        point.y <= shape.y + shape.h;
+
+      if (!isInside) return false;
+
+      if (shape.fill && shape.fill !== "transparent") return true;
+
+      // If no fill, check if near borders
+      const distL = Math.abs(point.x - shape.x);
+      const distR = Math.abs(point.x - (shape.x + shape.w));
+      const distT = Math.abs(point.y - shape.y);
+      const distB = Math.abs(point.y - (shape.y + shape.h));
+
+      return (
+        distL <= LINE_HIT_THRESHOLD ||
+        distR <= LINE_HIT_THRESHOLD ||
+        distT <= LINE_HIT_THRESHOLD ||
+        distB <= LINE_HIT_THRESHOLD
+      );
+    }
+
     case "generatedui":
       return (
         point.x >= shape.x &&
@@ -57,6 +81,41 @@ export function isPointInShape(point: Point, shape: Shape): boolean {
         point.y >= shape.y &&
         point.y <= shape.y + shape.h
       );
+
+    case "ellipse": {
+      const h = shape.x + shape.w / 2;
+      const k = shape.y + shape.h / 2;
+      const a = shape.w / 2;
+      const b = shape.h / 2;
+
+      // Check bounding box first
+      if (
+        point.x < shape.x ||
+        point.x > shape.x + shape.w ||
+        point.y < shape.y ||
+        point.y > shape.y + shape.h
+      ) {
+        return false;
+      }
+
+      const val =
+        Math.pow(point.x - h, 2) / Math.pow(a, 2) +
+        Math.pow(point.y - k, 2) / Math.pow(b, 2);
+
+      if (val > 1) return false;
+
+      if (shape.fill && shape.fill !== "transparent") return true;
+
+      // If no fill, check if near edge
+      const gradX = (2 * (point.x - h)) / (a * a);
+      const gradY = (2 * (point.y - k)) / (b * b);
+      const gradLen = Math.sqrt(gradX * gradX + gradY * gradY);
+
+      if (gradLen === 0) return false;
+
+      const dist = Math.abs(val - 1) / gradLen;
+      return dist <= LINE_HIT_THRESHOLD;
+    }
 
     case "freedraw":
       for (let i = 0; i < shape.points.length - 1; i++) {
@@ -78,19 +137,17 @@ export function isPointInShape(point: Point, shape: Shape): boolean {
         ) <= LINE_HIT_THRESHOLD
       );
 
-    case "text":
-      const textWidth = Math.max(
-        shape.text.length * (shape.fontSize * 0.6),
-        100
-      );
-      const textHeight = shape.fontSize * 1.2;
+    case "text": {
+      const { width, height } = getTextShapeDimensions(shape);
+      const padding = 8;
 
       return (
-        point.x >= shape.x - TEXT_BOUNDS_MARGIN &&
-        point.x <= shape.x + textWidth + TEXT_PADDING + TEXT_BOUNDS_MARGIN &&
-        point.y >= shape.y - TEXT_BOUNDS_MARGIN &&
-        point.y <= shape.y + textHeight + TEXT_PADDING + TEXT_BOUNDS_MARGIN
+        point.x >= shape.x - padding &&
+        point.x <= shape.x + width + padding &&
+        point.y >= shape.y - padding &&
+        point.y <= shape.y + height + padding
       );
+    }
 
     default:
       return false;
@@ -98,14 +155,150 @@ export function isPointInShape(point: Point, shape: Shape): boolean {
 }
 
 /**
- * Get the topmost shape at a point (iterates from end to start for z-order)
+ * Check if a point is within the bounding box of a shape (regardless of fill)
  */
-export function getShapeAtPoint(point: Point, shapes: Shape[]): Shape | null {
+function isPointInShapeBounds(point: Point, shape: Shape): boolean {
+  switch (shape.type) {
+    case "frame":
+    case "rect":
+    case "ellipse":
+    case "generatedui":
+      return (
+        point.x >= shape.x &&
+        point.x <= shape.x + shape.w &&
+        point.y >= shape.y &&
+        point.y <= shape.y + shape.h
+      );
+
+    case "freedraw": {
+      if (shape.points.length === 0) return false;
+      const xs = shape.points.map((p) => p.x);
+      const ys = shape.points.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      return (
+        point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY
+      );
+    }
+
+    case "arrow":
+    case "line": {
+      const minX = Math.min(shape.startX, shape.endX);
+      const maxX = Math.max(shape.startX, shape.endX);
+      const minY = Math.min(shape.startY, shape.endY);
+      const maxY = Math.max(shape.startY, shape.endY);
+      // Add threshold for lines since they have no area
+      const threshold = LINE_HIT_THRESHOLD;
+      return (
+        point.x >= minX - threshold &&
+        point.x <= maxX + threshold &&
+        point.y >= minY - threshold &&
+        point.y <= maxY + threshold
+      );
+    }
+
+    case "text": {
+      const { width, height } = getTextShapeDimensions(shape);
+      const padding = 8;
+
+      return (
+        point.x >= shape.x - padding &&
+        point.x <= shape.x + width + padding &&
+        point.y >= shape.y - padding &&
+        point.y <= shape.y + height + padding
+      );
+    }
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Calculate the area of a shape's bounding box
+ */
+function getShapeBoundsArea(shape: Shape): number {
+  switch (shape.type) {
+    case "frame":
+    case "rect":
+    case "ellipse":
+    case "generatedui":
+      return shape.w * shape.h;
+
+    case "freedraw": {
+      if (shape.points.length === 0) return 0;
+      const xs = shape.points.map((p) => p.x);
+      const ys = shape.points.map((p) => p.y);
+      const w = Math.max(...xs) - Math.min(...xs);
+      const h = Math.max(...ys) - Math.min(...ys);
+      return w * h;
+    }
+
+    case "arrow":
+    case "line": {
+      const w = Math.abs(shape.endX - shape.startX);
+      const h = Math.abs(shape.endY - shape.startY);
+      return w * h;
+    }
+
+    case "text": {
+      const { width, height } = getTextShapeDimensions(shape);
+      const padding = 8;
+      return (width + padding * 2) * (height + padding * 2);
+    }
+
+    default:
+      return Infinity;
+  }
+}
+
+/**
+ * Get the topmost shape at a point with smart nested shape handling
+ *
+ * Strategy:
+ * 1. Collect all shapes whose bounds contain the point
+ * 2. For shapes that actually "hit" (border or fill), prefer the smallest one
+ * 3. This ensures clicking on a smaller shape selects it, even if a larger shape is on top
+ */
+export function getShapeAtPoint(
+  point: Point,
+  shapes: Shape[],
+  options?: { allowBoundsFallback?: boolean }
+): Shape | null {
+  const candidateShapes: Array<{ shape: Shape; hits: boolean; area: number }> =
+    [];
+  const allowBoundsFallback = options?.allowBoundsFallback ?? true;
+
+  // Collect all shapes whose bounds contain the point
   for (let i = shapes.length - 1; i >= 0; i--) {
     const shape = shapes[i];
-    if (isPointInShape(point, shape)) {
-      return shape;
+    if (isPointInShapeBounds(point, shape)) {
+      const hits = isPointInShape(point, shape);
+      const area = getShapeBoundsArea(shape);
+      candidateShapes.push({ shape, hits, area });
     }
   }
+
+  if (candidateShapes.length === 0) return null;
+
+  // Separate shapes that actually hit vs just have bounds
+  const hittingShapes = candidateShapes.filter((c) => c.hits);
+  const boundsOnlyShapes = candidateShapes.filter((c) => !c.hits);
+
+  // If we have shapes that actually hit, return the smallest one
+  if (hittingShapes.length > 0) {
+    return hittingShapes.reduce((smallest, current) =>
+      current.area < smallest.area ? current : smallest
+    ).shape;
+  }
+
+  if (allowBoundsFallback && boundsOnlyShapes.length > 0) {
+    return boundsOnlyShapes.reduce((smallest, current) =>
+      current.area < smallest.area ? current : smallest
+    ).shape;
+  }
+
   return null;
 }

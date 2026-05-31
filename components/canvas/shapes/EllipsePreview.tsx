@@ -12,7 +12,7 @@ export const EllipsePreview = ({
 
   return (
     <div
-      className="absolute pointer-events-none border-2 border-gray-400"
+      className="absolute pointer-events-none border-2 border-gray-400 border-dotted"
       style={{
         left: x,
         top: y,

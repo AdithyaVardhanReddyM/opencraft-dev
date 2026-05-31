@@ -68,6 +68,7 @@ export type ShapesAction =
   | { type: "CLEAR_SELECTION" }
   | { type: "SELECT_ALL" }
   | { type: "DELETE_SELECTED" }
+  | { type: "SET_EDITING_TEXT"; payload: string | null }
   | {
       type: "LOAD_PROJECT";
       payload: {
@@ -84,6 +85,7 @@ export const initialShapesState: ShapesState = {
   shapes: createEntityState<Shape>(),
   selected: {},
   frameCounter: 0,
+  editingTextId: null,
 };
 
 // Reducer
@@ -165,6 +167,7 @@ export function shapesReducer(
       return {
         ...state,
         shapes: addEntity(state.shapes, text),
+        editingTextId: text.id,
       };
     }
 
@@ -259,8 +262,15 @@ export function shapesReducer(
         ...state,
         shapes: removeMany(state.shapes, idsToDelete),
         selected: {},
+        editingTextId: null,
       };
     }
+
+    case "SET_EDITING_TEXT":
+      return {
+        ...state,
+        editingTextId: action.payload,
+      };
 
     case "LOAD_PROJECT":
       return {
@@ -269,6 +279,7 @@ export function shapesReducer(
         tool: action.payload.tool,
         selected: action.payload.selected,
         frameCounter: action.payload.frameCounter,
+        editingTextId: null,
       };
 
     default:

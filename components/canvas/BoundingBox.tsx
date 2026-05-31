@@ -1,6 +1,7 @@
 "use client";
 
 import type { Shape, ViewportState } from "@/types/canvas";
+import { getTextShapeDimensions } from "@/lib/canvas/text-utils";
 
 interface BoundingBoxProps {
   shape: Shape;
@@ -22,17 +23,24 @@ function calculateBounds(shape: Shape): Bounds {
     case "frame":
     case "rect":
     case "ellipse":
+      return {
+        x: shape.x - 4,
+        y: shape.y - 4,
+        w: shape.w + 8,
+        h: shape.h + 8,
+      };
     case "generatedui":
       return { x: shape.x, y: shape.y, w: shape.w, h: shape.h };
 
-    case "text":
-      // Estimate text bounds (rough approximation)
+    case "text": {
+      const { width, height } = getTextShapeDimensions(shape);
       return {
-        x: shape.x,
-        y: shape.y - shape.fontSize,
-        w: 100, // Approximate width
-        h: shape.fontSize + 10,
+        x: shape.x - 4,
+        y: shape.y - 4,
+        w: width + 8,
+        h: height + 8,
       };
+    }
 
     case "freedraw": {
       const xs = shape.points.map((p) => p.x);
@@ -106,14 +114,6 @@ export function BoundingBox({
           height: bounds.h,
         }}
       >
-        {/* Border */}
-        <div
-          className="absolute inset-0 border-2 pointer-events-none"
-          style={{
-            borderColor: "hsl(24 95% 53%)",
-          }}
-        />
-
         {/* Start point handle */}
         <div
           className="absolute pointer-events-auto cursor-move"

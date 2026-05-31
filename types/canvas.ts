@@ -106,6 +106,8 @@ export interface TextShape extends BaseShape {
   lineHeight: number;
   letterSpacing: number;
   textTransform: "none" | "uppercase" | "lowercase" | "capitalize";
+  w?: number;
+  h?: number;
 }
 
 export interface GeneratedUIShape extends BaseShape {
@@ -144,6 +146,7 @@ export interface ShapesState {
   shapes: EntityState<Shape>;
   selected: SelectionMap;
   frameCounter: number;
+  editingTextId: string | null;
 }
 
 // Draft shape (temporary shape during drawing)

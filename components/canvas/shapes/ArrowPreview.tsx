@@ -5,7 +5,7 @@ export const ArrowPreview = ({
   startWorld: { x: number; y: number };
   currentWorld: { x: number; y: number };
 }) => {
-  const arrowHeadSize = 12;
+  const arrowHeadSize = 6;
 
   return (
     <svg

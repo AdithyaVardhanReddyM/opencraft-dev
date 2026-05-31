@@ -10,11 +10,12 @@ import type {
   GeneratedUIShape,
   Point,
 } from "@/types/canvas";
+import { measureTextDimensions, TEXT_PLACEHOLDER } from "./text-utils";
 
 // Default shape styling
 export const SHAPE_DEFAULTS = {
   stroke: "#ffff",
-  strokeWidth: 2,
+  strokeWidth: 1,
 } as const;
 
 /**
@@ -169,6 +170,7 @@ export function createLine(params: {
 export function createText(params: {
   x: number;
   y: number;
+  id?: string;
   text?: string;
   fontSize?: number;
   fontFamily?: string;
@@ -183,25 +185,42 @@ export function createText(params: {
   strokeWidth?: number;
   fill?: string | null;
 }): TextShape {
-  return {
-    id: nanoid(),
+  const fontSize = params.fontSize ?? 16;
+  const fontFamily = params.fontFamily ?? "Inter, sans-serif";
+  const fontWeight = params.fontWeight ?? 400;
+  const fontStyle = params.fontStyle ?? "normal";
+  const textValue = params.text ?? TEXT_PLACEHOLDER;
+  const textAlign = params.textAlign ?? "left";
+  const textDecoration = params.textDecoration ?? "none";
+  const lineHeight = params.lineHeight ?? 1.2;
+  const letterSpacing = params.letterSpacing ?? 0;
+  const textTransform = params.textTransform ?? "none";
+
+  const shape: TextShape = {
+    id: params.id ?? nanoid(),
     type: "text",
     x: params.x,
     y: params.y,
-    text: params.text ?? "Type here...",
-    fontSize: params.fontSize ?? 16,
-    fontFamily: params.fontFamily ?? "Inter, sans-serif",
-    fontWeight: params.fontWeight ?? 400,
-    fontStyle: params.fontStyle ?? "normal",
-    textAlign: params.textAlign ?? "left",
-    textDecoration: params.textDecoration ?? "none",
-    lineHeight: params.lineHeight ?? 1.2,
-    letterSpacing: params.letterSpacing ?? 0,
-    textTransform: params.textTransform ?? "none",
+    text: textValue,
+    fontSize,
+    fontFamily,
+    fontWeight,
+    fontStyle,
+    textAlign,
+    textDecoration,
+    lineHeight,
+    letterSpacing,
+    textTransform,
     stroke: params.stroke ?? SHAPE_DEFAULTS.stroke,
     strokeWidth: params.strokeWidth ?? SHAPE_DEFAULTS.strokeWidth,
-    fill: params.fill ?? "#ffffff",
+    fill: params.fill ?? "transparent",
   };
+
+  const { width, height } = measureTextDimensions(shape);
+  shape.w = width;
+  shape.h = height;
+
+  return shape;
 }
 
 /**

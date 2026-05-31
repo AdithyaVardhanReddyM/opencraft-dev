@@ -14,6 +14,7 @@ import type {
 } from "@/types/canvas";
 import { screenToWorld } from "@/lib/canvas/coordinate-utils";
 import { getShapeAtPoint } from "@/lib/canvas/hit-testing";
+import { getTextShapeDimensions } from "@/lib/canvas/text-utils";
 
 const RAF_INTERVAL_MS = 8;
 
@@ -31,6 +32,7 @@ export interface UseInfiniteCanvasReturn {
   onPointerMove: React.PointerEventHandler<HTMLDivElement>;
   onPointerUp: React.PointerEventHandler<HTMLDivElement>;
   onPointerCancel: React.PointerEventHandler<HTMLDivElement>;
+  onDoubleClick: React.MouseEventHandler<HTMLDivElement>;
 
   // Utilities
   attachCanvasRef: (ref: HTMLDivElement | null) => void;
@@ -40,6 +42,7 @@ export interface UseInfiniteCanvasReturn {
   setIsSidebarOpen: (open: boolean) => void;
   zoomIn: () => void;
   zoomOut: () => void;
+  resetZoom: () => void;
   getSelectionBox: () => { start: Point; current: Point } | null;
 }
 
@@ -393,11 +396,25 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
   const getLocalPointFromPtr = (e: WithClientXY): Point =>
     localPointFromClient(e.clientX, e.clientY);
 
+  const isInteractiveTarget = (element: HTMLElement | null): boolean => {
+    if (!element) return false;
+    return (
+      element.tagName === "BUTTON" ||
+      element.closest("button") !== null ||
+      element.classList.contains("pointer-events-auto") ||
+      element.closest(".pointer-events-auto") !== null
+    );
+  };
+
   // Utility functions
   const blurActiveTextInput = () => {
     const activeElement = document.activeElement;
-    if (activeElement && activeElement.tagName === "INPUT") {
-      (activeElement as HTMLInputElement).blur();
+    if (
+      activeElement &&
+      (activeElement.tagName === "INPUT" ||
+        activeElement.tagName === "TEXTAREA")
+    ) {
+      (activeElement as HTMLElement).blur();
     }
   };
 
@@ -429,11 +446,12 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
   // Pointer event handlers
   const onPointerDown: React.PointerEventHandler<HTMLDivElement> = (e) => {
     const target = e.target as HTMLElement;
-    const isButton =
-      target.tagName === "BUTTON" ||
-      target.closest("button") ||
-      target.classList.contains("pointer-events-auto") ||
-      target.closest(".pointer-events-auto");
+    const isButton = isInteractiveTarget(target);
+
+    // Allow interaction with text area when editing
+    if (target.tagName === "TEXTAREA") {
+      return;
+    }
 
     if (!isButton) {
       e.preventDefault();
@@ -461,7 +479,23 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
 
       if (e.button === 0) {
         if (currentTool === "select") {
-          const hitShape = getShapeAtPoint(world, shapesList);
+          // Check if we hit a shape directly
+          let hitShape = getShapeAtPoint(world, shapesList);
+
+          // If no direct hit, check if we hit the bounding box of a selected shape
+          if (!hitShape) {
+            const selectedIds = Object.keys(selectedShapes);
+            for (const id of selectedIds) {
+              const shape = shapesState.shapes.entities[id];
+              if (
+                shape &&
+                intersectsSelectionBox(shape, { start: world, current: world })
+              ) {
+                hitShape = shape;
+                break;
+              }
+            }
+          }
 
           if (hitShape) {
             const isAlreadySelected = selectedShapes[hitShape.id];
@@ -473,9 +507,16 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
             isMovingRef.current = true;
             moveStartRef.current = world;
 
-            // Store initial positions for all selected shapes
+            // Store initial positions for shapes that will be moved
             initialShapePositionsRef.current = {};
-            Object.keys(selectedShapes).forEach((id) => {
+
+            // If the shape was already selected, store positions for all selected shapes
+            // If it's newly selected, only store position for this shape
+            const shapesToStore = isAlreadySelected
+              ? Object.keys(selectedShapes)
+              : [hitShape.id];
+
+            shapesToStore.forEach((id) => {
               const shape = shapesState.shapes.entities[id];
               if (shape) {
                 if (
@@ -507,35 +548,6 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
                 }
               }
             });
-
-            // Also store initial position for the hit shape if not already selected
-            if (
-              hitShape.type === "frame" ||
-              hitShape.type === "rect" ||
-              hitShape.type === "ellipse" ||
-              hitShape.type === "generatedui"
-            ) {
-              initialShapePositionsRef.current[hitShape.id] = {
-                x: hitShape.x,
-                y: hitShape.y,
-              };
-            } else if (hitShape.type === "freedraw") {
-              initialShapePositionsRef.current[hitShape.id] = {
-                points: [...hitShape.points],
-              };
-            } else if (hitShape.type === "arrow" || hitShape.type === "line") {
-              initialShapePositionsRef.current[hitShape.id] = {
-                startX: hitShape.startX,
-                startY: hitShape.startY,
-                endX: hitShape.endX,
-                endY: hitShape.endY,
-              };
-            } else if (hitShape.type === "text") {
-              initialShapePositionsRef.current[hitShape.id] = {
-                x: hitShape.x,
-                y: hitShape.y,
-              };
-            }
           } else {
             // Clicked on empty space - start selection box or clear selection
             if (!e.shiftKey) {
@@ -549,7 +561,9 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         } else if (currentTool === "eraser") {
           isErasingRef.current = true;
           erasedShapesRef.current.clear();
-          const hitShape = getShapeAtPoint(world, shapesList);
+          const hitShape = getShapeAtPoint(world, shapesList, {
+            allowBoundsFallback: false,
+          });
           if (hitShape) {
             dispatchShapes({ type: "REMOVE_SHAPE", payload: hitShape.id });
             erasedShapesRef.current.add(hitShape.id);
@@ -598,7 +612,9 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     }
 
     if (isErasingRef.current && currentTool === "eraser") {
-      const hitShape = getShapeAtPoint(world, shapesList);
+      const hitShape = getShapeAtPoint(world, shapesList, {
+        allowBoundsFallback: false,
+      });
       if (hitShape && !erasedShapesRef.current.has(hitShape.id)) {
         dispatchShapes({ type: "REMOVE_SHAPE", payload: hitShape.id });
         erasedShapesRef.current.add(hitShape.id);
@@ -799,16 +815,40 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     onPointerUp(e);
   };
 
+  const onDoubleClick: React.MouseEventHandler<HTMLDivElement> = (e) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === "TEXTAREA") {
+      return;
+    }
+
+    if (isInteractiveTarget(target)) {
+      return;
+    }
+
+    e.preventDefault();
+
+    const local = getLocalPointFromPtr(e.nativeEvent);
+    const world = screenToWorld(local, viewport.translate, viewport.scale);
+    const hitShape = getShapeAtPoint(world, shapesList);
+
+    if (hitShape?.type === "text") {
+      dispatchShapes({ type: "SET_EDITING_TEXT", payload: hitShape.id });
+    }
+  };
+
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
     const originScreen = localPointFromClient(e.clientX, e.clientY);
 
+    // Check for pinch-to-zoom gesture (ctrlKey is often set on trackpads)
+    // or explicit mouse wheel zoom (metaKey/ctrlKey)
     if (e.ctrlKey || e.metaKey) {
       dispatchViewport({
         type: "WHEEL_ZOOM",
         payload: { deltaY: e.deltaY, originScreen },
       });
     } else {
+      // Pan handling
       const dx = e.shiftKey ? e.deltaY : e.deltaX;
       const dy = e.shiftKey ? 0 : e.deltaY;
       dispatchViewport({
@@ -849,6 +889,10 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     dispatchViewport({ type: "ZOOM_OUT" });
   };
 
+  const resetZoom = (): void => {
+    dispatchViewport({ type: "SET_ZOOM", payload: 1 });
+  };
+
   const getSelectionBox = (): { start: Point; current: Point } | null =>
     selectionBoxRef.current;
 
@@ -863,6 +907,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     onPointerMove,
     onPointerUp,
     onPointerCancel,
+    onDoubleClick,
     attachCanvasRef,
     selectTool,
     getDraftShape,
@@ -870,6 +915,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     setIsSidebarOpen,
     zoomIn,
     zoomOut,
+    resetZoom,
     getSelectionBox,
   };
 }
@@ -901,13 +947,14 @@ function intersectsSelectionBox(
       shapeMaxY = shape.y + shape.h;
       break;
 
-    case "text":
-      // Estimate text bounds (rough approximation)
+    case "text": {
+      const { width, height } = getTextShapeDimensions(shape);
       shapeMinX = shape.x;
-      shapeMaxX = shape.x + 100; // Approximate width
-      shapeMinY = shape.y - shape.fontSize;
-      shapeMaxY = shape.y + 10;
+      shapeMaxX = shape.x + width;
+      shapeMinY = shape.y;
+      shapeMaxY = shape.y + height;
       break;
+    }
 
     case "freedraw": {
       const xs = shape.points.map((p) => p.x);

@@ -17,6 +17,7 @@ import { Line } from "@/components/canvas/shapes/Line";
 import { Arrow } from "@/components/canvas/shapes/Arrow";
 import { Stroke } from "@/components/canvas/shapes/Stroke";
 import { Text } from "@/components/canvas/shapes/Text";
+import { getTextShapeDimensions } from "@/lib/canvas/text-utils";
 
 // Import preview components
 import { FramePreview } from "@/components/canvas/shapes/FramePreview";
@@ -36,12 +37,14 @@ function CanvasContent() {
     onPointerMove,
     onPointerUp,
     onPointerCancel,
+    onDoubleClick,
     attachCanvasRef,
     selectTool,
     getDraftShape,
     getFreeDrawPoints,
     zoomIn,
     zoomOut,
+    resetZoom,
     getSelectionBox,
   } = useInfiniteCanvas();
 
@@ -70,6 +73,7 @@ function CanvasContent() {
         scale={viewport.scale}
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
+        onReset={resetZoom}
         minScale={viewport.minScale}
         maxScale={viewport.maxScale}
       />
@@ -89,6 +93,7 @@ function CanvasContent() {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
+        onDoubleClick={onDoubleClick}
         className={`h-full w-full ${cursorClass} relative overflow-hidden`}
         style={{
           touchAction: "none",
@@ -204,6 +209,29 @@ function CanvasContent() {
           {Object.keys(selectedShapes).map((id) => {
             const shape = shapes.find((s) => s.id === id);
             if (!shape) return null;
+
+            // For text, we might want a different kind of selection indicator
+            // or just the standard bounding box without resize handles if resizing isn't supported yet
+            if (shape.type === "text") {
+              const { width, height } = getTextShapeDimensions(shape);
+              return (
+                <div
+                  key={`bbox-${id}`}
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: shape.x - 4,
+                    top: shape.y - 4,
+                    width: width + 8,
+                    height: height + 8,
+                  }}
+                >
+                  <div
+                    className="absolute inset-0 border-2 pointer-events-none"
+                    style={{ borderColor: "hsl(24 95% 53%)" }}
+                  />
+                </div>
+              );
+            }
 
             return (
               <BoundingBox

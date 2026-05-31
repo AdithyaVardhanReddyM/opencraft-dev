@@ -4,7 +4,7 @@ export const Frame = ({ shape }: { shape: FrameShape }) => {
   return (
     <>
       <div
-        className="absolute pointer-events-none backdrop-blur-xl bg-white/[0.08] border border-white/[0.12] saturate-150"
+        className="absolute pointer-events-none backdrop-blur-xl bg-white/8 border border-white/12 saturate-150"
         style={{
           left: shape.x,
           top: shape.y,

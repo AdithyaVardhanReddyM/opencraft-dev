@@ -41,8 +41,8 @@ export const initialViewportState: ViewportState = {
   mode: "idle",
   panStartScreen: null,
   panStartTranslate: null,
-  wheelPanSpeed: 0.5,
-  zoomStep: 1.06,
+  wheelPanSpeed: 2.0,
+  zoomStep: 1.05,
 };
 
 // Reducer
@@ -121,7 +121,11 @@ export function viewportReducer(
 
     case "WHEEL_ZOOM": {
       const { deltaY, originScreen } = action.payload;
-      const factor = Math.pow(state.zoomStep, -deltaY / 53);
+      // Adjust sensitivity for mouse wheel vs trackpad
+      // Trackpads usually send smaller deltaY values more frequently
+      // Mouse wheels send larger values less frequently
+      const sensitivity = Math.abs(deltaY) < 50 ? 0.25 : 0.05;
+      const factor = Math.pow(state.zoomStep, -deltaY * sensitivity);
       const next = clamp(state.scale * factor, state.minScale, state.maxScale);
       const t = zoomAroundScreenPoint(
         originScreen,
