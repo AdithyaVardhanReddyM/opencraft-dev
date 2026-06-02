@@ -1,6 +1,12 @@
 "use client";
 
 import { Undo2, Redo2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface HistoryPillProps {
   onUndo: () => void;
@@ -15,28 +21,51 @@ export function HistoryPill({
   canUndo = false,
   canRedo = false,
 }: HistoryPillProps) {
+  // Detect platform for keyboard shortcuts
+  const isMac =
+    typeof navigator !== "undefined" &&
+    navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+  const undoShortcut = isMac ? "⌘Z" : "Ctrl+Z";
+  const redoShortcut = isMac ? "⌘⇧Z" : "Ctrl+Shift+Z";
+
   return (
     <div className="pointer-events-auto fixed bottom-4 left-[220px] z-50">
       <div className="flex items-center rounded-full border border-border bg-card/95 p-1 shadow-lg backdrop-blur-sm">
-        <button
-          onClick={onUndo}
-          disabled={!canUndo}
-          aria-label="Undo"
-          aria-disabled={!canUndo}
-          className="flex h-8 w-8 items-center justify-center rounded-full transition-colors outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-accent enabled:hover:text-accent-foreground"
-        >
-          <Undo2 className="h-4 w-4" />
-        </button>
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onUndo}
+                disabled={!canUndo}
+                aria-label="Undo"
+                aria-disabled={!canUndo}
+                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-accent enabled:hover:text-accent-foreground"
+              >
+                <Undo2 className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>Undo ({undoShortcut})</p>
+            </TooltipContent>
+          </Tooltip>
 
-        <button
-          onClick={onRedo}
-          disabled={!canRedo}
-          aria-label="Redo"
-          aria-disabled={!canRedo}
-          className="flex h-8 w-8 items-center justify-center rounded-full transition-colors outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-accent enabled:hover:text-accent-foreground"
-        >
-          <Redo2 className="h-4 w-4" />
-        </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onRedo}
+                disabled={!canRedo}
+                aria-label="Redo"
+                aria-disabled={!canRedo}
+                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-accent enabled:hover:text-accent-foreground"
+              >
+                <Redo2 className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>Redo ({redoShortcut})</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
   );

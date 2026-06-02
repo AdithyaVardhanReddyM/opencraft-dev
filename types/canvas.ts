@@ -153,6 +153,14 @@ export interface EntityState<T> {
 // Selection state
 export type SelectionMap = Record<string, true>;
 
+// History entry representing a snapshot of canvas state
+export interface HistoryEntry {
+  shapes: EntityState<Shape>;
+  selected: SelectionMap;
+  frameCounter: number;
+  timestamp: number;
+}
+
 // Shapes state
 export interface ShapesState {
   tool: Tool;
@@ -160,6 +168,8 @@ export interface ShapesState {
   selected: SelectionMap;
   frameCounter: number;
   editingTextId: string | null;
+  history: HistoryEntry[];
+  historyPointer: number;
 }
 
 // Draft shape (temporary shape during drawing)

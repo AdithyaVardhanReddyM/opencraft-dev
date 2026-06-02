@@ -23,9 +23,23 @@ import {
   createText,
   createGeneratedUI,
 } from "./shape-factories";
+import {
+  createHistoryEntry,
+  addToHistory,
+  undo as historyUndo,
+  redo as historyRedo,
+} from "./history-manager";
+
+const emptyShapesState = createEntityState<Shape>();
 
 // Action types
-export type ShapesAction =
+interface ShapesActionMeta {
+  meta?: {
+    skipHistory?: boolean;
+  };
+}
+
+type ShapesActionCore =
   | { type: "SET_TOOL"; payload: Tool }
   | {
       type: "ADD_FRAME";
@@ -68,6 +82,7 @@ export type ShapesAction =
   | { type: "CLEAR_SELECTION" }
   | { type: "SELECT_ALL" }
   | { type: "DELETE_SELECTED" }
+  | { type: "PUSH_HISTORY" }
   | { type: "SET_EDITING_TEXT"; payload: string | null }
   | {
       type: "LOAD_PROJECT";
@@ -76,17 +91,70 @@ export type ShapesAction =
         tool: Tool;
         selected: Record<string, true>;
         frameCounter: number;
+        history?: import("@/types/canvas").HistoryEntry[];
+        historyPointer?: number;
       };
-    };
+    }
+  | { type: "UNDO" }
+  | { type: "REDO" };
+
+export type ShapesAction = ShapesActionCore & ShapesActionMeta;
 
 // Initial state
 export const initialShapesState: ShapesState = {
   tool: "select",
-  shapes: createEntityState<Shape>(),
+  shapes: emptyShapesState,
   selected: {},
   frameCounter: 0,
   editingTextId: null,
+  history: [createHistoryEntry(emptyShapesState, {}, 0)],
+  historyPointer: 0,
 };
+
+function recordHistoryIfNeeded(
+  prevState: ShapesState,
+  snapshot: Pick<ShapesState, "shapes" | "selected" | "frameCounter">,
+  action: ShapesAction
+): { history: ShapesState["history"]; pointer: number } {
+  if (action.meta?.skipHistory) {
+    return { history: prevState.history, pointer: prevState.historyPointer };
+  }
+
+  const historyEntry = createHistoryEntry(
+    snapshot.shapes,
+    snapshot.selected,
+    snapshot.frameCounter
+  );
+
+  return addToHistory(
+    prevState.history,
+    prevState.historyPointer,
+    historyEntry
+  );
+}
+
+function applyStateChange(
+  state: ShapesState,
+  action: ShapesAction,
+  mutate: (state: ShapesState) => ShapesState
+): ShapesState {
+  const nextState = mutate(state);
+  const { history, pointer } = recordHistoryIfNeeded(
+    state,
+    {
+      shapes: nextState.shapes,
+      selected: nextState.selected,
+      frameCounter: nextState.frameCounter,
+    },
+    action
+  );
+
+  return {
+    ...nextState,
+    history,
+    historyPointer: pointer,
+  };
+}
 
 // Reducer
 export function shapesReducer(
@@ -111,88 +179,86 @@ export function shapesReducer(
         frameNumber: frameCounter,
       });
 
-      return {
-        ...state,
-        shapes: addEntity(state.shapes, frame),
+      return applyStateChange(state, action, (current) => ({
+        ...current,
+        shapes: addEntity(current.shapes, frame),
         frameCounter,
-      };
+      }));
     }
 
     case "ADD_RECT": {
       const rect = createRect(action.payload);
-      return {
-        ...state,
-        shapes: addEntity(state.shapes, rect),
-      };
+      return applyStateChange(state, action, (current) => ({
+        ...current,
+        shapes: addEntity(current.shapes, rect),
+      }));
     }
 
     case "ADD_ELLIPSE": {
       const ellipse = createEllipse(action.payload);
-      return {
-        ...state,
-        shapes: addEntity(state.shapes, ellipse),
-      };
+      return applyStateChange(state, action, (current) => ({
+        ...current,
+        shapes: addEntity(current.shapes, ellipse),
+      }));
     }
 
     case "ADD_FREEDRAW": {
       const { points } = action.payload;
-      // Validate points array
       if (!points || points.length === 0) {
         return state;
       }
 
       const freedraw = createFreeDraw({ points });
-      return {
-        ...state,
-        shapes: addEntity(state.shapes, freedraw),
-      };
+      return applyStateChange(state, action, (current) => ({
+        ...current,
+        shapes: addEntity(current.shapes, freedraw),
+      }));
     }
 
     case "ADD_ARROW": {
       const arrow = createArrow(action.payload);
-      return {
-        ...state,
-        shapes: addEntity(state.shapes, arrow),
-      };
+      return applyStateChange(state, action, (current) => ({
+        ...current,
+        shapes: addEntity(current.shapes, arrow),
+      }));
     }
 
     case "ADD_LINE": {
       const line = createLine(action.payload);
-      return {
-        ...state,
-        shapes: addEntity(state.shapes, line),
-      };
+      return applyStateChange(state, action, (current) => ({
+        ...current,
+        shapes: addEntity(current.shapes, line),
+      }));
     }
 
     case "ADD_TEXT": {
       const text = createText(action.payload);
-      return {
-        ...state,
-        shapes: addEntity(state.shapes, text),
+      return applyStateChange(state, action, (current) => ({
+        ...current,
+        shapes: addEntity(current.shapes, text),
         editingTextId: text.id,
-      };
+      }));
     }
 
     case "ADD_GENERATED_UI": {
       const generatedUI = createGeneratedUI(action.payload);
-      return {
-        ...state,
-        shapes: addEntity(state.shapes, generatedUI),
-      };
+      return applyStateChange(state, action, (current) => ({
+        ...current,
+        shapes: addEntity(current.shapes, generatedUI),
+      }));
     }
 
     case "UPDATE_SHAPE": {
       const { id, patch } = action.payload;
-      return {
-        ...state,
-        shapes: updateEntity(state.shapes, id, patch),
-      };
+      return applyStateChange(state, action, (current) => ({
+        ...current,
+        shapes: updateEntity(current.shapes, id, patch),
+      }));
     }
 
     case "REMOVE_SHAPE": {
       const id = action.payload;
 
-      // Remove from selection if selected
       const newSelected = { ...state.selected };
       delete newSelected[id];
 
@@ -200,21 +266,22 @@ export function shapesReducer(
       const { shapes: renumberedShapes, frameCount } =
         renumberFramesState(removed);
 
-      return {
-        ...state,
+      return applyStateChange(state, action, (current) => ({
+        ...current,
         shapes: renumberedShapes,
         selected: newSelected,
         frameCounter: frameCount,
-      };
+      }));
     }
 
-    case "CLEAR_ALL":
-      return {
-        ...state,
+    case "CLEAR_ALL": {
+      return applyStateChange(state, action, (current) => ({
+        ...current,
         shapes: removeAll<Shape>(),
         selected: {},
         frameCounter: 0,
-      };
+      }));
+    }
 
     case "SELECT_SHAPE":
       return {
@@ -261,12 +328,30 @@ export function shapesReducer(
       const { shapes: renumberedShapes, frameCount } =
         renumberFramesState(removed);
 
-      return {
-        ...state,
+      return applyStateChange(state, action, (current) => ({
+        ...current,
         shapes: renumberedShapes,
         selected: {},
         editingTextId: null,
         frameCounter: frameCount,
+      }));
+    }
+
+    case "PUSH_HISTORY": {
+      const { history, pointer } = recordHistoryIfNeeded(
+        state,
+        {
+          shapes: state.shapes,
+          selected: state.selected,
+          frameCounter: state.frameCounter,
+        },
+        action
+      );
+
+      return {
+        ...state,
+        history,
+        historyPointer: pointer,
       };
     }
 
@@ -284,7 +369,49 @@ export function shapesReducer(
         selected: action.payload.selected,
         frameCounter: action.payload.frameCounter,
         editingTextId: null,
+        history: action.payload.history || [],
+        historyPointer: action.payload.historyPointer ?? -1,
       };
+
+    case "UNDO": {
+      const { entry, pointer } = historyUndo(
+        state.history,
+        state.historyPointer
+      );
+
+      if (!entry) {
+        // No undo available
+        return state;
+      }
+
+      return {
+        ...state,
+        shapes: entry.shapes,
+        selected: entry.selected,
+        frameCounter: entry.frameCounter,
+        historyPointer: pointer,
+      };
+    }
+
+    case "REDO": {
+      const { entry, pointer } = historyRedo(
+        state.history,
+        state.historyPointer
+      );
+
+      if (!entry) {
+        // No redo available
+        return state;
+      }
+
+      return {
+        ...state,
+        shapes: entry.shapes,
+        selected: entry.selected,
+        frameCounter: entry.frameCounter,
+        historyPointer: pointer,
+      };
+    }
 
     default:
       return state;

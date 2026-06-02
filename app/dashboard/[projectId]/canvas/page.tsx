@@ -32,6 +32,8 @@ function CanvasContent() {
     shapes,
     activeTool,
     selectedShapes,
+    canUndo,
+    canRedo,
     onPointerDown,
     onPointerMove,
     onPointerUp,
@@ -46,6 +48,8 @@ function CanvasContent() {
     resetZoom,
     zoomToFit,
     getSelectionBox,
+    undo,
+    redo,
   } = useInfiniteCanvas();
 
   const { cursorClass } = useCanvasCursor();
@@ -53,15 +57,6 @@ function CanvasContent() {
   const draftShape = getDraftShape();
   const freeDrawPoints = getFreeDrawPoints();
   const selectionBox = getSelectionBox();
-
-  // TODO: Implement undo/redo functionality
-  const handleUndo = () => {
-    console.log("Undo action - to be implemented");
-  };
-
-  const handleRedo = () => {
-    console.log("Redo action - to be implemented");
-  };
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-accent">
@@ -81,10 +76,10 @@ function CanvasContent() {
 
       {/* History Pill */}
       <HistoryPill
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        canUndo={false}
-        canRedo={false}
+        onUndo={undo}
+        onRedo={redo}
+        canUndo={canUndo}
+        canRedo={canRedo}
       />
 
       {/* Canvas - Outer container for event handling */}

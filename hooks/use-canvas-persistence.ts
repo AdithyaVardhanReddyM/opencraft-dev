@@ -42,6 +42,8 @@ export function useCanvasPersistence(projectId: string) {
           tool: stored.tool,
           selected: stored.selected,
           frameCounter: stored.frameCounter,
+          history: stored.history,
+          historyPointer: stored.historyPointer,
         },
       });
     }
@@ -67,6 +69,8 @@ export function useCanvasPersistence(projectId: string) {
           tool: deserialized.tool,
           selected: deserialized.selected,
           frameCounter: deserialized.frameCounter,
+          history: deserialized.history,
+          historyPointer: deserialized.historyPointer,
         },
       });
     },

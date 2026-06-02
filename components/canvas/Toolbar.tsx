@@ -3,7 +3,6 @@
 import {
   MousePointer2,
   Hand,
-  Hash,
   Square,
   Circle,
   Pencil,
@@ -11,6 +10,7 @@ import {
   Eraser,
   ArrowRight,
   Minus,
+  Frame,
 } from "lucide-react";
 import type { Tool } from "@/types/canvas";
 import type { LucideIcon } from "lucide-react";
@@ -31,7 +31,7 @@ interface ToolConfig {
 const TOOLS: ToolConfig[] = [
   { id: "select", icon: MousePointer2, label: "Select", shortcut: "S" },
   { id: "hand", icon: Hand, label: "Hand", shortcut: "H" },
-  { id: "frame", icon: Hash, label: "Frame", shortcut: "F" },
+  { id: "frame", icon: Frame, label: "Frame", shortcut: "F" },
   { id: "rect", icon: Square, label: "Rectangle", shortcut: "R" },
   { id: "ellipse", icon: Circle, label: "Ellipse", shortcut: "C" },
   { id: "line", icon: Minus, label: "Line", shortcut: "L" },

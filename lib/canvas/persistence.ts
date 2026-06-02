@@ -3,7 +3,9 @@ import type {
   ShapesState,
   EntityState,
   Shape,
+  HistoryEntry,
 } from "@/types/canvas";
+import { HISTORY_CONFIG } from "./history-manager";
 
 export interface CanvasProjectData {
   viewport: {
@@ -14,6 +16,8 @@ export interface CanvasProjectData {
   tool: ShapesState["tool"];
   selected: ShapesState["selected"];
   frameCounter: number;
+  history?: HistoryEntry[];
+  historyPointer?: number;
   version: string;
   lastModified: number;
 }
@@ -25,6 +29,34 @@ export function serializeCanvasState(
   viewport: ViewportState,
   shapes: ShapesState
 ): CanvasProjectData {
+  // Limit persisted history to most recent entries
+  let persistedHistory: HistoryEntry[] | undefined;
+  let persistedPointer: number | undefined;
+
+  if (shapes.history.length > 0) {
+    const maxSize = HISTORY_CONFIG.PERSISTED_HISTORY_SIZE;
+    const pointer = shapes.historyPointer;
+
+    if (shapes.history.length <= maxSize) {
+      // History fits within limit, persist all
+      persistedHistory = shapes.history;
+      persistedPointer = pointer;
+    } else {
+      // Calculate slice range to preserve relevant history around current pointer
+      const halfSize = Math.floor(maxSize / 2);
+      let startIdx = Math.max(0, pointer - halfSize);
+      let endIdx = Math.min(shapes.history.length, startIdx + maxSize);
+
+      // Adjust if we're near the end
+      if (endIdx - startIdx < maxSize) {
+        startIdx = Math.max(0, endIdx - maxSize);
+      }
+
+      persistedHistory = shapes.history.slice(startIdx, endIdx);
+      persistedPointer = pointer - startIdx;
+    }
+  }
+
   return {
     viewport: {
       scale: viewport.scale,
@@ -37,6 +69,8 @@ export function serializeCanvasState(
     tool: shapes.tool,
     selected: shapes.selected,
     frameCounter: shapes.frameCounter,
+    history: persistedHistory,
+    historyPointer: persistedPointer,
     version: "1.0.0",
     lastModified: Date.now(),
   };
@@ -51,6 +85,8 @@ export function deserializeCanvasState(data: CanvasProjectData): {
   tool: ShapesState["tool"];
   selected: ShapesState["selected"];
   frameCounter: number;
+  history: HistoryEntry[];
+  historyPointer: number;
 } {
   return {
     viewport: {
@@ -64,6 +100,8 @@ export function deserializeCanvasState(data: CanvasProjectData): {
     tool: data.tool,
     selected: data.selected,
     frameCounter: data.frameCounter,
+    history: data.history || [],
+    historyPointer: data.historyPointer ?? -1,
   };
 }
 
@@ -87,6 +125,8 @@ export function importCanvasState(jsonString: string): {
   tool: ShapesState["tool"];
   selected: ShapesState["selected"];
   frameCounter: number;
+  history: HistoryEntry[];
+  historyPointer: number;
 } {
   const data = JSON.parse(jsonString) as CanvasProjectData;
   return deserializeCanvasState(data);
@@ -117,6 +157,8 @@ export function loadFromLocalStorage(projectId: string): {
   tool: ShapesState["tool"];
   selected: ShapesState["selected"];
   frameCounter: number;
+  history: HistoryEntry[];
+  historyPointer: number;
 } | null {
   try {
     const stored = localStorage.getItem(`canvas-project-${projectId}`);

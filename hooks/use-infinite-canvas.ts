@@ -16,6 +16,10 @@ import type {
 import { screenToWorld } from "@/lib/canvas/coordinate-utils";
 import { getShapeAtPoint } from "@/lib/canvas/hit-testing";
 import { getTextShapeDimensions } from "@/lib/canvas/text-utils";
+import {
+  canUndo as checkCanUndo,
+  canRedo as checkCanRedo,
+} from "@/lib/canvas/history-manager";
 
 const RAF_INTERVAL_MS = 8;
 
@@ -42,6 +46,10 @@ export interface UseInfiniteCanvasReturn {
   isSidebarOpen: boolean;
   hasSelectedText: boolean;
 
+  // History state
+  canUndo: boolean;
+  canRedo: boolean;
+
   // Event Handlers
   onPointerDown: React.PointerEventHandler<HTMLDivElement>;
   onPointerMove: React.PointerEventHandler<HTMLDivElement>;
@@ -60,6 +68,10 @@ export interface UseInfiniteCanvasReturn {
   resetZoom: () => void;
   zoomToFit: () => void;
   getSelectionBox: () => { start: Point; current: Point } | null;
+
+  // History actions
+  undo: () => void;
+  redo: () => void;
 }
 
 export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
@@ -123,6 +135,38 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
   const panRafRef = useRef<number | null>(null);
   const pendingPanPointRef = useRef<Point | null>(null);
 
+  const historyBatchRef = useRef({ active: false, mutated: false });
+
+  const startHistoryBatch = () => {
+    historyBatchRef.current = { active: true, mutated: false };
+  };
+
+  const markHistoryBatchMutated = useCallback(() => {
+    if (historyBatchRef.current.active) {
+      historyBatchRef.current.mutated = true;
+    }
+  }, []);
+
+  const commitHistoryBatch = useCallback(() => {
+    if (historyBatchRef.current.active && historyBatchRef.current.mutated) {
+      dispatchShapes({ type: "PUSH_HISTORY" });
+    }
+    if (historyBatchRef.current.active) {
+      historyBatchRef.current = { active: false, mutated: false };
+    }
+  }, [dispatchShapes]);
+
+  const dispatchInteractionUpdate = useCallback(
+    (action: Parameters<typeof dispatchShapes>[0]) => {
+      dispatchShapes({
+        ...action,
+        meta: { ...(action.meta ?? {}), skipHistory: true },
+      });
+      markHistoryBatchMutated();
+    },
+    [dispatchShapes, markHistoryBatchMutated]
+  );
+
   // Computed values
   const currentTool = shapesState.tool;
   const selectedShapes = shapesState.selected;
@@ -132,6 +176,10 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     const shape = shapesState.shapes.entities[id];
     return shape?.type === "text";
   });
+
+  // History state
+  const canUndo = checkCanUndo(shapesState.historyPointer);
+  const canRedo = checkCanRedo(shapesState.history, shapesState.historyPointer);
 
   // Auto-open sidebar for text selection
   useEffect(() => {
@@ -163,6 +211,33 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
           dispatchViewport({ type: "HAND_TOOL_ENABLE" });
         }
         return;
+      }
+
+      // Undo/Redo shortcuts
+      if (!isTypingElement) {
+        const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+        const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+        // Undo: Ctrl+Z / Cmd+Z
+        if (cmdOrCtrl && e.key.toLowerCase() === "z" && !e.shiftKey) {
+          e.preventDefault();
+          dispatchShapes({ type: "UNDO" });
+          return;
+        }
+
+        // Redo: Ctrl+Shift+Z / Cmd+Shift+Z
+        if (cmdOrCtrl && e.key.toLowerCase() === "z" && e.shiftKey) {
+          e.preventDefault();
+          dispatchShapes({ type: "REDO" });
+          return;
+        }
+
+        // Redo alternative: Ctrl+Y / Cmd+Y
+        if (cmdOrCtrl && e.key.toLowerCase() === "y") {
+          e.preventDefault();
+          dispatchShapes({ type: "REDO" });
+          return;
+        }
       }
 
       if (!isTypingElement && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -244,6 +319,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
           : undefined;
 
       isResizingRef.current = true;
+      startHistoryBatch();
       resizeDataRef.current = {
         shapeId,
         corner,
@@ -287,7 +363,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
             ? { startX: world.x, startY: world.y }
             : { endX: world.x, endY: world.y };
 
-        dispatchShapes({
+        dispatchInteractionUpdate({
           type: "UPDATE_SHAPE",
           payload: {
             id: shapeId,
@@ -405,7 +481,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         const nextLineHeight = Math.max(0.5, metrics.lineHeight);
         const nextLetterSpacing = metrics.letterSpacing * scale;
 
-        dispatchShapes({
+        dispatchInteractionUpdate({
           type: "UPDATE_SHAPE",
           payload: {
             id: shapeId,
@@ -429,7 +505,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         shape.type === "ellipse" ||
         shape.type === "generatedui"
       ) {
-        dispatchShapes({
+        dispatchInteractionUpdate({
           type: "UPDATE_SHAPE",
           payload: {
             id: shapeId,
@@ -465,7 +541,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
           y: newActualY + (point.y - actualMinY) * scaleY,
         }));
 
-        dispatchShapes({
+        dispatchInteractionUpdate({
           type: "UPDATE_SHAPE",
           payload: {
             id: shapeId,
@@ -526,7 +602,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
           newEndY = newActualY + (shape.endY - actualMinY) * scaleY;
         }
 
-        dispatchShapes({
+        dispatchInteractionUpdate({
           type: "UPDATE_SHAPE",
           payload: {
             id: shapeId,
@@ -544,6 +620,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     const handleResizeEnd = () => {
       isResizingRef.current = false;
       resizeDataRef.current = null;
+      commitHistoryBatch();
     };
 
     window.addEventListener("shape-resize-start", handleResizeStart);
@@ -556,7 +633,8 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
       window.removeEventListener("shape-resize-end", handleResizeEnd);
     };
   }, [
-    dispatchShapes,
+    dispatchInteractionUpdate,
+    commitHistoryBatch,
     shapesState.shapes.entities,
     viewport.translate,
     viewport.scale,
@@ -692,6 +770,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
 
             isMovingRef.current = true;
             moveStartRef.current = world;
+            startHistoryBatch();
 
             // Store initial positions for shapes that will be moved
             initialShapePositionsRef.current = {};
@@ -747,11 +826,15 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         } else if (currentTool === "eraser") {
           isErasingRef.current = true;
           erasedShapesRef.current.clear();
+          startHistoryBatch();
           const hitShape = getShapeAtPoint(world, shapesList, {
             allowBoundsFallback: false,
           });
           if (hitShape) {
-            dispatchShapes({ type: "REMOVE_SHAPE", payload: hitShape.id });
+            dispatchInteractionUpdate({
+              type: "REMOVE_SHAPE",
+              payload: hitShape.id,
+            });
             erasedShapesRef.current.add(hitShape.id);
           } else {
             blurActiveTextInput();
@@ -802,7 +885,10 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         allowBoundsFallback: false,
       });
       if (hitShape && !erasedShapesRef.current.has(hitShape.id)) {
-        dispatchShapes({ type: "REMOVE_SHAPE", payload: hitShape.id });
+        dispatchInteractionUpdate({
+          type: "REMOVE_SHAPE",
+          payload: hitShape.id,
+        });
         erasedShapesRef.current.add(hitShape.id);
       }
     }
@@ -830,7 +916,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
               typeof initialPos.x === "number" &&
               typeof initialPos.y === "number"
             ) {
-              dispatchShapes({
+              dispatchInteractionUpdate({
                 type: "UPDATE_SHAPE",
                 payload: {
                   id,
@@ -848,7 +934,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
                 x: point.x + deltaX,
                 y: point.y + deltaY,
               }));
-              dispatchShapes({
+              dispatchInteractionUpdate({
                 type: "UPDATE_SHAPE",
                 payload: {
                   id,
@@ -865,7 +951,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
               typeof initialPos.endX === "number" &&
               typeof initialPos.endY === "number"
             ) {
-              dispatchShapes({
+              dispatchInteractionUpdate({
                 type: "UPDATE_SHAPE",
                 payload: {
                   id,
@@ -962,6 +1048,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
 
   const onPointerUp: React.PointerEventHandler<HTMLDivElement> = (e) => {
     canvasRef.current?.releasePointerCapture?.(e.pointerId);
+    commitHistoryBatch();
 
     if (viewport.mode === "panning" || viewport.mode === "shiftPanning") {
       dispatchViewport({ type: "PAN_END" });
@@ -1108,6 +1195,14 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
   const getSelectionBox = (): { start: Point; current: Point } | null =>
     selectionBoxRef.current;
 
+  const undo = (): void => {
+    dispatchShapes({ type: "UNDO" });
+  };
+
+  const redo = (): void => {
+    dispatchShapes({ type: "REDO" });
+  };
+
   return {
     viewport,
     shapes: shapesList,
@@ -1116,6 +1211,8 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     selectedShapes,
     isSidebarOpen,
     hasSelectedText,
+    canUndo,
+    canRedo,
     onPointerDown,
     onPointerMove,
     onPointerUp,
@@ -1131,6 +1228,8 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     resetZoom,
     zoomToFit,
     getSelectionBox,
+    undo,
+    redo,
   };
 }
 
