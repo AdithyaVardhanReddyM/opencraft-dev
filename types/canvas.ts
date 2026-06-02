@@ -181,4 +181,11 @@ export interface ResizeData {
   corner: ResizeHandle;
   initialBounds: { x: number; y: number; w: number; h: number };
   startPoint: { x: number; y: number };
+  textMetrics?: {
+    width: number;
+    height: number;
+    fontSize: number;
+    lineHeight: number;
+    letterSpacing: number;
+  };
 }

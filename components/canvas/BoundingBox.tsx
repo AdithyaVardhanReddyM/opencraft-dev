@@ -7,6 +7,7 @@ interface BoundingBoxProps {
   shape: Shape;
   viewport: ViewportState;
   onResizeStart: (corner: ResizeHandle, bounds: Bounds) => void;
+  showEdgeHandles?: boolean;
 }
 
 interface Bounds {
@@ -75,6 +76,7 @@ export function BoundingBox({
   shape,
   viewport,
   onResizeStart,
+  showEdgeHandles = true,
 }: BoundingBoxProps) {
   const bounds = calculateBounds(shape);
   const handleSize = 8;
@@ -245,62 +247,66 @@ export function BoundingBox({
         onPointerDown={(e) => handlePointerDown("se", e)}
       />
 
-      {/* Edge handles */}
-      {/* North */}
-      <div
-        className="absolute pointer-events-auto cursor-n-resize"
-        style={{
-          left: `calc(50% - ${handleSize / 2}px)`,
-          top: -handleSize / 2,
-          width: handleSize,
-          height: handleSize,
-          backgroundColor: "white",
-          border: "2px solid hsl(24 95% 53%)",
-        }}
-        onPointerDown={(e) => handlePointerDown("n", e)}
-      />
+      {showEdgeHandles && (
+        <>
+          {/* Edge handles */}
+          {/* North */}
+          <div
+            className="absolute pointer-events-auto cursor-n-resize"
+            style={{
+              left: `calc(50% - ${handleSize / 2}px)`,
+              top: -handleSize / 2,
+              width: handleSize,
+              height: handleSize,
+              backgroundColor: "white",
+              border: "2px solid hsl(24 95% 53%)",
+            }}
+            onPointerDown={(e) => handlePointerDown("n", e)}
+          />
 
-      {/* South */}
-      <div
-        className="absolute pointer-events-auto cursor-s-resize"
-        style={{
-          left: `calc(50% - ${handleSize / 2}px)`,
-          bottom: -handleSize / 2,
-          width: handleSize,
-          height: handleSize,
-          backgroundColor: "white",
-          border: "2px solid hsl(24 95% 53%)",
-        }}
-        onPointerDown={(e) => handlePointerDown("s", e)}
-      />
+          {/* South */}
+          <div
+            className="absolute pointer-events-auto cursor-s-resize"
+            style={{
+              left: `calc(50% - ${handleSize / 2}px)`,
+              bottom: -handleSize / 2,
+              width: handleSize,
+              height: handleSize,
+              backgroundColor: "white",
+              border: "2px solid hsl(24 95% 53%)",
+            }}
+            onPointerDown={(e) => handlePointerDown("s", e)}
+          />
 
-      {/* East */}
-      <div
-        className="absolute pointer-events-auto cursor-e-resize"
-        style={{
-          right: -handleSize / 2,
-          top: `calc(50% - ${handleSize / 2}px)`,
-          width: handleSize,
-          height: handleSize,
-          backgroundColor: "white",
-          border: "2px solid hsl(24 95% 53%)",
-        }}
-        onPointerDown={(e) => handlePointerDown("e", e)}
-      />
+          {/* East */}
+          <div
+            className="absolute pointer-events-auto cursor-e-resize"
+            style={{
+              right: -handleSize / 2,
+              top: `calc(50% - ${handleSize / 2}px)`,
+              width: handleSize,
+              height: handleSize,
+              backgroundColor: "white",
+              border: "2px solid hsl(24 95% 53%)",
+            }}
+            onPointerDown={(e) => handlePointerDown("e", e)}
+          />
 
-      {/* West */}
-      <div
-        className="absolute pointer-events-auto cursor-w-resize"
-        style={{
-          left: -handleSize / 2,
-          top: `calc(50% - ${handleSize / 2}px)`,
-          width: handleSize,
-          height: handleSize,
-          backgroundColor: "white",
-          border: "2px solid hsl(24 95% 53%)",
-        }}
-        onPointerDown={(e) => handlePointerDown("w", e)}
-      />
+          {/* West */}
+          <div
+            className="absolute pointer-events-auto cursor-w-resize"
+            style={{
+              left: -handleSize / 2,
+              top: `calc(50% - ${handleSize / 2}px)`,
+              width: handleSize,
+              height: handleSize,
+              backgroundColor: "white",
+              border: "2px solid hsl(24 95% 53%)",
+            }}
+            onPointerDown={(e) => handlePointerDown("w", e)}
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -191,23 +191,20 @@ export function shapesReducer(
 
     case "REMOVE_SHAPE": {
       const id = action.payload;
-      const shape = state.shapes.entities[id];
-
-      // Decrement frame counter if removing a frame
-      const frameCounter =
-        shape?.type === "frame"
-          ? Math.max(0, state.frameCounter - 1)
-          : state.frameCounter;
 
       // Remove from selection if selected
       const newSelected = { ...state.selected };
       delete newSelected[id];
 
+      const removed = removeEntity(state.shapes, id);
+      const { shapes: renumberedShapes, frameCount } =
+        renumberFramesState(removed);
+
       return {
         ...state,
-        shapes: removeEntity(state.shapes, id),
+        shapes: renumberedShapes,
         selected: newSelected,
-        frameCounter,
+        frameCounter: frameCount,
       };
     }
 
@@ -260,11 +257,16 @@ export function shapesReducer(
         return state;
       }
 
+      const removed = removeMany(state.shapes, idsToDelete);
+      const { shapes: renumberedShapes, frameCount } =
+        renumberFramesState(removed);
+
       return {
         ...state,
-        shapes: removeMany(state.shapes, idsToDelete),
+        shapes: renumberedShapes,
         selected: {},
         editingTextId: null,
+        frameCounter: frameCount,
       };
     }
 
@@ -287,4 +289,31 @@ export function shapesReducer(
     default:
       return state;
   }
+}
+
+function renumberFramesState(shapes: EntityState<Shape>): {
+  shapes: EntityState<Shape>;
+  frameCount: number;
+} {
+  let frameCount = 0;
+  const entities: EntityState<Shape>["entities"] = { ...shapes.entities };
+
+  shapes.ids.forEach((id) => {
+    const shape = entities[id];
+    if (shape?.type === "frame") {
+      frameCount += 1;
+      entities[id] = {
+        ...shape,
+        frameNumber: frameCount,
+      };
+    }
+  });
+
+  return {
+    shapes: {
+      ids: shapes.ids,
+      entities,
+    },
+    frameCount,
+  };
 }

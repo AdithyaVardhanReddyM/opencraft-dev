@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { Tool } from "@/types/canvas";
 import type { LucideIcon } from "lucide-react";
+import { Kbd } from "@/components/ui/kbd";
 
 interface ToolbarProps {
   currentTool: Tool;
@@ -42,7 +43,7 @@ const TOOLS: ToolConfig[] = [
 
 export function Toolbar({ currentTool, onToolSelect }: ToolbarProps) {
   return (
-    <div className="pointer-events-auto fixed left-1/2 top-4 z-50 -translate-x-1/2">
+    <div className="pointer-events-auto fixed left-1/2 top-4 z-50 -translate-x-1/2 space-y-1 text-center">
       <div className="flex gap-1 rounded-lg border border-border bg-card/95 p-2 shadow-lg backdrop-blur-sm">
         {TOOLS.map((tool) => {
           const Icon = tool.icon;
@@ -73,6 +74,10 @@ export function Toolbar({ currentTool, onToolSelect }: ToolbarProps) {
           );
         })}
       </div>
+      <p className="text-[10px] text-muted-foreground/80">
+        Glide the canvas with <Kbd className="bg-white/8">Scroll</Kbd> drag,
+        hold <Kbd className="bg-white/8">Space</Kbd>, or pick the hand tool.
+      </p>
     </div>
   );
 }

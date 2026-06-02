@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useCanvasContext } from "@/contexts/CanvasContext";
 import type {
   Point,
+  Rect,
   Tool,
   ViewportState,
   Shape,
@@ -57,6 +58,7 @@ export interface UseInfiniteCanvasReturn {
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
+  zoomToFit: () => void;
   getSelectionBox: () => { start: Point; current: Point } | null;
 }
 
@@ -163,7 +165,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         return;
       }
 
-      if (!isTypingElement) {
+      if (!isTypingElement && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const key = e.key.toLowerCase();
         const mappedTool = TOOL_HOTKEYS[key];
         if (mappedTool) {
@@ -226,6 +228,21 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     const handleResizeStart = (e: Event) => {
       const customEvent = e as CustomEvent;
       const { shapeId, corner, bounds } = customEvent.detail;
+      const shape = shapesState.shapes.entities[shapeId];
+      const textMetrics =
+        shape?.type === "text"
+          ? (() => {
+              const dims = getTextShapeDimensions(shape);
+              return {
+                width: dims.width,
+                height: dims.height,
+                fontSize: shape.fontSize,
+                lineHeight: shape.lineHeight,
+                letterSpacing: shape.letterSpacing,
+              };
+            })()
+          : undefined;
+
       isResizingRef.current = true;
       resizeDataRef.current = {
         shapeId,
@@ -235,6 +252,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
           x: customEvent.detail.clientX || 0,
           y: customEvent.detail.clientY || 0,
         },
+        textMetrics,
       };
     };
 
@@ -334,6 +352,75 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         case "e":
           newBounds.w = Math.max(10, world.x - initialBounds.x);
           break;
+      }
+
+      if (shape.type === "text") {
+        const metrics = resizeDataRef.current.textMetrics;
+        const isCornerHandle =
+          handle === "nw" ||
+          handle === "ne" ||
+          handle === "sw" ||
+          handle === "se";
+        if (!metrics || !isCornerHandle) return;
+
+        const padding = 4;
+        const padded = padding * 2;
+        const contentInitialWidth = Math.max(initialBounds.w - padded, 1);
+        const contentInitialHeight = Math.max(initialBounds.h - padded, 1);
+        const contentNewWidth = Math.max(newBounds.w - padded, 1);
+        const contentNewHeight = Math.max(newBounds.h - padded, 1);
+
+        const initialDiagonal = Math.max(
+          Math.hypot(contentInitialWidth, contentInitialHeight),
+          1
+        );
+        const newDiagonal = Math.hypot(contentNewWidth, contentNewHeight);
+        let scale = newDiagonal / initialDiagonal;
+        scale = Math.min(Math.max(scale, 0.1), 10);
+
+        const anchorX =
+          handle === "nw" || handle === "sw"
+            ? initialBounds.x + initialBounds.w
+            : initialBounds.x;
+        const anchorY =
+          handle === "nw" || handle === "ne"
+            ? initialBounds.y + initialBounds.h
+            : initialBounds.y;
+
+        const scaledContentWidth = metrics.width * scale;
+        const scaledContentHeight = metrics.height * scale;
+        const scaledBoundsWidth = scaledContentWidth + padded;
+        const scaledBoundsHeight = scaledContentHeight + padded;
+
+        const nextBoundsX =
+          handle === "nw" || handle === "sw"
+            ? anchorX - scaledBoundsWidth
+            : anchorX;
+        const nextBoundsY =
+          handle === "nw" || handle === "ne"
+            ? anchorY - scaledBoundsHeight
+            : anchorY;
+
+        const nextFontSize = Math.max(6, metrics.fontSize * scale);
+        const nextLineHeight = Math.max(0.5, metrics.lineHeight);
+        const nextLetterSpacing = metrics.letterSpacing * scale;
+
+        dispatchShapes({
+          type: "UPDATE_SHAPE",
+          payload: {
+            id: shapeId,
+            patch: {
+              x: nextBoundsX + padding,
+              y: nextBoundsY + padding,
+              fontSize: nextFontSize,
+              lineHeight: nextLineHeight,
+              letterSpacing: nextLetterSpacing,
+              w: scaledContentWidth,
+              h: scaledContentHeight,
+            },
+          },
+        });
+        return;
       }
 
       if (
@@ -1002,6 +1089,22 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     }
   };
 
+  const zoomToFit = (): void => {
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+    const bounds = getShapesBoundingBox(shapesList);
+    if (!bounds) return;
+    const rect = canvasEl.getBoundingClientRect();
+    dispatchViewport({
+      type: "ZOOM_TO_FIT",
+      payload: {
+        bounds,
+        viewportPx: { width: rect.width, height: rect.height },
+        padding: 120,
+      },
+    });
+  };
+
   const getSelectionBox = (): { start: Point; current: Point } | null =>
     selectionBoxRef.current;
 
@@ -1026,6 +1129,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     zoomIn,
     zoomOut,
     resetZoom,
+    zoomToFit,
     getSelectionBox,
   };
 }
@@ -1092,4 +1196,91 @@ function intersectsSelectionBox(
     shapeMaxY < boxMinY ||
     shapeMinY > boxMaxY
   );
+}
+
+function getShapesBoundingBox(shapes: Shape[]): Rect | null {
+  if (shapes.length === 0) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const shape of shapes) {
+    const bounds = getShapeBounds(shape);
+    if (!bounds) continue;
+    minX = Math.min(minX, bounds.x);
+    minY = Math.min(minY, bounds.y);
+    maxX = Math.max(maxX, bounds.x + bounds.width);
+    maxY = Math.max(maxY, bounds.y + bounds.height);
+  }
+
+  if (
+    !isFinite(minX) ||
+    !isFinite(minY) ||
+    !isFinite(maxX) ||
+    !isFinite(maxY)
+  ) {
+    return null;
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY),
+  };
+}
+
+function getShapeBounds(shape: Shape): Rect | null {
+  switch (shape.type) {
+    case "frame":
+    case "rect":
+    case "ellipse":
+    case "generatedui":
+      return {
+        x: shape.x,
+        y: shape.y,
+        width: Math.max(1, shape.w),
+        height: Math.max(1, shape.h),
+      };
+    case "text": {
+      const { width, height } = getTextShapeDimensions(shape);
+      return {
+        x: shape.x,
+        y: shape.y,
+        width: Math.max(1, width),
+        height: Math.max(1, height),
+      };
+    }
+    case "freedraw": {
+      if (shape.points.length === 0) return null;
+      const xs = shape.points.map((p) => p.x);
+      const ys = shape.points.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      const maxX = Math.max(...xs);
+      const maxY = Math.max(...ys);
+      return {
+        x: minX,
+        y: minY,
+        width: Math.max(1, maxX - minX),
+        height: Math.max(1, maxY - minY),
+      };
+    }
+    case "arrow":
+    case "line": {
+      const minX = Math.min(shape.startX, shape.endX);
+      const minY = Math.min(shape.startY, shape.endY);
+      const maxX = Math.max(shape.startX, shape.endX);
+      const maxY = Math.max(shape.startY, shape.endY);
+      return {
+        x: minX,
+        y: minY,
+        width: Math.max(1, maxX - minX),
+        height: Math.max(1, maxY - minY),
+      };
+    }
+    default:
+      return null;
+  }
 }

@@ -17,7 +17,6 @@ import { Line } from "@/components/canvas/shapes/Line";
 import { Arrow } from "@/components/canvas/shapes/Arrow";
 import { Stroke } from "@/components/canvas/shapes/Stroke";
 import { Text } from "@/components/canvas/shapes/Text";
-import { getTextShapeDimensions } from "@/lib/canvas/text-utils";
 
 // Import preview components
 import { FramePreview } from "@/components/canvas/shapes/FramePreview";
@@ -45,6 +44,7 @@ function CanvasContent() {
     zoomIn,
     zoomOut,
     resetZoom,
+    zoomToFit,
     getSelectionBox,
   } = useInfiniteCanvas();
 
@@ -74,6 +74,7 @@ function CanvasContent() {
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
         onReset={resetZoom}
+        onZoomToFit={zoomToFit}
         minScale={viewport.minScale}
         maxScale={viewport.maxScale}
       />
@@ -210,34 +211,12 @@ function CanvasContent() {
             const shape = shapes.find((s) => s.id === id);
             if (!shape) return null;
 
-            // For text, we might want a different kind of selection indicator
-            // or just the standard bounding box without resize handles if resizing isn't supported yet
-            if (shape.type === "text") {
-              const { width, height } = getTextShapeDimensions(shape);
-              return (
-                <div
-                  key={`bbox-${id}`}
-                  className="absolute pointer-events-none"
-                  style={{
-                    left: shape.x - 4,
-                    top: shape.y - 4,
-                    width: width + 8,
-                    height: height + 8,
-                  }}
-                >
-                  <div
-                    className="absolute inset-0 border-2 pointer-events-none"
-                    style={{ borderColor: "hsl(24 95% 53%)" }}
-                  />
-                </div>
-              );
-            }
-
             return (
               <BoundingBox
                 key={`bbox-${id}`}
                 shape={shape}
                 viewport={viewport}
+                showEdgeHandles={shape.type !== "text"}
                 onResizeStart={(corner, bounds) => {
                   window.dispatchEvent(
                     new CustomEvent("shape-resize-start", {

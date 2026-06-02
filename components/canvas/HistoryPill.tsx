@@ -16,8 +16,8 @@ export function HistoryPill({
   canRedo = false,
 }: HistoryPillProps) {
   return (
-    <div className="pointer-events-auto fixed bottom-4 left-[180px] z-50">
-      <div className="flex items-center gap-0.5 rounded-full border border-border bg-card/95 p-1 shadow-lg backdrop-blur-sm">
+    <div className="pointer-events-auto fixed bottom-4 left-[220px] z-50">
+      <div className="flex items-center rounded-full border border-border bg-card/95 p-1 shadow-lg backdrop-blur-sm">
         <button
           onClick={onUndo}
           disabled={!canUndo}
