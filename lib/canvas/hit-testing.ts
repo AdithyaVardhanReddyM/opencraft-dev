@@ -286,18 +286,34 @@ export function getShapeAtPoint(
   // Separate shapes that actually hit vs just have bounds
   const hittingShapes = candidateShapes.filter((c) => c.hits);
   const boundsOnlyShapes = candidateShapes.filter((c) => !c.hits);
-
-  // If we have shapes that actually hit, return the smallest one
-  if (hittingShapes.length > 0) {
-    return hittingShapes.reduce((smallest, current) =>
+  const pickSmallest = (
+    list: Array<{ shape: Shape; hits: boolean; area: number }>
+  ) =>
+    list.reduce((smallest, current) =>
       current.area < smallest.area ? current : smallest
     ).shape;
+
+  const hittingNonFrames = hittingShapes.filter(
+    (candidate) => candidate.shape.type !== "frame"
+  );
+  if (hittingNonFrames.length > 0) {
+    return pickSmallest(hittingNonFrames);
+  }
+
+  if (hittingShapes.length > 0) {
+    if (allowBoundsFallback) {
+      const boundsNonFrames = boundsOnlyShapes.filter(
+        (candidate) => candidate.shape.type !== "frame"
+      );
+      if (boundsNonFrames.length > 0) {
+        return pickSmallest(boundsNonFrames);
+      }
+    }
+    return pickSmallest(hittingShapes);
   }
 
   if (allowBoundsFallback && boundsOnlyShapes.length > 0) {
-    return boundsOnlyShapes.reduce((smallest, current) =>
-      current.area < smallest.area ? current : smallest
-    ).shape;
+    return pickSmallest(boundsOnlyShapes);
   }
 
   return null;

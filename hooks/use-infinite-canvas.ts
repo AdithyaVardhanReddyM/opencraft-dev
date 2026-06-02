@@ -135,6 +135,11 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
   const panRafRef = useRef<number | null>(null);
   const pendingPanPointRef = useRef<Point | null>(null);
 
+  // Clipboard for copy/paste
+  const clipboardRef = useRef<Shape[]>([]);
+  // Track mouse position for paste location
+  const mouseWorldPosRef = useRef<Point>({ x: 0, y: 0 });
+
   const historyBatchRef = useRef({ active: false, mutated: false });
 
   const startHistoryBatch = () => {
@@ -213,7 +218,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         return;
       }
 
-      // Undo/Redo shortcuts
+      // Undo/Redo/Copy/Paste shortcuts
       if (!isTypingElement) {
         const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
         const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
@@ -236,6 +241,34 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         if (cmdOrCtrl && e.key.toLowerCase() === "y") {
           e.preventDefault();
           dispatchShapes({ type: "REDO" });
+          return;
+        }
+
+        // Copy: Ctrl+C / Cmd+C
+        if (cmdOrCtrl && e.key.toLowerCase() === "c") {
+          const selectedIds = Object.keys(selectedShapes);
+          if (selectedIds.length > 0) {
+            e.preventDefault();
+            const shapesToCopy = selectedIds
+              .map((id) => shapesState.shapes.entities[id])
+              .filter((s): s is Shape => s !== undefined);
+            clipboardRef.current = shapesToCopy;
+          }
+          return;
+        }
+
+        // Paste: Ctrl+V / Cmd+V
+        if (cmdOrCtrl && e.key.toLowerCase() === "v") {
+          if (clipboardRef.current.length > 0) {
+            e.preventDefault();
+            dispatchShapes({
+              type: "PASTE_SHAPES",
+              payload: {
+                shapes: clipboardRef.current,
+                pastePosition: mouseWorldPosRef.current,
+              },
+            });
+          }
           return;
         }
       }
@@ -874,6 +907,9 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
   const onPointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
     const local = getLocalPointFromPtr(e.nativeEvent);
     const world = screenToWorld(local, viewport.translate, viewport.scale);
+
+    // Track mouse position for paste location
+    mouseWorldPosRef.current = world;
 
     if (viewport.mode === "panning" || viewport.mode === "shiftPanning") {
       schedulePanMove(local);

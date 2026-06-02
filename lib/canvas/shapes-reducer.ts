@@ -96,7 +96,11 @@ type ShapesActionCore =
       };
     }
   | { type: "UNDO" }
-  | { type: "REDO" };
+  | { type: "REDO" }
+  | {
+      type: "PASTE_SHAPES";
+      payload: { shapes: Shape[]; pastePosition: Point };
+    };
 
 export type ShapesAction = ShapesActionCore & ShapesActionMeta;
 
@@ -413,6 +417,54 @@ export function shapesReducer(
       };
     }
 
+    case "PASTE_SHAPES": {
+      const { shapes: shapesToPaste, pastePosition } = action.payload;
+      if (shapesToPaste.length === 0) return state;
+
+      // Calculate bounding box of shapes to paste
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
+      for (const shape of shapesToPaste) {
+        const bounds = getFullShapeBounds(shape);
+        if (bounds) {
+          minX = Math.min(minX, bounds.x);
+          minY = Math.min(minY, bounds.y);
+          maxX = Math.max(maxX, bounds.x + bounds.w);
+          maxY = Math.max(maxY, bounds.y + bounds.h);
+        }
+      }
+
+      // Calculate center of the selection
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+
+      // Calculate offset to center shapes at paste position
+      const offsetX = pastePosition.x - centerX;
+      const offsetY = pastePosition.y - centerY;
+
+      let newShapes = state.shapes;
+      let frameCounter = state.frameCounter;
+      const newSelected: Record<string, true> = {};
+
+      for (const shape of shapesToPaste) {
+        const cloned = cloneShapeWithOffset(shape, offsetX, offsetY, () => {
+          frameCounter += 1;
+          return frameCounter;
+        });
+        newShapes = addEntity(newShapes, cloned);
+        newSelected[cloned.id] = true;
+      }
+
+      return applyStateChange(state, action, () => ({
+        ...state,
+        shapes: newShapes,
+        selected: newSelected,
+        frameCounter,
+      }));
+    }
+
     default:
       return state;
   }
@@ -443,4 +495,116 @@ function renumberFramesState(shapes: EntityState<Shape>): {
     },
     frameCount,
   };
+}
+
+// Helper to get full shape bounds (position + dimensions) for paste positioning
+function getFullShapeBounds(
+  shape: Shape
+): { x: number; y: number; w: number; h: number } | null {
+  switch (shape.type) {
+    case "frame":
+    case "rect":
+    case "ellipse":
+    case "generatedui":
+      return { x: shape.x, y: shape.y, w: shape.w, h: shape.h };
+    case "text":
+      return { x: shape.x, y: shape.y, w: shape.w ?? 100, h: shape.h ?? 20 };
+    case "freedraw": {
+      if (shape.points.length === 0) return null;
+      const xs = shape.points.map((p) => p.x);
+      const ys = shape.points.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      const maxX = Math.max(...xs);
+      const maxY = Math.max(...ys);
+      return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+    }
+    case "arrow":
+    case "line": {
+      const minX = Math.min(shape.startX, shape.endX);
+      const minY = Math.min(shape.startY, shape.endY);
+      const maxX = Math.max(shape.startX, shape.endX);
+      const maxY = Math.max(shape.startY, shape.endY);
+      return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+    }
+    default:
+      return null;
+  }
+}
+
+// Clone a shape with new ID and offset position
+function cloneShapeWithOffset(
+  shape: Shape,
+  offsetX: number,
+  offsetY: number,
+  getNextFrameNumber: () => number
+): Shape {
+  const { nanoid } = require("nanoid");
+  const newId = nanoid();
+
+  switch (shape.type) {
+    case "frame":
+      return {
+        ...shape,
+        id: newId,
+        x: shape.x + offsetX,
+        y: shape.y + offsetY,
+        frameNumber: getNextFrameNumber(),
+      };
+    case "rect":
+      return {
+        ...shape,
+        id: newId,
+        x: shape.x + offsetX,
+        y: shape.y + offsetY,
+      };
+    case "ellipse":
+      return {
+        ...shape,
+        id: newId,
+        x: shape.x + offsetX,
+        y: shape.y + offsetY,
+      };
+    case "text":
+      return {
+        ...shape,
+        id: newId,
+        x: shape.x + offsetX,
+        y: shape.y + offsetY,
+      };
+    case "generatedui":
+      return {
+        ...shape,
+        id: newId,
+        x: shape.x + offsetX,
+        y: shape.y + offsetY,
+      };
+    case "freedraw":
+      return {
+        ...shape,
+        id: newId,
+        points: shape.points.map((p) => ({
+          x: p.x + offsetX,
+          y: p.y + offsetY,
+        })),
+      };
+    case "arrow":
+      return {
+        ...shape,
+        id: newId,
+        startX: shape.startX + offsetX,
+        startY: shape.startY + offsetY,
+        endX: shape.endX + offsetX,
+        endY: shape.endY + offsetY,
+      };
+    case "line":
+      return {
+        ...shape,
+        id: newId,
+        startX: shape.startX + offsetX,
+        startY: shape.startY + offsetY,
+        endX: shape.endX + offsetX,
+        endY: shape.endY + offsetY,
+      };
+  }
 }
