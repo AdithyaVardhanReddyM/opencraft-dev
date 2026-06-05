@@ -69,7 +69,9 @@ The canvas uses two separate reducers for clean separation of concerns:
 - `REMOVE_SHAPE`: Delete single shape
 - `SELECT_SHAPE`, `DESELECT_SHAPE`, `CLEAR_SELECTION`, `SELECT_ALL`: Selection management
 - `DELETE_SELECTED`: Delete all selected shapes
+- `PASTE_SHAPES`: Paste copied shapes at cursor position (centers selection at paste point)
 - `LOAD_PROJECT`: Restore entire canvas state
+- `UNDO`, `REDO`: History navigation
 
 ### 4. Main Hook (`hooks/use-infinite-canvas.ts`)
 
@@ -93,7 +95,9 @@ The `useInfiniteCanvas` hook provides the complete canvas interaction API:
 - Refs for non-reactive state (no re-renders during interactions)
 - Multi-shape selection and movement with initial position tracking
 - Shape resizing via custom DOM events (shape-resize-start, shape-resize-move, shape-resize-end)
-- Keyboard shortcuts (Space for hand tool, Delete/Backspace, tool hotkeys)
+- Copy/paste functionality with center-based positioning
+- Clipboard tracking for multi-paste support
+- Keyboard shortcuts (Space for hand tool, Delete/Backspace, tool hotkeys, Ctrl/Cmd+C/V/Z)
 - Tool hotkeys: S (select), H (hand), F (frame), R (rect), C (ellipse), L (line), A (arrow), D (freedraw), T (text), E (eraser)
 - Button click detection (prevents canvas interaction on UI buttons)
 - Text input auto-blur on empty space click
@@ -101,6 +105,7 @@ The `useInfiniteCanvas` hook provides the complete canvas interaction API:
 - Double-click to edit text shapes
 - Selection box for multi-select (drag on empty space)
 - Hand tool override with Space key (temporary pan mode)
+- Undo/redo with history tracking
 
 ### 5. Utilities
 
@@ -195,7 +200,7 @@ Each shape type has dedicated components:
 
 - `Toolbar.tsx`: Tool selection with all drawing tools
 - `ZoomBar.tsx`: Zoom controls (in/out/reset) and percentage display
-- `HistoryPill.tsx`: Undo/redo controls (TODO: implement functionality)
+- `HistoryPill.tsx`: Undo/redo controls with keyboard shortcuts
 - `BoundingBox.tsx`: Selection bounds with 8-point resize handles (corners + edges)
 - `SelectionBox.tsx`: Multi-select rectangle (drag on empty space)
 
@@ -307,6 +312,10 @@ Each shape type has dedicated components:
 
 - **Space**: Enable hand tool (temporary pan with left mouse, shows grab cursor)
 - **Delete/Backspace**: Delete selected shapes (disabled in text inputs)
+- **Ctrl/Cmd+Z**: Undo last action
+- **Ctrl/Cmd+Shift+Z** or **Ctrl/Cmd+Y**: Redo last undone action
+- **Ctrl/Cmd+C**: Copy selected shapes to clipboard
+- **Ctrl/Cmd+V**: Paste shapes from clipboard (centers at cursor position)
 - **S**: Select tool
 - **H**: Hand tool
 - **F**: Frame tool
@@ -322,10 +331,6 @@ Each shape type has dedicated components:
 
 - **Escape**: Clear selection
 - **Ctrl/Cmd+A**: Select all
-- **Ctrl/Cmd+Z**: Undo
-- **Ctrl/Cmd+Shift+Z**: Redo
-- **Ctrl/Cmd+C**: Copy
-- **Ctrl/Cmd+V**: Paste
 - **Ctrl/Cmd+D**: Duplicate
 
 ## Performance Optimizations
@@ -386,16 +391,17 @@ TOOL_HOTKEYS = {
 
 ## Future Enhancements
 
-- [ ] Undo/Redo with history tracking
+- [x] Undo/Redo with history tracking
+- [x] Copy/paste functionality
 - [ ] Collaborative editing via WebSocket
 - [ ] Touch gesture support (pinch-to-zoom)
 - [ ] Grid and shape snapping
 - [ ] Layer management (z-index)
 - [ ] Shape grouping
-- [ ] Copy/paste functionality
+- [ ] Duplicate functionality (Ctrl/Cmd+D)
 - [ ] Export to image/SVG
 - [ ] Shape alignment tools
-- [ ] Keyboard shortcuts (Escape, Ctrl+A, etc.)
+- [ ] Additional keyboard shortcuts (Escape, Ctrl+A)
 - [ ] Shape locking
 - [ ] Guides and rulers
 
@@ -468,6 +474,17 @@ pnpm dev
 - Calculates shape bounds for all shape types
 - Uses AABB (Axis-Aligned Bounding Box) intersection test
 - Supports multi-select by dragging on empty space
+
+### Copy/Paste System (`lib/canvas/shapes-reducer.ts`)
+
+- `PASTE_SHAPES` action: Clones shapes with new IDs and offsets
+- `cloneShapeWithOffset`: Creates deep copies of shapes with position offset
+- `getFullShapeBounds`: Calculates bounding box including dimensions for all shape types
+- Center-based positioning: Calculates center of copied selection and pastes at cursor
+- Frame counter increments for pasted frames
+- Clipboard stored in ref for persistence across multiple pastes
+- Mouse position tracked in world coordinates for accurate paste location
+- Supports pasting all shape types: frames, rects, ellipses, freedraw, arrows, lines, text, generatedui
 
 ## Implementation Details
 

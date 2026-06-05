@@ -39,8 +39,17 @@ export function CanvasProvider({ children }: { children: React.ReactNode }) {
     initialShapesState
   );
 
-  // Compute shapes list from entity state
+  // Compute shapes list from entity state with safety checks
   const shapesList = useMemo(() => {
+    // Safety check for invalid shapes state
+    if (
+      !shapes.shapes ||
+      !Array.isArray(shapes.shapes.ids) ||
+      !shapes.shapes.entities
+    ) {
+      return [];
+    }
+
     return shapes.shapes.ids
       .map((id) => shapes.shapes.entities[id])
       .filter((shape): shape is Shape => Boolean(shape));

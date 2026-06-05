@@ -18,7 +18,7 @@ export const FramePreview = ({
         top: y,
         width: w,
         height: h,
-        borderRadius: "12px",
+        borderRadius: "10px",
       }}
     />
   );

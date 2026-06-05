@@ -30,7 +30,12 @@ export function HistoryPill({
 
   return (
     <div className="pointer-events-auto fixed bottom-4 left-[220px] z-50">
-      <div className="flex items-center rounded-full border border-border bg-card/95 p-1 shadow-lg backdrop-blur-sm">
+      <div
+        className="flex items-center rounded-full border border-border bg-card/90 p-1 backdrop-blur-2xl saturate-150"
+        style={{
+          boxShadow: "0 4px 16px -4px oklch(0 0 0 / 0.4)",
+        }}
+      >
         <TooltipProvider delayDuration={300}>
           <Tooltip>
             <TooltipTrigger asChild>

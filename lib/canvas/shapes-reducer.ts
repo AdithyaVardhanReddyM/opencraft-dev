@@ -365,17 +365,35 @@ export function shapesReducer(
         editingTextId: action.payload,
       };
 
-    case "LOAD_PROJECT":
+    case "LOAD_PROJECT": {
+      // Ensure shapes has valid EntityState structure
+      const loadedShapes = action.payload.shapes;
+      const validShapes: EntityState<Shape> =
+        loadedShapes &&
+        Array.isArray(loadedShapes.ids) &&
+        typeof loadedShapes.entities === "object"
+          ? loadedShapes
+          : emptyShapesState;
+
+      // Ensure selected is a valid object
+      const validSelected =
+        action.payload.selected &&
+        typeof action.payload.selected === "object" &&
+        !Array.isArray(action.payload.selected)
+          ? action.payload.selected
+          : {};
+
       return {
         ...state,
-        shapes: action.payload.shapes,
-        tool: action.payload.tool,
-        selected: action.payload.selected,
-        frameCounter: action.payload.frameCounter,
+        shapes: validShapes,
+        tool: action.payload.tool || "select",
+        selected: validSelected,
+        frameCounter: action.payload.frameCounter || 0,
         editingTextId: null,
         history: action.payload.history || [],
         historyPointer: action.payload.historyPointer ?? -1,
       };
+    }
 
     case "UNDO": {
       const { entry, pointer } = historyUndo(

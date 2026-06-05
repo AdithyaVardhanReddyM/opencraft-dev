@@ -42,7 +42,12 @@ export function ZoomBar({
           <span>+</span>
           <Kbd className="bg-white/8">Scroll</Kbd>
         </p>
-        <div className="flex items-center gap-0.5 rounded-full border border-border bg-card/95 p-1 shadow-lg backdrop-blur-sm">
+        <div
+          className="flex items-center gap-0.5 rounded-full border border-border bg-card/90 p-1 backdrop-blur-2xl saturate-150"
+          style={{
+            boxShadow: "0 4px 16px -4px oklch(0 0 0 / 0.4)",
+          }}
+        >
           <button
             onClick={onZoomOut}
             disabled={isAtMin}

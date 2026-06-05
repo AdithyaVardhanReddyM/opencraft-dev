@@ -1,13 +1,18 @@
 "use client";
 
+import { use } from "react";
+import { Loader2 } from "lucide-react";
 import { CanvasProvider } from "@/contexts/CanvasContext";
+import { BackButton } from "@/components/canvas/BackButton";
 import { useInfiniteCanvas } from "@/hooks/use-infinite-canvas";
 import { useCanvasCursor } from "@/hooks/use-canvas-cursor";
+import { useAutosave } from "@/hooks/use-autosave";
 import { Toolbar } from "@/components/canvas/Toolbar";
 import { ZoomBar } from "@/components/canvas/ZoomBar";
 import { HistoryPill } from "@/components/canvas/HistoryPill";
 import { BoundingBox } from "@/components/canvas/BoundingBox";
 import { SelectionBox } from "@/components/canvas/SelectionBox";
+import { SaveIndicator } from "@/components/canvas/SaveIndicator";
 
 // Import shape components
 import { Frame } from "@/components/canvas/shapes/Frame";
@@ -26,7 +31,9 @@ import { LinePreview } from "@/components/canvas/shapes/LinePreview";
 import { ArrowPreview } from "@/components/canvas/shapes/ArrowPreview";
 import { FreeDrawStrokePreview } from "@/components/canvas/shapes/StrokePreview";
 
-function CanvasContent() {
+function CanvasContent({ projectId }: { projectId: string }) {
+  // Autosave hook
+  const { saveStatus, lastSavedAt, isLoading } = useAutosave(projectId);
   const {
     viewport,
     shapes,
@@ -58,6 +65,20 @@ function CanvasContent() {
   const freeDrawPoints = getFreeDrawPoints();
   const selectionBox = getSelectionBox();
 
+  // Show loading state while initial data is being fetched
+  if (isLoading) {
+    return (
+      <div className="relative h-screen w-full overflow-hidden bg-accent flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            Loading canvas...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative h-screen w-full overflow-hidden bg-accent">
       {/* Toolbar */}
@@ -81,6 +102,16 @@ function CanvasContent() {
         canUndo={canUndo}
         canRedo={canRedo}
       />
+
+      {/* Back to Dashboard */}
+      <div className="absolute top-3 left-3 z-50">
+        <BackButton />
+      </div>
+
+      {/* Save Indicator - subtle, top-right corner */}
+      <div className="absolute top-3 right-3 z-50">
+        <SaveIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+      </div>
 
       {/* Canvas - Outer container for event handling */}
       <div
@@ -228,10 +259,16 @@ function CanvasContent() {
   );
 }
 
-export default function CanvasPage() {
+interface CanvasPageProps {
+  params: Promise<{ projectId: string }>;
+}
+
+export default function CanvasPage({ params }: CanvasPageProps) {
+  const { projectId } = use(params);
+
   return (
     <CanvasProvider>
-      <CanvasContent />
+      <CanvasContent projectId={projectId} />
     </CanvasProvider>
   );
 }

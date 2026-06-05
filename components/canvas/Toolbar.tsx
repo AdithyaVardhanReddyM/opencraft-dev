@@ -44,7 +44,13 @@ const TOOLS: ToolConfig[] = [
 export function Toolbar({ currentTool, onToolSelect }: ToolbarProps) {
   return (
     <div className="pointer-events-auto fixed left-1/2 top-4 z-50 -translate-x-1/2 space-y-1 text-center">
-      <div className="flex gap-1 rounded-lg border border-border bg-card/95 p-2 shadow-lg backdrop-blur-sm">
+      <div
+        className="flex gap-1 rounded-lg border border-border bg-card/90 p-2 backdrop-blur-2xl saturate-150"
+        style={{
+          boxShadow:
+            "0 4px 24px -4px oklch(0.7114 0.1728 56.6323 / 0.3), 0 8px 16px -4px oklch(0 0 0 / 0.4)",
+        }}
+      >
         {TOOLS.map((tool) => {
           const Icon = tool.icon;
           const isActive = currentTool === tool.id;

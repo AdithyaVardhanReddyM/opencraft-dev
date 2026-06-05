@@ -10,7 +10,7 @@ export const Frame = ({ shape }: { shape: FrameShape }) => {
           top: shape.y,
           width: shape.w,
           height: shape.h,
-          borderRadius: "12px",
+          borderRadius: "10px",
         }}
       />
       <div
