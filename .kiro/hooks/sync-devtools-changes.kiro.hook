@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Sync DevTools UI Changes",
+  "description": "Manually triggered hook that uses the Chrome DevTools MCP to detect CSS/style changes made in the browser's developer tools and updates the corresponding source code files to match those UI adjustments.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Use the chrome-devtools MCP to inspect the current page and detect any CSS or style changes the user has made in the browser's DevTools. Compare these changes against the source code in the project (components in /components, styles in /app/globals.css, and Tailwind classes in TSX files). Update the relevant source files to reflect the UI changes made in DevTools. Focus on:\n1. CSS property changes (colors, spacing, sizing, typography)\n2. Tailwind class equivalents for inline style changes\n3. Layout adjustments (flexbox, grid, positioning)\n\nAfter identifying changes, update the appropriate files to persist the DevTools modifications into the codebase."
+  }
+}

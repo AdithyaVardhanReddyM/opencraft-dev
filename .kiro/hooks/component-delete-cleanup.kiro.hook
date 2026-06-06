@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Component Import Cleanup",
+  "description": "When a component file is deleted, finds all imports of this component across the codebase, removes or comments out those import statements, and suggests replacements if appropriate.",
+  "version": "1",
+  "when": {
+    "type": "fileDeleted",
+    "patterns": [
+      "components/**/*.tsx",
+      "components/**/*.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A component file has been deleted. Please:\n\n1. Search the entire codebase for any imports of this deleted component\n2. For each file that imports the deleted component:\n   - Identify the import statement(s)\n   - Comment out or remove the import statement\n   - Check if the component is used in the file and comment out or remove those usages\n   - If there's an obvious replacement component (e.g., similar name, same directory), suggest it\n3. Provide a summary of all files that were affected and changes made\n4. Warn about any files that may need manual review due to complex usage patterns"
+  }
+}

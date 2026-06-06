@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Documentation Lookup",
+  "description": "Automatically triggers Context7 MCP to fetch relevant documentation when you edit or create files. This helps the AI provide accurate, up-to-date guidance for technologies like Next.js, Convex, Clerk, Tailwind, shadcn/ui, and other libraries in your stack - preventing hallucination and ensuring correct syntax.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Before responding to the user's request, analyze what technologies, libraries, or APIs are involved. If the request involves any of these technologies: Next.js, React, Convex, Clerk, Tailwind CSS, shadcn/ui, Radix UI, react-hook-form, zod, date-fns, or any other library where you're uncertain about the exact syntax or latest API - use the Context7 MCP to fetch the relevant documentation first. Look up the specific functions, hooks, components, or patterns needed. This ensures your response uses correct, up-to-date syntax and prevents hallucination. Only skip the documentation lookup if you are 100% confident about the implementation details."
+  }
+}

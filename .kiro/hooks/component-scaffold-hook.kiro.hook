@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Component Scaffolder",
+  "description": "When a new component file is created, automatically generates a TypeScript functional component with props interface, analyzes the folder context to add necessary imports, and creates skeleton code based on the filename and sibling components.",
+  "version": "1",
+  "when": {
+    "type": "fileCreated",
+    "patterns": [
+      "components/**/*.tsx",
+      "app/**/*.tsx"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A new component file has been created. Please:\n\n1. **Analyze the folder context**: Look at sibling files in the same directory to understand the component's role within a larger feature (e.g., if in `components/canvas/shapes/`, check existing shape components for patterns).\n\n2. **Add necessary imports**: Based on the folder and filename, add appropriate imports:\n   - For `components/ui/`: Import from Radix UI primitives, use `cn` from `@/lib/utils`, add `class-variance-authority` if needed\n   - For `components/canvas/`: Import from `@/types/canvas`, `@/contexts/CanvasContext`, relevant canvas utilities\n   - For `components/canvas/shapes/`: Import shape types, follow existing shape component patterns\n   - For `components/dashboard/`: Import from `@/components/ui`, Convex hooks, Clerk auth if needed\n   - For `app/`: Import layout components, metadata exports for pages\n\n3. **Generate TypeScript boilerplate**:\n   - Add `\"use client\"` directive if the component needs client-side features\n   - Create a Props interface named `{ComponentName}Props`\n   - Export a functional component with proper typing\n   - Use destructured props with sensible defaults\n\n4. **Infer skeleton code from context**:\n   - Parse the filename to understand the component's purpose\n   - Look at related components in the same folder for patterns\n   - If it's a shape component, follow the Frame/Rectangle/Ellipse pattern\n   - If it's a dashboard component, follow ProjectCard/EmptyState patterns\n   - Add placeholder JSX structure that matches the naming convention\n\n5. **Follow project conventions**:\n   - Use Tailwind CSS for styling with CSS variables\n   - Use shadcn/ui components from `@/components/ui`\n   - Follow the existing code style in sibling files"
+  }
+}

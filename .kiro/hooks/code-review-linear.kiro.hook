@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Code Review with Linear Tickets",
+  "description": "Reviews the current file for code quality issues, potential bugs, performance optimizations, security vulnerabilities, and accessibility concerns. Automatically creates Linear tickets for identified bugs and vulnerabilities.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the current file thoroughly for:\n\n1. **Code Quality Issues**: Check for code smells, naming conventions, complexity, duplication, and adherence to best practices for the tech stack (Next.js 16, TypeScript, React 19, Tailwind CSS v4, shadcn/ui).\n\n2. **Potential Bugs**: Identify logic errors, edge cases, null/undefined handling, race conditions, memory leaks, and incorrect state management.\n\n3. **Performance Optimizations**: Look for unnecessary re-renders, missing memoization, inefficient algorithms, bundle size concerns, and opportunities for lazy loading.\n\n4. **Security Vulnerabilities**: Check for XSS risks, injection vulnerabilities, improper authentication/authorization, exposed secrets, and unsafe data handling.\n\n5. **Accessibility Concerns**: Verify proper ARIA labels, semantic HTML, keyboard navigation, color contrast, and screen reader compatibility.\n\nAfter the review, use the Linear MCP to create tickets for each identified bug and security vulnerability. For each ticket:\n- Set an appropriate title describing the issue\n- Include detailed description with file location and line numbers\n- Set priority based on severity (bugs: medium-high, security: high-urgent)\n- Add relevant labels if available (bug, security, etc.)\n\nProvide a summary of findings organized by category and list the Linear tickets created."
+  }
+}

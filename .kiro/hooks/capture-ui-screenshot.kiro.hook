@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Capture UI Screenshot",
+  "description": "Manually trigger to capture a screenshot of the current browser state using chrome-devtools MCP. Use this to get visual feedback on UI changes, compare the current state with your code, or when you've made adjustments in the browser DevTools that need to be reflected in the code.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Use the chrome-devtools MCP to capture a screenshot of the current browser page. After capturing:\n\n1. Analyze the screenshot to understand the current UI state\n2. If there are visual issues or differences from the expected design, identify them\n3. If the user has made DevTools adjustments (CSS changes, element modifications), identify what changes were made by comparing with the current codebase\n4. Suggest code changes to match the visual state if needed\n\nFocus on the UI components in the components/canvas/, components/dashboard/, and components/ui/ directories, as well as any relevant page files in the app/ directory."
+  }
+}

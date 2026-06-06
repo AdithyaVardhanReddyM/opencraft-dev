@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Convex Schema Sync Checker",
+  "description": "When the Convex schema is modified, this hook analyzes the changes and suggests updates needed in related mutations, queries, and frontend components that consume the data. It checks for type mismatches, missing fields in UI components, and ensures the frontend data layer stays synchronized with the database schema.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "convex/schema.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "The Convex schema has been modified. Please analyze the changes and:\n\n1. **Identify affected mutations/queries**: Check `convex/projects.ts` and any other Convex function files for queries and mutations that interact with the modified tables. Flag any that may need updates.\n\n2. **Check frontend data consumers**: Look for React components and hooks that use `useQuery` or `useMutation` with the affected tables. Common locations include:\n   - `components/dashboard/` for project-related components\n   - `hooks/use-canvas-persistence.ts` for canvas data\n   - `contexts/CanvasContext.tsx` for canvas state\n\n3. **Type safety audit**: Verify that TypeScript types in `types/` directory align with the new schema structure. Suggest type updates if needed.\n\n4. **Suggest migration strategy**: If the schema change affects existing data, recommend how to handle the migration (default values, data transformation, etc.).\n\n5. **Update checklist**: Provide a concrete list of files that likely need updates with specific suggestions for each.\n\nFocus on maintaining data consistency between Convex backend and the React frontend."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Pre-Commit Check",
+  "description": "Manual trigger that performs comprehensive pre-commit checks: scans for bugs, errors, potential key/secret leaks, lint errors, TypeScript errors. Creates Linear tickets for issues found and analyzes specs to close tickets for bugs already fixed.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Perform a comprehensive pre-commit code review:\n\n1. **Security Scan**: Check all staged/modified files for:\n   - Exposed API keys, secrets, tokens (check .env patterns in code)\n   - Hardcoded credentials or passwords\n   - Sensitive data in logs or comments\n\n2. **Code Quality**: Run and analyze:\n   - `pnpm lint` for ESLint errors\n   - `pnpm tsc --noEmit` for TypeScript errors\n   - Look for common bugs, null pointer issues, unhandled promises\n\n3. **Bug Detection**: Scan for:\n   - Logic errors and edge cases\n   - Missing error handling\n   - Race conditions or async issues\n   - Unused variables or dead code\n\n4. **Linear Integration**:\n   - For each issue found, create a Linear ticket with clear description\n   - Check existing specs/tests to see if any bugs are already fixed\n   - If a bug referenced in Linear is fixed in specs, close that Linear ticket\n   - Use Linear API to create/update/close tickets as needed\n\n5. **Report**: Provide a summary of:\n   - All issues found with severity levels\n   - Linear tickets created\n   - Linear tickets closed (bugs already fixed)\n   - Recommendations for fixes\n\nRun the necessary commands and provide actionable feedback before committing."
+  }
+}
