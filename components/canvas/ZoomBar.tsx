@@ -34,14 +34,7 @@ export function ZoomBar({
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="pointer-events-auto fixed bottom-4 left-4 z-50 space-y-1">
-        <p className="text-[10px] font-medium text-muted-foreground/80 inline-flex items-center gap-1">
-          <span>Zoom with</span>
-          <Kbd className="bg-white/8">Ctrl</Kbd>/
-          <Kbd className="bg-white/8">Cmd</Kbd>
-          <span>+</span>
-          <Kbd className="bg-white/8">Scroll</Kbd>
-        </p>
+      <div className="pointer-events-auto fixed bottom-4 right-27 z-50">
         <div
           className="flex items-center gap-0.5 rounded-full border border-border bg-card/90 p-1 backdrop-blur-2xl saturate-150"
           style={{

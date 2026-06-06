@@ -7,6 +7,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Separator } from "../ui/separator";
 
 interface HistoryPillProps {
   onUndo: () => void;
@@ -29,9 +30,9 @@ export function HistoryPill({
   const redoShortcut = isMac ? "⌘⇧Z" : "Ctrl+Shift+Z";
 
   return (
-    <div className="pointer-events-auto fixed bottom-4 left-[220px] z-50">
+    <div className="pointer-events-auto fixed bottom-4 right-3 z-50">
       <div
-        className="flex items-center rounded-full border border-border bg-card/90 p-1 backdrop-blur-2xl saturate-150"
+        className="flex items-center gap-2 px-1.5 rounded-full border border-border bg-card/90 p-1 backdrop-blur-2xl saturate-150"
         style={{
           boxShadow: "0 4px 16px -4px oklch(0 0 0 / 0.4)",
         }}
@@ -53,7 +54,6 @@ export function HistoryPill({
               <p>Undo ({undoShortcut})</p>
             </TooltipContent>
           </Tooltip>
-
           <Tooltip>
             <TooltipTrigger asChild>
               <button

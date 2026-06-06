@@ -45,8 +45,8 @@ export function SaveIndicator({ status, lastSavedAt }: SaveIndicatorProps) {
         return {
           icon: <Loader2 className="h-3.5 w-3.5 animate-spin" />,
           tooltip: "Saving changes...",
-          color: "text-blue-400/70",
-          hoverColor: "hover:text-blue-400",
+          color: "text-primary/70",
+          hoverColor: "hover:text-primary",
         };
       case "offline":
         return {

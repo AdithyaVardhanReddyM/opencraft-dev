@@ -1,9 +1,10 @@
 "use client";
 
-import { use } from "react";
+import { use, useState, useCallback } from "react";
 import { Loader2 } from "lucide-react";
-import { CanvasProvider } from "@/contexts/CanvasContext";
+import { CanvasProvider, useCanvasContext } from "@/contexts/CanvasContext";
 import { BackButton } from "@/components/canvas/BackButton";
+import { CanvasActions } from "@/components/canvas/CanvasActions";
 import { useInfiniteCanvas } from "@/hooks/use-infinite-canvas";
 import { useCanvasCursor } from "@/hooks/use-canvas-cursor";
 import { useAutosave } from "@/hooks/use-autosave";
@@ -13,6 +14,11 @@ import { HistoryPill } from "@/components/canvas/HistoryPill";
 import { BoundingBox } from "@/components/canvas/BoundingBox";
 import { SelectionBox } from "@/components/canvas/SelectionBox";
 import { SaveIndicator } from "@/components/canvas/SaveIndicator";
+import {
+  LayersSidebar,
+  LayersSidebarToggle,
+} from "@/components/canvas/LayersSidebar";
+import { getShapeCenter } from "@/lib/canvas/layers-sidebar-utils";
 
 // Import shape components
 import { Frame } from "@/components/canvas/shapes/Frame";
@@ -59,7 +65,40 @@ function CanvasContent({ projectId }: { projectId: string }) {
     redo,
   } = useInfiniteCanvas();
 
+  const { dispatchViewport, dispatchShapes } = useCanvasContext();
   const { cursorClass } = useCanvasCursor();
+
+  // Layers sidebar state
+  const [isLayersSidebarOpen, setIsLayersSidebarOpen] = useState(true);
+
+  // Handle shape click from sidebar - center viewport and select shape
+  const handleSidebarShapeClick = useCallback(
+    (shapeId: string) => {
+      const shape = shapes.find((s) => s.id === shapeId);
+      if (!shape) return;
+
+      // Calculate shape center
+      const center = getShapeCenter(shape);
+
+      // Get viewport dimensions (use window as fallback)
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Center the viewport on the shape
+      dispatchViewport({
+        type: "CENTER_ON_WORLD",
+        payload: {
+          world: center,
+          toScreen: { x: viewportWidth / 2, y: viewportHeight / 2 },
+        },
+      });
+
+      // Select the shape
+      dispatchShapes({ type: "CLEAR_SELECTION" });
+      dispatchShapes({ type: "SELECT_SHAPE", payload: shapeId });
+    },
+    [shapes, dispatchViewport, dispatchShapes]
+  );
 
   const draftShape = getDraftShape();
   const freeDrawPoints = getFreeDrawPoints();
@@ -80,7 +119,10 @@ function CanvasContent({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-accent">
+    <div
+      className="relative h-screen w-full overflow-hidden bg-accent"
+      style={{ overscrollBehavior: "none" }}
+    >
       {/* Toolbar */}
       <Toolbar currentTool={activeTool} onToolSelect={selectTool} />
 
@@ -103,14 +145,27 @@ function CanvasContent({ projectId }: { projectId: string }) {
         canRedo={canRedo}
       />
 
+      {/* Layers Sidebar */}
+      <LayersSidebar
+        shapes={shapes}
+        selectedShapes={selectedShapes}
+        onShapeClick={handleSidebarShapeClick}
+        isOpen={isLayersSidebarOpen}
+      />
+
       {/* Back to Dashboard */}
       <div className="absolute top-3 left-3 z-50">
         <BackButton />
       </div>
 
-      {/* Save Indicator - subtle, top-right corner */}
-      <div className="absolute top-3 right-3 z-50">
+      {/* Top Right Actions */}
+      <div className="absolute top-3 right-3 z-50 flex items-center gap-2">
         <SaveIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+        <CanvasActions />
+        <LayersSidebarToggle
+          isOpen={isLayersSidebarOpen}
+          onToggle={() => setIsLayersSidebarOpen(!isLayersSidebarOpen)}
+        />
       </div>
 
       {/* Canvas - Outer container for event handling */}
@@ -124,6 +179,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
         className={`h-full w-full ${cursorClass} relative overflow-hidden`}
         style={{
           touchAction: "none",
+          overscrollBehavior: "none",
         }}
       >
         {/* Inner container for transform */}

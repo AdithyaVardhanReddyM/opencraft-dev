@@ -43,12 +43,14 @@ const TOOLS: ToolConfig[] = [
 
 export function Toolbar({ currentTool, onToolSelect }: ToolbarProps) {
   return (
-    <div className="pointer-events-auto fixed left-1/2 top-4 z-50 -translate-x-1/2 space-y-1 text-center">
+    <div className="pointer-events-auto fixed left-1/2 top-0 z-50 -translate-x-1/2 flex flex-col items-center">
+      {/* Notch container */}
       <div
-        className="flex gap-1 rounded-lg border border-border bg-card/90 p-2 backdrop-blur-2xl saturate-150"
+        className="relative flex gap-1 bg-card px-3 pt-3 pb-3 backdrop-blur-2xl saturate-150"
         style={{
+          borderRadius: "0 0 16px 16px",
           boxShadow:
-            "0 4px 24px -4px oklch(0.7114 0.1728 56.6323 / 0.3), 0 8px 16px -4px oklch(0 0 0 / 0.4)",
+            "0 8px 32px -4px oklch(0.7114 0.1728 56.6323 / 0.25), 0 12px 24px -8px oklch(0 0 0 / 0.4), inset 0 -1px 0 0 rgba(255,255,255,0.05)",
         }}
       >
         {TOOLS.map((tool) => {
@@ -80,9 +82,10 @@ export function Toolbar({ currentTool, onToolSelect }: ToolbarProps) {
           );
         })}
       </div>
-      <p className="text-[10px] text-muted-foreground/80">
-        Glide the canvas with <Kbd className="bg-white/8">Scroll</Kbd> drag,
-        hold <Kbd className="bg-white/8">Space</Kbd>, or pick the hand tool.
+      {/* Helper text below notch */}
+      <p className="mt-2 text-[10px] text-muted-foreground/70">
+        Glide with <Kbd className="bg-white/8">Scroll</Kbd>, hold{" "}
+        <Kbd className="bg-white/8">Space</Kbd>, or use hand tool
       </p>
     </div>
   );
