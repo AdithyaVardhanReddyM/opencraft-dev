@@ -458,8 +458,16 @@
   outline-offset: 2px;
 }
 
-/* Smooth Scroll */
-html {
+/* Prevent browser history swipe gestures from hijacking canvas scrolling */
+html,
+body {
+  min-height: 100%;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: none;
+}
+
+/* Smooth scroll opt-in required by Next.js */
+html[data-scroll-behavior="smooth"] {
   scroll-behavior: smooth;
 }
 

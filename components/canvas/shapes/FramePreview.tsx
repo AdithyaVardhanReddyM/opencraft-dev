@@ -12,13 +12,12 @@ export const FramePreview = ({
 
   return (
     <div
-      className="absolute pointer-events-none backdrop-blur-xl bg-white/8 border-2 border-white/12"
+      className="absolute pointer-events-none backdrop-blur-xl bg-white/5 saturate-150"
       style={{
         left: x,
         top: y,
         width: w,
         height: h,
-        borderRadius: "10px",
       }}
     />
   );

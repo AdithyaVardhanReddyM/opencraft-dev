@@ -1,16 +1,20 @@
 import { FrameShape } from "@/types/canvas";
 
 export const Frame = ({ shape }: { shape: FrameShape }) => {
+  const borderRadius = shape.borderRadius ?? 0;
+  const fillColor = shape.fill ?? "rgba(255, 255, 255, 0.05)";
+
   return (
     <>
       <div
-        className="absolute pointer-events-none backdrop-blur-xl bg-white/8 border border-white/12 saturate-150"
+        className="absolute pointer-events-none backdrop-blur-xl saturate-150"
         style={{
           left: shape.x,
           top: shape.y,
           width: shape.w,
           height: shape.h,
-          borderRadius: "10px",
+          borderRadius: borderRadius > 0 ? `${borderRadius}px` : "0px",
+          backgroundColor: fillColor,
         }}
       />
       <div

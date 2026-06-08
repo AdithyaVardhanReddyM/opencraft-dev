@@ -141,6 +141,10 @@ type ShapesActionCore =
   | {
       type: "PASTE_SHAPES";
       payload: { shapes: Shape[]; pastePosition: Point };
+    }
+  | {
+      type: "REORDER_SHAPE";
+      payload: { shapeId: string; newIndex: number };
     };
 
 export type ShapesAction = ShapesActionCore & ShapesActionMeta;
@@ -474,6 +478,27 @@ export function shapesReducer(
         frameCounter: entry.frameCounter,
         historyPointer: pointer,
       };
+    }
+
+    case "REORDER_SHAPE": {
+      const { shapeId, newIndex } = action.payload;
+      const currentIndex = state.shapes.ids.indexOf(shapeId);
+
+      if (currentIndex === -1 || currentIndex === newIndex) {
+        return state;
+      }
+
+      const newIds = [...state.shapes.ids];
+      newIds.splice(currentIndex, 1);
+      newIds.splice(newIndex, 0, shapeId);
+
+      return applyStateChange(state, action, (current) => ({
+        ...current,
+        shapes: {
+          ...current.shapes,
+          ids: newIds,
+        },
+      }));
     }
 
     case "PASTE_SHAPES": {

@@ -30,6 +30,7 @@ export function createFrame(params: {
   stroke?: string;
   strokeWidth?: number;
   fill?: string | null;
+  borderRadius?: number;
 }): FrameShape {
   return {
     id: nanoid(),
@@ -42,6 +43,7 @@ export function createFrame(params: {
     stroke: "transparent",
     strokeWidth: 0,
     fill: params.fill ?? "rgba(255, 255, 255, 0.05)",
+    borderRadius: params.borderRadius ?? 0, // Default to sharp corners for frames
   };
 }
 

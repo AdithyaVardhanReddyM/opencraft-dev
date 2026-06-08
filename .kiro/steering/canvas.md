@@ -11,7 +11,7 @@ The infinite canvas system is a core feature of Unit {set}, providing a Figma-li
 The canvas uses two separate reducers for clean separation of concerns:
 
 - **Viewport Reducer**: Manages pan, zoom, and viewport mode
-- **Shapes Reducer**: Manages drawing entities, selection, and tools
+- **Shapes Reducer**: Manages drawing entities, selection, tools, and history
 
 ```typescript
 // Context provides:
@@ -20,6 +20,8 @@ The canvas uses two separate reducers for clean separation of concerns:
 - shapes: ShapesState
 - dispatchShapes: React.Dispatch<ShapesAction>
 - shapesList: Shape[] (computed from normalized entity state)
+- defaultProperties: ShapeDefaultProperties (stroke, color, corner defaults)
+- setDefaultProperty: (property: string, value: unknown) => void
 ```
 
 ### 2. Core Types (`types/canvas.ts`)
@@ -32,7 +34,7 @@ The canvas uses two separate reducers for clean separation of concerns:
 **Shape Types:**
 
 - `FrameShape`: Rectangular frames with auto-incrementing numbers
-- `RectShape`: Basic rectangles
+- `RectShape`: Basic rectangles with optional border radius
 - `EllipseShape`: Ellipses
 - `FreeDrawShape`: Freehand paths with point arrays
 - `ArrowShape`: Arrows with start/end points
@@ -48,12 +50,13 @@ The canvas uses two separate reducers for clean separation of concerns:
 
 - Normalized entity state: `{ ids: string[], entities: Record<string, Shape> }`
 - Selection map: `Record<string, true>` for O(1) lookup
+- History: `HistoryEntry[]` with pointer for undo/redo
 
 ### 3. Reducers
 
 **Viewport Reducer** (`lib/canvas/viewport-reducer.ts`):
 
-- `SET_TRANSLATE`, `SET_SCALE`: Direct viewport updates
+- `SET_TRANSLATE`, `SET_SCALE`, `SET_ZOOM`: Direct viewport updates
 - `ZOOM_IN`, `ZOOM_OUT`, `ZOOM_BY`: Zoom operations
 - `WHEEL_ZOOM`, `WHEEL_PAN`: Mouse/trackpad interactions
 - `PAN_START`, `PAN_MOVE`, `PAN_END`: Pan gesture handling
@@ -67,9 +70,12 @@ The canvas uses two separate reducers for clean separation of concerns:
 - `ADD_*`: Create shapes (FRAME, RECT, ELLIPSE, FREEDRAW, ARROW, LINE, TEXT, GENERATED_UI)
 - `UPDATE_SHAPE`: Modify shape properties
 - `REMOVE_SHAPE`: Delete single shape
+- `CLEAR_ALL`: Remove all shapes
 - `SELECT_SHAPE`, `DESELECT_SHAPE`, `CLEAR_SELECTION`, `SELECT_ALL`: Selection management
 - `DELETE_SELECTED`: Delete all selected shapes
 - `PASTE_SHAPES`: Paste copied shapes at cursor position (centers selection at paste point)
+- `SET_EDITING_TEXT`: Enter text editing mode
+- `PUSH_HISTORY`: Manually push history entry (for batched operations)
 - `LOAD_PROJECT`: Restore entire canvas state
 - `UNDO`, `REDO`: History navigation
 
@@ -81,12 +87,14 @@ The `useInfiniteCanvas` hook provides the complete canvas interaction API:
 
 - `viewport`, `shapes`, `currentTool`, `activeTool`, `selectedShapes`: State
 - `isSidebarOpen`, `hasSelectedText`: UI state
+- `canUndo`, `canRedo`: History state
 - `onPointerDown`, `onPointerMove`, `onPointerUp`, `onPointerCancel`, `onDoubleClick`: Event handlers
 - `attachCanvasRef`: Canvas DOM ref attachment
 - `selectTool`: Tool switching
 - `getDraftShape`, `getFreeDrawPoints`, `getSelectionBox`: Draft state getters
 - `setIsSidebarOpen`: Sidebar control
-- `zoomIn`, `zoomOut`, `resetZoom`: Zoom controls
+- `zoomIn`, `zoomOut`, `resetZoom`, `zoomToFit`: Zoom controls
+- `undo`, `redo`: History actions
 
 **Key Features:**
 
@@ -97,7 +105,8 @@ The `useInfiniteCanvas` hook provides the complete canvas interaction API:
 - Shape resizing via custom DOM events (shape-resize-start, shape-resize-move, shape-resize-end)
 - Copy/paste functionality with center-based positioning
 - Clipboard tracking for multi-paste support
-- Keyboard shortcuts (Space for hand tool, Delete/Backspace, tool hotkeys, Ctrl/Cmd+C/V/Z)
+- History batching for move/resize operations (single undo for entire drag)
+- Keyboard shortcuts (Space for hand tool, Delete/Backspace, tool hotkeys, Ctrl/Cmd+C/V/Z/Y)
 - Tool hotkeys: S (select), H (hand), F (frame), R (rect), C (ellipse), L (line), A (arrow), D (freedraw), T (text), E (eraser)
 - Button click detection (prevents canvas interaction on UI buttons)
 - Text input auto-blur on empty space click
@@ -105,7 +114,7 @@ The `useInfiniteCanvas` hook provides the complete canvas interaction API:
 - Double-click to edit text shapes
 - Selection box for multi-select (drag on empty space)
 - Hand tool override with Space key (temporary pan mode)
-- Undo/redo with history tracking
+- Default shape properties applied to new shapes
 
 ### 5. Utilities
 
@@ -151,7 +160,61 @@ The `useInfiniteCanvas` hook provides the complete canvas interaction API:
 - `exportCanvasState`, `importCanvasState`: JSON string conversion
 - `saveToLocalStorage`, `loadFromLocalStorage`, `clearLocalStorage`: Browser storage
 - Auto-save with 1-second debounce
-- Stores viewport state, shapes, tool, selection, and frame counter
+- Stores viewport state, shapes, tool, selection, frame counter, and history
+
+**History Manager** (`lib/canvas/history-manager.ts`):
+
+- `createHistoryEntry`: Create snapshot of canvas state
+- `addToHistory`: Add entry with truncation and max size limiting
+- `undo`, `redo`: Navigate history stack
+- `canUndo`, `canRedo`: Check availability
+- Configurable max history size (default: 50 entries)
+- Persisted history size for localStorage (default: 20 entries)
+
+**Properties Utils** (`lib/canvas/properties-utils.ts`):
+
+- Stroke type options: "solid" | "dashed"
+- Stroke width presets: "thin" (1px) | "normal" (2px) | "thick" (4px)
+- Corner type options: "sharp" (0px) | "rounded" (8px)
+- Font family presets: "sans" | "playful" | "mono"
+- Text alignment options: "left" | "center" | "right"
+- Curated color palette for dark mode (10 colors)
+- `getControlsForTool`: Get applicable controls for a tool
+- `getControlsForShapes`: Get controls for selected shapes
+- Conversion utilities: `strokeWidthToPixels`, `cornerTypeToRadius`, `fontFamilyPresetToCSS`
+
+**Autosave Utils** (`lib/canvas/autosave-utils.ts`):
+
+- Save status types: "saved" | "saving" | "offline" | "error"
+- `resolveConflict`: Timestamp-based conflict resolution (local vs cloud)
+- `deriveSaveStatus`: Derive status from state flags
+- `calculateBackoffDelay`: Exponential backoff for retries
+- `isRetryableError`, `classifyError`: Error handling utilities
+- `formatRelativeTime`: Human-readable "last saved" display
+
+**Layers Sidebar Utils** (`lib/canvas/layers-sidebar-utils.ts`):
+
+- `getShapeIcon`: Map shape type to Lucide icon
+- `getShapeName`: Generate readable display name
+- `getShapeCenter`: Calculate center point in world coordinates
+- `getShapeBounds`: Get bounding box of a shape
+
+**Text Utils** (`lib/canvas/text-utils.ts`):
+
+- `measureTextDimensions`: Measures text width/height using canvas context
+- `getTextShapeDimensions`: Gets dimensions from shape or measures if needed
+- `clampTextDimensions`: Constrains text dimensions to min/max bounds
+- `getMinTextHeight`: Calculates minimum text height based on font size and line height
+- Uses canvas 2D context for accurate text measurement
+- Supports text transform (uppercase, lowercase, capitalize)
+- Handles multi-line text with line height and letter spacing
+
+**Cursor Utils** (`lib/canvas/cursor-utils.ts`):
+
+- `getCursorForTool`: Maps tools to cursor classes
+- `getCursorForViewportMode`: Returns cursor for viewport modes (panning/shiftPanning)
+- `shouldShowGrabCursor`: Determines when to show grab cursor (Space key held)
+- Cursor classes: select, pen, eraser, crosshair, text, move, grab, grabbing
 
 ### 6. Persistence Hook (`hooks/use-canvas-persistence.ts`)
 
@@ -167,7 +230,7 @@ Manages canvas state persistence:
 Main canvas rendering component:
 
 - Wraps content in `CanvasProvider`
-- Renders toolbar, zoom bar, history pill
+- Renders toolbar, zoom bar, history pill, save indicator
 - Transforms shapes with viewport scale/translate
 - Renders draft shapes during drawing
 - Renders selection boxes and bounding boxes
@@ -180,7 +243,7 @@ Each shape type has dedicated components:
 **Rendered Shapes:**
 
 - `Frame.tsx`: Frames with auto-incrementing numbers
-- `Rectangle.tsx`: Basic rectangles
+- `Rectangle.tsx`: Basic rectangles with optional border radius
 - `Ellipse.tsx`: Ellipses
 - `Line.tsx`: Straight lines
 - `Arrow.tsx`: Arrows with arrowheads
@@ -199,19 +262,28 @@ Each shape type has dedicated components:
 ### 9. UI Components (`components/canvas/`)
 
 - `Toolbar.tsx`: Tool selection with all drawing tools
-- `ZoomBar.tsx`: Zoom controls (in/out/reset) and percentage display
+- `ZoomBar.tsx`: Zoom controls (in/out/reset/fit) and percentage display
 - `HistoryPill.tsx`: Undo/redo controls with keyboard shortcuts
 - `BoundingBox.tsx`: Selection bounds with 8-point resize handles (corners + edges)
 - `SelectionBox.tsx`: Multi-select rectangle (drag on empty space)
+- `ShapePropertiesBar.tsx`: Properties bar for tool/shape settings
+- `LayersSidebar.tsx`: Layer list with shape selection and visibility
+- `SaveIndicator.tsx`: Auto-save status indicator
+- `BackButton.tsx`: Navigation back to dashboard
+- `CanvasActions.tsx`: Canvas action buttons (export, etc.)
 
-### 10. Cursor Management (`lib/canvas/cursor-utils.ts` + `hooks/use-canvas-cursor.ts`)
+### 10. Property Controls (`components/canvas/property-controls/`)
 
-**Cursor Utils:**
+Reusable property control components:
 
-- `getCursorForTool`: Maps tools to cursor classes
-- `getCursorForViewportMode`: Returns cursor for viewport modes (panning/shiftPanning)
-- `shouldShowGrabCursor`: Determines when to show grab cursor (Space key held)
-- Cursor classes: select, pen, eraser, crosshair, text, move, grab, grabbing
+- `ColorPicker.tsx`: Color selection from curated palette
+- `StrokeTypeControl.tsx`: Solid/dashed stroke toggle
+- `StrokeWidthControl.tsx`: Thin/normal/thick width selector
+- `CornerTypeControl.tsx`: Sharp/rounded corner toggle
+- `FontFamilyControl.tsx`: Sans/playful/mono font selector
+- `TextAlignControl.tsx`: Left/center/right alignment
+
+### 11. Cursor Management (`hooks/use-canvas-cursor.ts`)
 
 **Cursor Hook:**
 
@@ -238,6 +310,7 @@ Each shape type has dedicated components:
 - Ctrl/Cmd + mouse wheel (zooms around cursor position)
 - Zoom in/out buttons (1.2x factor)
 - Reset zoom button (resets to 1.0 scale around canvas center)
+- Zoom to fit button (fits all shapes in viewport with padding)
 - Pinch-to-zoom on trackpads (via ctrlKey detection)
 - Adaptive sensitivity: trackpad (0.25) vs mouse wheel (0.05)
 
@@ -258,12 +331,14 @@ Each shape type has dedicated components:
 - Click and drag to draw
 - Draft preview during drawing
 - Auto-switch to select tool after drawing
+- Applies default properties (stroke color, width, type, corner radius)
 
 **Freedraw Tool:**
 
 - Click and drag to draw freehand
 - RAF throttling for smooth rendering
 - Auto-switch to select tool after drawing
+- Applies default stroke color and type
 
 **Text Tool:**
 
@@ -290,6 +365,7 @@ Each shape type has dedicated components:
 - Calculates delta from move start and applies to all shapes
 - Supports moving all shape types: frames, rects, ellipses, freedraw, arrows, lines, text, generatedui
 - Movement preserves shape structure (points for freedraw, start/end for lines/arrows)
+- History batching: entire move operation is single undo entry
 
 ### Resizing
 
@@ -302,9 +378,10 @@ Each shape type has dedicated components:
   - Frames, rects, ellipses, generatedui: Direct x, y, w, h updates
   - Freedraw: Scales points proportionally within new bounds
   - Arrows/lines: Special handling for line-start and line-end handles, scales diagonal lines
-  - Text: Shows selection indicator only (no resize handles yet)
+  - Text: Proportional scaling of font size, line height, letter spacing
 - Minimum size constraint: 10px width and height
 - Resize data stored in ref to prevent re-renders
+- History batching: entire resize operation is single undo entry
 
 ### Keyboard Shortcuts
 
@@ -342,6 +419,7 @@ Each shape type has dedicated components:
 5. **Immutable State Updates**: Spread operators for efficient updates
 6. **Normalized Entity State**: O(1) lookups by ID
 7. **Debounced Auto-Save**: 1-second debounce for localStorage
+8. **History Batching**: Move/resize operations batched into single history entries
 
 ## Constants
 
@@ -374,6 +452,31 @@ TEXT_MIN_WIDTH = 24;
 TEXT_MAX_WIDTH = 1200;
 AVG_CHAR_WIDTH_RATIO = 0.55;
 
+// History configuration (history-manager.ts)
+MAX_HISTORY_SIZE = 50;
+PERSISTED_HISTORY_SIZE = 20;
+
+// Autosave configuration (autosave-utils.ts)
+LOCAL_SAVE_DEBOUNCE_MS = 1000;
+CLOUD_SYNC_DEBOUNCE_MS = 2000;
+MAX_RETRIES = 3;
+
+// Properties (properties-utils.ts)
+STROKE_WIDTH_MAP = { thin: 1, normal: 2, thick: 4 };
+CORNER_RADIUS_MAP = { sharp: 0, rounded: 8 };
+COLOR_PALETTE = [
+  "#ffffff",
+  "#a1a1aa",
+  "#f87171",
+  "#fb923c",
+  "#facc15",
+  "#4ade80",
+  "#22d3ee",
+  "#60a5fa",
+  "#a78bfa",
+  "#f472b6",
+];
+
 // Tool hotkeys (use-infinite-canvas.ts)
 TOOL_HOTKEYS = {
   s: "select",
@@ -393,10 +496,14 @@ TOOL_HOTKEYS = {
 
 - [x] Undo/Redo with history tracking
 - [x] Copy/paste functionality
+- [x] Shape properties bar (stroke, color, corners)
+- [x] Layers sidebar
+- [x] Save indicator
+- [x] Zoom to fit
 - [ ] Collaborative editing via WebSocket
 - [ ] Touch gesture support (pinch-to-zoom)
 - [ ] Grid and shape snapping
-- [ ] Layer management (z-index)
+- [ ] Layer management (z-index reordering)
 - [ ] Shape grouping
 - [ ] Duplicate functionality (Ctrl/Cmd+D)
 - [ ] Export to image/SVG
@@ -416,6 +523,7 @@ TOOL_HOTKEYS = {
 5. Create shape component in `components/canvas/shapes/`
 6. Create preview component for draft rendering
 7. Add rendering logic to canvas page
+8. Update `layers-sidebar-utils.ts` with icon and name
 
 ### When Adding New Tools
 
@@ -426,6 +534,17 @@ TOOL_HOTKEYS = {
 5. Add cursor styling to `cursor-utils.ts` TOOL_CURSOR_MAP
 6. Add keyboard shortcut to TOOL_HOTKEYS in `use-infinite-canvas.ts`
 7. Update shapes reducer if new shape type is needed
+8. Update `properties-utils.ts` if tool has configurable properties
+
+### When Adding New Properties
+
+1. Add property type to `properties-utils.ts`
+2. Create control component in `components/canvas/property-controls/`
+3. Export from `property-controls/index.ts`
+4. Add to `getControlsForTool` and `getControlsForShapes`
+5. Update `ShapePropertiesBar.tsx` to render the control
+6. Update shape factories to accept the property
+7. Update `defaultProperties` in `CanvasContext.tsx`
 
 ### When Modifying State
 
@@ -434,6 +553,8 @@ TOOL_HOTKEYS = {
 - Keep reducers pure (no side effects)
 - Store interaction state in refs, not state (prevents re-renders)
 - Use RAF for performance-critical operations
+- Use `meta: { skipHistory: true }` for intermediate updates during drag operations
+- Call `PUSH_HISTORY` at the end of batched operations
 
 ### When Adding Persistence
 
@@ -441,6 +562,7 @@ TOOL_HOTKEYS = {
 - Test localStorage save/load
 - Implement Convex mutations/queries when ready
 - Handle migration for schema changes
+- Consider history truncation for storage limits
 
 ## Testing
 
@@ -456,36 +578,6 @@ pnpm dev
 # Navigate to /dashboard/[projectId]/canvas
 ```
 
-## Additional Utilities
-
-### Text Utils (`lib/canvas/text-utils.ts`)
-
-- `measureTextDimensions`: Measures text width/height using canvas context
-- `getTextShapeDimensions`: Gets dimensions from shape or measures if needed
-- `clampTextDimensions`: Constrains text dimensions to min/max bounds
-- `getMinTextHeight`: Calculates minimum text height based on font size and line height
-- Uses canvas 2D context for accurate text measurement
-- Supports text transform (uppercase, lowercase, capitalize)
-- Handles multi-line text with line height and letter spacing
-
-### Selection Box Helper (`use-infinite-canvas.ts`)
-
-- `intersectsSelectionBox`: Checks if shape intersects with selection rectangle
-- Calculates shape bounds for all shape types
-- Uses AABB (Axis-Aligned Bounding Box) intersection test
-- Supports multi-select by dragging on empty space
-
-### Copy/Paste System (`lib/canvas/shapes-reducer.ts`)
-
-- `PASTE_SHAPES` action: Clones shapes with new IDs and offsets
-- `cloneShapeWithOffset`: Creates deep copies of shapes with position offset
-- `getFullShapeBounds`: Calculates bounding box including dimensions for all shape types
-- Center-based positioning: Calculates center of copied selection and pastes at cursor
-- Frame counter increments for pasted frames
-- Clipboard stored in ref for persistence across multiple pastes
-- Mouse position tracked in world coordinates for accurate paste location
-- Supports pasting all shape types: frames, rects, ellipses, freedraw, arrows, lines, text, generatedui
-
 ## Implementation Details
 
 ### Event Handling
@@ -499,10 +591,20 @@ pnpm dev
 ### State Management Strategy
 
 - **Viewport state**: Managed by viewport reducer (pan, zoom, mode)
-- **Shapes state**: Managed by shapes reducer (entities, selection, tool)
+- **Shapes state**: Managed by shapes reducer (entities, selection, tool, history)
 - **Interaction state**: Stored in refs (draft shapes, movement, resizing)
 - **UI state**: Local component state (sidebar, force updates)
+- **Default properties**: Managed in context (stroke, color, corners)
 - Refs prevent re-renders during high-frequency interactions
+
+### History Management
+
+- History entries contain: shapes, selected, frameCounter, timestamp
+- Pointer-based navigation (undo decrements, redo increments)
+- Forward history truncated on new action
+- Max size limiting with oldest entry removal
+- Batched operations use `skipHistory` meta flag
+- Manual `PUSH_HISTORY` for batch completion
 
 ### Performance Considerations
 
@@ -513,6 +615,7 @@ pnpm dev
 - Immutable state updates with spread operators
 - Normalized entity state for O(1) lookups
 - Debounced auto-save (1 second)
+- History batching reduces memory usage
 
 ## Migration Notes
 

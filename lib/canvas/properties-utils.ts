@@ -17,7 +17,10 @@ export type ControlType =
   | "cornerType"
   | "fontFamily"
   | "textAlign"
-  | "textColor";
+  | "textColor"
+  | "frameFill"
+  | "frameCornerType"
+  | "dimensions";
 
 // Font family options
 export type FontFamilyPreset = "sans" | "playful" | "mono";
@@ -59,6 +62,20 @@ export const COLOR_PALETTE = [
   "#f472b6", // Pink 400
 ] as const;
 
+// Frame fill color palette - subtle tints that work well on dark canvas
+export const FRAME_FILL_PALETTE = [
+  "rgba(255, 255, 255, 0.05)", // Default - subtle white
+  "rgba(251, 146, 60, 0.08)", // Pale orange
+  "rgba(96, 165, 250, 0.08)", // Pale blue
+  "rgba(74, 222, 128, 0.08)", // Pale green
+  "rgba(167, 139, 250, 0.08)", // Pale violet
+  "rgba(244, 114, 182, 0.08)", // Pale pink
+  "rgba(34, 211, 238, 0.08)", // Pale cyan
+  "rgba(250, 204, 21, 0.08)", // Pale yellow
+  "rgba(248, 113, 113, 0.08)", // Pale red
+  "rgba(161, 161, 170, 0.08)", // Pale gray
+] as const;
+
 // Default shape properties
 export interface ShapeDefaultProperties {
   strokeType: StrokeType;
@@ -94,6 +111,8 @@ const TOOLS_WITH_CORNER_TYPE: Tool[] = ["rect"];
 const TOOLS_WITH_FONT_FAMILY: Tool[] = ["text"];
 const TOOLS_WITH_TEXT_ALIGN: Tool[] = ["text"];
 const TOOLS_WITH_TEXT_COLOR: Tool[] = ["text"];
+const TOOLS_WITH_FRAME_FILL: Tool[] = ["frame"];
+const TOOLS_WITH_FRAME_CORNER_TYPE: Tool[] = ["frame"];
 
 // Shape types that support properties
 const SHAPES_WITH_STROKE_TYPE = [
@@ -109,6 +128,9 @@ const SHAPES_WITH_CORNER_TYPE = ["rect"];
 const SHAPES_WITH_FONT_FAMILY = ["text"];
 const SHAPES_WITH_TEXT_ALIGN = ["text"];
 const SHAPES_WITH_TEXT_COLOR = ["text"];
+const SHAPES_WITH_FRAME_FILL = ["frame"];
+const SHAPES_WITH_FRAME_CORNER_TYPE = ["frame"];
+const SHAPES_WITH_DIMENSIONS = ["frame", "rect", "ellipse"];
 
 /**
  * Convert stroke width preset to pixel value
@@ -197,6 +219,12 @@ export function getControlsForTool(tool: Tool): ControlType[] {
   if (TOOLS_WITH_TEXT_COLOR.includes(tool)) {
     controls.push("textColor");
   }
+  if (TOOLS_WITH_FRAME_CORNER_TYPE.includes(tool)) {
+    controls.push("frameCornerType");
+  }
+  if (TOOLS_WITH_FRAME_FILL.includes(tool)) {
+    controls.push("frameFill");
+  }
 
   return controls;
 }
@@ -232,6 +260,15 @@ export function getControlsForShapes(shapes: Shape[]): ControlType[] {
   const allSupportTextColor = shapes.every((s) =>
     SHAPES_WITH_TEXT_COLOR.includes(s.type)
   );
+  const allSupportFrameFill = shapes.every((s) =>
+    SHAPES_WITH_FRAME_FILL.includes(s.type)
+  );
+  const allSupportFrameCornerType = shapes.every((s) =>
+    SHAPES_WITH_FRAME_CORNER_TYPE.includes(s.type)
+  );
+  const allSupportDimensions = shapes.every((s) =>
+    SHAPES_WITH_DIMENSIONS.includes(s.type)
+  );
 
   if (allSupportStrokeType) controls.push("strokeType");
   if (allSupportStrokeWidth) controls.push("strokeWidth");
@@ -240,6 +277,9 @@ export function getControlsForShapes(shapes: Shape[]): ControlType[] {
   if (allSupportFontFamily) controls.push("fontFamily");
   if (allSupportTextAlign) controls.push("textAlign");
   if (allSupportTextColor) controls.push("textColor");
+  if (allSupportFrameCornerType) controls.push("frameCornerType");
+  if (allSupportFrameFill) controls.push("frameFill");
+  if (allSupportDimensions) controls.push("dimensions");
 
   return controls;
 }
@@ -266,7 +306,23 @@ export function shapeSupportsProperty(
       return SHAPES_WITH_TEXT_ALIGN.includes(shape.type);
     case "textColor":
       return SHAPES_WITH_TEXT_COLOR.includes(shape.type);
+    case "frameFill":
+      return SHAPES_WITH_FRAME_FILL.includes(shape.type);
+    case "frameCornerType":
+      return SHAPES_WITH_FRAME_CORNER_TYPE.includes(shape.type);
+    case "dimensions":
+      return SHAPES_WITH_DIMENSIONS.includes(shape.type);
     default:
       return false;
   }
+}
+
+/**
+ * Convert frame border radius to corner type
+ */
+export function frameRadiusToCornerType(
+  radius: number | undefined
+): CornerType {
+  if (radius === undefined || radius === null) return "sharp"; // Default for frames is sharp
+  return radius === 0 ? "sharp" : "rounded";
 }

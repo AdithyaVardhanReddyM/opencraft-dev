@@ -66,6 +66,7 @@ export interface FrameShape extends BaseShape {
   w: number;
   h: number;
   frameNumber: number;
+  borderRadius?: number;
 }
 
 export interface RectShape extends BaseShape {

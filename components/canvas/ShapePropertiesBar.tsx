@@ -1,6 +1,12 @@
 "use client";
 
-import type { Tool, Shape, RectShape, TextShape } from "@/types/canvas";
+import type {
+  Tool,
+  Shape,
+  RectShape,
+  TextShape,
+  FrameShape,
+} from "@/types/canvas";
 import {
   type ShapeDefaultProperties,
   type StrokeType,
@@ -14,6 +20,7 @@ import {
   pixelsToStrokeWidth,
   radiusToCornerType,
   cssFontFamilyToPreset,
+  frameRadiusToCornerType,
 } from "@/lib/canvas/properties-utils";
 import {
   StrokeTypeControl,
@@ -22,6 +29,8 @@ import {
   CornerTypeControl,
   FontFamilyControl,
   TextAlignControl,
+  FrameFillPicker,
+  DimensionsControl,
 } from "./property-controls";
 
 interface ShapePropertiesBarProps {
@@ -79,6 +88,18 @@ export function ShapePropertiesBar({
     ? getTextColorFromShapes(selectedShapes)
     : "#ffffff";
 
+  const frameFillValue = hasSelection
+    ? getFrameFillFromShapes(selectedShapes)
+    : "rgba(255, 255, 255, 0.05)";
+
+  const frameCornerTypeValue = hasSelection
+    ? getFrameCornerTypeFromShapes(selectedShapes)
+    : "sharp";
+
+  const dimensionsValue = hasSelection
+    ? getDimensionsFromShapes(selectedShapes)
+    : { width: 0, height: 0 };
+
   // Handlers
   const handleStrokeTypeChange = (value: StrokeType) => {
     if (hasSelection) {
@@ -127,6 +148,30 @@ export function ShapePropertiesBar({
   const handleTextColorChange = (value: string) => {
     if (hasSelection) {
       onPropertyChange("textColor", value);
+    }
+  };
+
+  const handleFrameFillChange = (value: string) => {
+    if (hasSelection) {
+      onPropertyChange("frameFill", value);
+    }
+  };
+
+  const handleFrameCornerTypeChange = (value: CornerType) => {
+    if (hasSelection) {
+      onPropertyChange("frameCornerType", value);
+    }
+  };
+
+  const handleWidthChange = (value: number) => {
+    if (hasSelection) {
+      onPropertyChange("width", value);
+    }
+  };
+
+  const handleHeightChange = (value: number) => {
+    if (hasSelection) {
+      onPropertyChange("height", value);
     }
   };
 
@@ -194,6 +239,35 @@ export function ShapePropertiesBar({
           <ColorPicker
             value={textColorValue}
             onChange={handleTextColorChange}
+          />
+        </>
+      )}
+
+      {controls.includes("frameCornerType") && (
+        <CornerTypeControl
+          value={frameCornerTypeValue}
+          onChange={handleFrameCornerTypeChange}
+        />
+      )}
+
+      {controls.includes("frameFill") && (
+        <>
+          <Separator />
+          <FrameFillPicker
+            value={frameFillValue}
+            onChange={handleFrameFillChange}
+          />
+        </>
+      )}
+
+      {controls.includes("dimensions") && (
+        <>
+          <Separator />
+          <DimensionsControl
+            width={dimensionsValue.width}
+            height={dimensionsValue.height}
+            onWidthChange={handleWidthChange}
+            onHeightChange={handleHeightChange}
           />
         </>
       )}
@@ -281,4 +355,52 @@ function getTextColorFromShapes(shapes: Shape[]): string | "mixed" {
   if (colors.length === 0) return "#ffffff";
   const first = colors[0];
   return colors.every((c) => c === first) ? first : "mixed";
+}
+
+function getFrameFillFromShapes(shapes: Shape[]): string | "mixed" {
+  const fills = shapes
+    .filter((s): s is FrameShape => s.type === "frame")
+    .map((s) => s.fill ?? "rgba(255, 255, 255, 0.05)");
+
+  if (fills.length === 0) return "rgba(255, 255, 255, 0.05)";
+  const first = fills[0];
+  return fills.every((f) => f === first) ? first : "mixed";
+}
+
+function getFrameCornerTypeFromShapes(shapes: Shape[]): CornerType | "mixed" {
+  const radii = shapes
+    .filter((s): s is FrameShape => s.type === "frame")
+    .map((s) => frameRadiusToCornerType(s.borderRadius));
+
+  if (radii.length === 0) return "sharp";
+  const first = radii[0];
+  return radii.every((r) => r === first) ? first : "mixed";
+}
+
+function getDimensionsFromShapes(shapes: Shape[]): {
+  width: number | "mixed";
+  height: number | "mixed";
+} {
+  const dimensionShapes = shapes.filter(
+    (
+      s
+    ): s is
+      | FrameShape
+      | RectShape
+      | (Shape & { type: "ellipse"; w: number; h: number }) =>
+      s.type === "frame" || s.type === "rect" || s.type === "ellipse"
+  );
+
+  if (dimensionShapes.length === 0) return { width: 0, height: 0 };
+
+  const widths = dimensionShapes.map((s) => s.w);
+  const heights = dimensionShapes.map((s) => s.h);
+
+  const firstWidth = widths[0];
+  const firstHeight = heights[0];
+
+  return {
+    width: widths.every((w) => w === firstWidth) ? firstWidth : "mixed",
+    height: heights.every((h) => h === firstHeight) ? firstHeight : "mixed",
+  };
 }

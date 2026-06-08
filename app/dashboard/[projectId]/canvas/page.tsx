@@ -147,6 +147,26 @@ function CanvasContent({ projectId }: { projectId: string }) {
               patch.stroke = value;
             }
             break;
+          case "frameFill":
+            if (shape.type === "frame") {
+              patch.fill = value;
+            }
+            break;
+          case "frameCornerType":
+            if (shape.type === "frame") {
+              patch.borderRadius = cornerTypeToRadius(value as CornerType);
+            }
+            break;
+          case "width":
+            if (["frame", "rect", "ellipse"].includes(shape.type)) {
+              patch.w = value;
+            }
+            break;
+          case "height":
+            if (["frame", "rect", "ellipse"].includes(shape.type)) {
+              patch.h = value;
+            }
+            break;
         }
 
         if (Object.keys(patch).length > 0) {
@@ -250,6 +270,12 @@ function CanvasContent({ projectId }: { projectId: string }) {
         shapes={shapes}
         selectedShapes={selectedShapes}
         onShapeClick={handleSidebarShapeClick}
+        onReorderShape={(shapeId, newIndex) => {
+          dispatchShapes({
+            type: "REORDER_SHAPE",
+            payload: { shapeId, newIndex },
+          });
+        }}
         isOpen={isLayersSidebarOpen}
       />
 
