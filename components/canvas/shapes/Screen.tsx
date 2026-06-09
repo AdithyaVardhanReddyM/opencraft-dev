@@ -78,12 +78,27 @@ export function Screen({
             <iframe
               src={sandboxUrl}
               className="w-full h-full border-0"
+              style={{
+                pointerEvents: isSelected ? "auto" : "none",
+              }}
               title={title}
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             />
           ) : (
             <EmptyState />
           )}
+
+          {/* Click Overlay - captures clicks when screen is not selected */}
+          <div
+            className="absolute inset-0"
+            style={{
+              pointerEvents: isSelected ? "none" : "auto",
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick?.();
+            }}
+          />
         </div>
       </div>
     </div>

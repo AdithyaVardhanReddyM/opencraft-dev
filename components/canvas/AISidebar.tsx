@@ -1,31 +1,41 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   MessageSquare,
-  Send,
-  Loader2,
-  Bot,
-  User,
-  Sparkles,
   Code2,
   Pencil,
-  PanelLeftClose,
   AlertCircle,
   RefreshCw,
+  Sparkles,
+  Copy,
+  Check,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import { MessageResponse } from "@/components/ai-elements/message";
+import { Loader } from "@/components/ai-elements/loader";
+import Image from "next/image";
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  type PromptInputMessage,
+  PromptInputSubmit,
+  PromptInputTextarea,
+} from "@/components/ai-elements/prompt-input";
 
-interface Message {
+interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
@@ -39,52 +49,22 @@ interface ErrorState {
   canRetry: boolean;
 }
 
-// Toggle button component
-export function AISidebarToggle({
-  isOpen,
-  onToggle,
-}: {
-  isOpen: boolean;
-  onToggle: () => void;
-}) {
-  const [tooltipOpen, setTooltipOpen] = useState(false);
-  const isHoveringRef = useRef(false);
+type ChatInputStatus = "submitted" | "streaming" | "ready" | "error";
 
-  return (
-    <Tooltip
-      delayDuration={300}
-      open={tooltipOpen}
-      onOpenChange={(open) => {
-        if (open && !isHoveringRef.current) return;
-        setTooltipOpen(open);
-      }}
-    >
-      <TooltipTrigger asChild>
-        <button
-          onClick={onToggle}
-          onMouseEnter={() => {
-            isHoveringRef.current = true;
-          }}
-          onMouseLeave={() => {
-            isHoveringRef.current = false;
-            setTooltipOpen(false);
-          }}
-          aria-label={isOpen ? "Close AI panel" : "Open AI panel"}
-          className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/20",
-            isOpen
-              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/30"
-              : "bg-background/80 backdrop-blur-sm hover:bg-accent hover:text-accent-foreground shadow-sm hover:shadow-primary/20"
-          )}
-        >
-          <PanelLeftClose className="h-4 w-4" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" sideOffset={4} className="text-xs">
-        {isOpen ? "Close AI panel" : "Open AI panel"}
-      </TooltipContent>
-    </Tooltip>
-  );
+const SUGGESTIONS = [
+  "Create a landing page",
+  "Build a dashboard",
+  "Design a login form",
+  "Add a navigation bar",
+];
+
+/**
+ * Strip files_summary tags from message content for display
+ */
+function stripFilesSummary(content: string): string {
+  return content
+    .replace(/<files_summary>[\s\S]*?<\/files_summary>/g, "")
+    .trim();
 }
 
 export function AISidebar({
@@ -99,41 +79,54 @@ export function AISidebar({
   projectId?: string;
 }) {
   const [activeTab, setActiveTab] = useState("chat");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [error, setError] = useState<ErrorState | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [chatStatus, setChatStatus] = useState<ChatInputStatus>("ready");
 
-  // Auto-scroll to bottom when new messages arrive
+  // Mutation to save user messages to database
+  const createMessage = useMutation(api.messages.createMessage);
+
+  // Fetch messages from Convex when screen is selected
+  const convexMessages = useQuery(
+    api.messages.getMessages,
+    selectedScreenId ? { screenId: selectedScreenId as Id<"screens"> } : "skip"
+  );
+
+  // Convert Convex messages to local format when they load
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (!selectedScreenId) {
+      setIsLoadingHistory(false);
+      return;
     }
-  }, [messages]);
 
-  // Focus input when sidebar opens
-  useEffect(() => {
-    if (isOpen && inputRef.current && activeTab === "chat") {
-      inputRef.current.focus();
+    if (convexMessages === undefined) {
+      setIsLoadingHistory(true);
+      return;
     }
-  }, [isOpen, activeTab]);
 
-  // Auto-resize textarea
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
-    e.target.style.height = "auto";
-    e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
-  };
+    setIsLoadingHistory(false);
+
+    if (convexMessages && convexMessages.length > 0) {
+      const formattedMessages: ChatMessage[] = convexMessages.map((msg) => ({
+        id: msg._id,
+        role: msg.role,
+        content: stripFilesSummary(msg.content),
+        timestamp: new Date(msg.createdAt),
+      }));
+      setLocalMessages(formattedMessages);
+    }
+  }, [convexMessages, selectedScreenId]);
+
+  const messages = localMessages;
 
   const sendMessage = useCallback(
-    async (messageContent?: string) => {
-      const content = messageContent || input.trim();
+    async (messageContent: string) => {
+      const content = messageContent.trim();
       if (!content || isLoading) return;
 
-      // Validate required fields
       if (!selectedScreenId || !projectId) {
         setError({
           message: "Please select a screen to chat with AI",
@@ -143,27 +136,28 @@ export function AISidebar({
         return;
       }
 
-      // Clear any previous error state
       setError(null);
 
-      const userMessage: Message = {
+      const userMessage: ChatMessage = {
         id: `msg-${Date.now()}`,
         role: "user",
         content: content,
         timestamp: new Date(),
       };
 
-      // Only add user message if it's not a retry (retry uses existing message)
-      if (!messageContent) {
-        setMessages((prev) => [...prev, userMessage]);
-        setInput("");
-        if (inputRef.current) {
-          inputRef.current.style.height = "auto";
-        }
-      }
+      setLocalMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
+      setChatStatus("submitted");
 
       try {
+        // Save user message to database first
+        await createMessage({
+          screenId: selectedScreenId as Id<"screens">,
+          role: "user",
+          content: content,
+        });
+
+        // Then trigger the AI workflow
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -182,22 +176,22 @@ export function AISidebar({
           throw new Error(errorMessage);
         }
         setThreadId(data.threadId);
+        setChatStatus("streaming");
 
-        await pollForResponse(data.eventId, content);
+        // Keep loading state while agent processes
+        await pollForResponse(data.eventId);
       } catch (err) {
         console.error("Chat error:", err);
         const errorMessage =
           err instanceof Error ? err.message : "An unexpected error occurred";
 
-        // Set error state for retry functionality
         setError({
           message: errorMessage,
           originalMessage: content,
           canRetry: true,
         });
 
-        // Add error message to chat
-        setMessages((prev) => [
+        setLocalMessages((prev) => [
           ...prev,
           {
             id: `msg-${Date.now()}`,
@@ -207,19 +201,17 @@ export function AISidebar({
             isError: true,
           },
         ]);
-      } finally {
         setIsLoading(false);
+        setChatStatus("error");
       }
     },
-    [input, isLoading, threadId, selectedScreenId, projectId]
+    [isLoading, threadId, selectedScreenId, projectId, createMessage]
   );
 
-  // Retry the last failed message
   const retryLastMessage = useCallback(() => {
     if (!error?.canRetry || !error.originalMessage) return;
 
-    // Remove the last error message from the chat
-    setMessages((prev) => {
+    setLocalMessages((prev) => {
       const lastMessage = prev[prev.length - 1];
       if (lastMessage?.isError) {
         return prev.slice(0, -1);
@@ -227,37 +219,33 @@ export function AISidebar({
       return prev;
     });
 
-    // Retry sending the message
     sendMessage(error.originalMessage);
   }, [error, sendMessage]);
 
-  // Clear messages when screen changes
   useEffect(() => {
-    setMessages([]);
+    setLocalMessages([]);
     setThreadId(null);
     setError(null);
+    setIsLoadingHistory(!!selectedScreenId);
   }, [selectedScreenId]);
 
-  const pollForResponse = async (eventId: string, originalMessage: string) => {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `msg-${Date.now()}`,
-        role: "assistant",
-        content: `I received your message: "${originalMessage}". The agent is processing this in the background. Check the Inngest dashboard for the full response.`,
-        timestamp: new Date(),
-      },
-    ]);
+  const pollForResponse = async (_eventId: string) => {
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    setIsLoading(false);
+    setChatStatus("ready");
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+  const handleSuggestionClick = (suggestion: string) => {
+    sendMessage(suggestion);
   };
+
+  const handleSubmit = useCallback(
+    (message: PromptInputMessage) => {
+      if (!message.text.trim()) return;
+      sendMessage(message.text);
+    },
+    [sendMessage]
+  );
 
   if (!isOpen) return null;
 
@@ -271,13 +259,12 @@ export function AISidebar({
       }}
     >
       <div className="flex flex-col h-full rounded-xl bg-background/95 backdrop-blur-xl shadow-2xl overflow-hidden">
-        {/* Tabs */}
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
           className="flex flex-col flex-1 overflow-hidden"
         >
-          {/* Header with tabs - Notch Style */}
+          {/* Header with tabs */}
           <div className="relative flex items-center justify-center pt-3 pb-1 px-3 z-10">
             <TabsList className="relative h-10 bg-muted/30 backdrop-blur-2xl saturate-150 border border-border/20 shadow-sm rounded-full p-1 gap-1 grid grid-cols-3">
               {["chat", "edit", "code"].map((tab) => (
@@ -308,32 +295,30 @@ export function AISidebar({
             value="chat"
             className="flex-1 flex flex-col overflow-hidden mt-0 data-[state=inactive]:hidden"
           >
-            {/* Messages */}
-            <ScrollArea className="flex-1 px-3 py-3" ref={scrollRef}>
-              {messages.length === 0 ? (
-                <EmptyChat hasScreen={!!selectedScreenId} />
-              ) : (
-                <div className="space-y-4">
+            {isLoadingHistory ? (
+              <LoadingHistory />
+            ) : messages.length === 0 ? (
+              <EmptyChat
+                hasScreen={!!selectedScreenId}
+                onSuggestionClick={handleSuggestionClick}
+              />
+            ) : (
+              <Conversation className="flex-1">
+                <ConversationContent className="gap-4 px-3 py-3">
                   {messages.map((msg) => (
-                    <ChatMessage key={msg.id} message={msg} />
+                    <ChatMessageItem key={msg.id} message={msg} />
                   ))}
                   {isLoading && <ThinkingIndicator />}
                   {error?.canRetry && !isLoading && (
                     <ErrorRetryButton onRetry={retryLastMessage} />
                   )}
-                </div>
-              )}
-            </ScrollArea>
+                </ConversationContent>
+                <ConversationScrollButton />
+              </Conversation>
+            )}
 
             {/* Input */}
-            <ChatInput
-              ref={inputRef}
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              onSend={sendMessage}
-              isLoading={isLoading}
-            />
+            <ChatInput onSubmit={handleSubmit} status={chatStatus} />
           </TabsContent>
 
           {/* Edit Tab */}
@@ -365,11 +350,34 @@ export function AISidebar({
   );
 }
 
-// Empty chat state
-function EmptyChat({ hasScreen }: { hasScreen: boolean }) {
+function LoadingHistory() {
+  return (
+    <div className="flex flex-col items-center justify-center flex-1 py-12 px-4">
+      <div className="relative mb-4">
+        <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center border border-border/40">
+          <Loader size={24} className="text-muted-foreground/60" />
+        </div>
+      </div>
+      <h3 className="text-sm font-medium text-foreground mb-1">
+        Loading messages
+      </h3>
+      <p className="text-xs text-muted-foreground text-center max-w-[200px]">
+        Fetching your conversation history...
+      </p>
+    </div>
+  );
+}
+
+function EmptyChat({
+  hasScreen,
+  onSuggestionClick,
+}: {
+  hasScreen: boolean;
+  onSuggestionClick: (suggestion: string) => void;
+}) {
   if (!hasScreen) {
     return (
-      <div className="flex flex-col items-center justify-center h-full py-12 px-4">
+      <div className="flex flex-col items-center justify-center flex-1 py-12 px-4">
         <div className="relative mb-4">
           <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center border border-border/40">
             <MessageSquare className="h-8 w-8 text-muted-foreground/60" />
@@ -386,102 +394,144 @@ function EmptyChat({ hasScreen }: { hasScreen: boolean }) {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-full py-12 px-4">
-      <div className="relative mb-4">
-        <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
-          <Sparkles className="h-8 w-8 text-primary" />
-        </div>
-        <div className="absolute -inset-2 bg-primary/10 rounded-3xl blur-xl -z-10" />
-      </div>
-      <h3 className="text-sm font-medium text-foreground mb-1">
-        Start a conversation
-      </h3>
-      <p className="text-xs text-muted-foreground text-center max-w-[200px] mb-6">
-        Ask me to help design, generate UI, or answer questions about your
-        project
-      </p>
-      <div className="flex flex-wrap gap-2 justify-center">
-        {["Design a hero section", "Create a button", "Add a form"].map(
-          (suggestion) => (
+    <div className="flex flex-col items-center justify-center flex-1 py-8 px-4">
+      <Image
+        src="/chat_initial_card.svg"
+        alt="Start a conversation"
+        width={400}
+        height={150}
+        className="mb-6"
+      />
+
+      {/* Suggestions */}
+      <div className="w-full space-y-2">
+        <p className="text-xs text-muted-foreground/70 text-center mb-3">
+          Try one of these
+        </p>
+        <div className="flex flex-wrap justify-center gap-2">
+          {SUGGESTIONS.map((suggestion) => (
             <button
               key={suggestion}
-              className="px-3 py-1.5 text-xs rounded-full border border-border/60 bg-muted/30 hover:bg-muted/60 hover:border-primary/30 text-muted-foreground hover:text-foreground transition-all"
+              onClick={() => onSuggestionClick(suggestion)}
+              className="px-3 py-1.5 text-xs rounded-full bg-muted/40 hover:bg-muted/70 text-muted-foreground hover:text-foreground border border-border/30 hover:border-border/50 transition-all duration-200"
             >
               {suggestion}
             </button>
-          )
-        )}
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-// Chat message component
-function ChatMessage({ message }: { message: Message }) {
+function formatMessageTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function ChatMessageItem({ message }: { message: ChatMessage }) {
+  const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
   const isError = message.isError;
 
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(message.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // User message - right-aligned bubble with copy button
+  if (isUser) {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <div className="group relative max-w-[85%]">
+          <div className="rounded-2xl rounded-br-sm px-3.5 py-2.5 text-sm leading-relaxed bg-primary text-primary-foreground">
+            {message.content}
+          </div>
+          <button
+            onClick={handleCopy}
+            className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+            title="Copy message"
+          >
+            {copied ? (
+              <Check className="h-3.5 w-3.5 text-green-500" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Assistant message - left-aligned with credits and time
   return (
-    <div
-      className={cn("flex gap-2.5", isUser ? "justify-end" : "justify-start")}
-    >
-      {!isUser && (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex gap-2.5 items-start">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center mt-0.5">
+          {isError ? (
+            <AlertCircle className="h-5 w-5 text-destructive" />
+          ) : (
+            <Image
+              src="/unitset_logo.svg"
+              alt="AI"
+              width={20}
+              height={20}
+              className="h-5 w-5"
+            />
+          )}
+        </div>
         <div
           className={cn(
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border",
-            isError
-              ? "bg-destructive/10 border-destructive/20"
-              : "bg-linear-to-br from-primary/20 to-primary/5 border-primary/20"
+            "flex-1 text-sm leading-relaxed",
+            isError ? "text-destructive" : "text-foreground"
           )}
         >
-          {isError ? (
-            <AlertCircle className="h-4 w-4 text-destructive" />
-          ) : (
-            <Bot className="h-4 w-4 text-primary" />
-          )}
+          <MessageResponse>{message.content}</MessageResponse>
         </div>
-      )}
-      <div
-        className={cn(
-          "max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
-          isUser
-            ? "bg-primary text-primary-foreground rounded-br-sm"
-            : isError
-            ? "bg-destructive/10 border border-destructive/20 text-destructive rounded-bl-sm"
-            : "bg-muted/60 border border-border/40 rounded-bl-sm"
-        )}
-      >
-        {message.content}
       </div>
-      {isUser && (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-secondary border border-border/40">
-          <User className="h-4 w-4 text-muted-foreground" />
+      {/* Credits and time footer */}
+      {!isError && (
+        <div className="flex items-center gap-2 ml-8.5 text-[10px] text-muted-foreground/60">
+          <span className="flex items-center gap-1">
+            <Sparkles className="h-2.5 w-2.5" />5 credits
+          </span>
+          <span className="text-muted-foreground/30">•</span>
+          <span>{formatMessageTime(message.timestamp)}</span>
         </div>
       )}
     </div>
   );
 }
 
-// Thinking indicator
 function ThinkingIndicator() {
   return (
-    <div className="flex gap-2.5">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
-        <Bot className="h-4 w-4 text-primary" />
+    <div className="flex gap-2.5 items-start">
+      <div className="flex h-6 w-6 shrink-0 items-center justify-center mt-0.5">
+        <Image
+          src="/unitset_logo.svg"
+          alt="AI"
+          width={20}
+          height={20}
+          className="h-5 w-5"
+        />
       </div>
-      <div className="flex items-center gap-2 rounded-xl bg-muted/60 border border-border/40 px-3.5 py-2.5 rounded-bl-sm">
-        <div className="flex gap-1">
-          <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]" />
-          <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]" />
-          <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce" />
-        </div>
-        <span className="text-xs text-muted-foreground">Thinking...</span>
+      <div className="flex items-center gap-2 py-1">
+        <Loader size={14} className="text-primary" />
+        <span className="text-sm text-muted-foreground">Thinking...</span>
       </div>
     </div>
   );
 }
 
-// Error retry button component
 function ErrorRetryButton({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex justify-center">
@@ -498,60 +548,41 @@ function ErrorRetryButton({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-// Chat input component
-const ChatInput = ({
-  ref,
-  value,
-  onChange,
-  onKeyDown,
-  onSend,
-  isLoading,
+function ChatInput({
+  onSubmit,
+  status,
 }: {
-  ref: React.RefObject<HTMLTextAreaElement | null>;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  onKeyDown: (e: React.KeyboardEvent) => void;
-  onSend: () => void;
-  isLoading: boolean;
-}) => {
+  onSubmit: (message: PromptInputMessage) => void;
+  status: ChatInputStatus;
+}) {
   return (
-    <div className="p-3 pt-0 bg-transparent">
-      <div className="relative group">
-        <div className="relative flex items-end gap-2 rounded-lg bg-muted/30 hover:bg-muted/50 p-1.5 transition-all focus-within:bg-muted/50 focus-within:ring-2 focus-within:ring-primary/10">
-          <textarea
-            ref={ref}
-            value={value}
-            onChange={onChange}
-            onKeyDown={onKeyDown}
-            placeholder="Ask AI..."
-            disabled={isLoading}
-            rows={1}
-            className="flex-1 resize-none bg-transparent text-sm placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 min-h-[36px] max-h-[120px] py-2.5 px-3 rounded-lg"
+    <div className="p-3 pt-2">
+      <PromptInput
+        onSubmit={onSubmit}
+        className={cn(
+          "rounded-xl bg-muted/30 border border-border/40 transition-colors hover:bg-muted/40",
+          "focus-within:bg-muted/50 focus-within:border-border/60",
+          "focus-within:ring-[3px] focus-within:ring-primary/70 focus-within:ring-offset-0 focus-within:shadow-[0_0_24px_rgba(249,115,22,0.35)]"
+        )}
+      >
+        <PromptInputBody>
+          <PromptInputTextarea
+            placeholder="Ask AI anything..."
+            className="min-h-[36px] max-h-[120px] text-sm placeholder:text-muted-foreground/50 bg-transparent border-none shadow-none focus-visible:ring-0"
           />
-          <Button
-            size="icon"
-            onClick={onSend}
-            disabled={!value.trim() || isLoading}
-            className={cn(
-              "h-8 w-8 shrink-0 rounded-full transition-all mb-0.5 mr-0.5",
-              value.trim() && !isLoading
-                ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
-                : "bg-muted/50 text-muted-foreground"
-            )}
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      </div>
+        </PromptInputBody>
+        <PromptInputFooter className="justify-end px-2 pb-2">
+          <PromptInputSubmit
+            status={status}
+            size="icon-sm"
+            className="h-8 w-8 rounded-lg"
+          />
+        </PromptInputFooter>
+      </PromptInput>
     </div>
   );
-};
+}
 
-// Coming soon placeholder
 function ComingSoonPlaceholder({
   icon: Icon,
   title,

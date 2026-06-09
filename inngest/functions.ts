@@ -1,17 +1,26 @@
 import {
   createAgent,
   createNetwork,
+  createState,
   createTool,
   openai,
   type Tool,
 } from "@inngest/agent-kit";
 import { inngest } from "./client";
 import Sandbox from "@e2b/code-interpreter";
-import { getSandbox, lastAssistantTextMessageContent } from "./utils";
+import {
+  getSandbox,
+  lastAssistantTextMessageContent,
+  formatMessagesForAgent,
+  shouldCreateNewSandbox,
+  type ConvexScreen,
+  type ConvexMessage,
+} from "./utils";
 import z from "zod";
 
 interface AgentState {
   summary: string;
+  filesSummary: string;
   files: { [path: string]: string };
 }
 
@@ -54,45 +63,117 @@ const extractTitleFromSummary = (summary: string): string => {
   return "Generated UI";
 };
 
+// Auto-pause timeout for sandboxes (15 minutes)
+const SANDBOX_AUTO_PAUSE_TIMEOUT_MS = 15 * 60 * 1000;
+
 // Chat function - directly invoke agent without network
 export const runChatAgent = inngest.createFunction(
   { id: "run-chat-agent" },
   { event: "chat/message.sent" },
   async ({ event, step }) => {
-    const sandboxId = await step.run("get-sandbox-id", async () => {
-      const sandbox = await Sandbox.create("unitset-sandbox-v1");
-      return sandbox.sandboxId;
-    });
-
     const { message, screenId, projectId } = event.data;
 
-    // const previousMessages = await step.run(
-    //   "get-previous-messages",
-    //   async () => {
-    //     const formattedMessages: Message[] = [];
+    // Step 1: Get screen to check for existing sandbox
+    const screen = await step.run("get-screen", async () => {
+      const convexHttpUrl = getConvexHttpUrl();
+      const response = await fetch(`${convexHttpUrl}/inngest/getScreen`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ screenId }),
+      });
+      if (!response.ok) {
+        console.error("Failed to get screen");
+        return null;
+      }
+      return (await response.json()) as ConvexScreen | null;
+    });
 
-    //     //convex query to fetch prev messages for this screen, orderby created ay desc -> take 5 -> reverse order
-    //     messages = [];
+    // Step 2: Get or create sandbox with auto-pause
+    const sandboxResult = await step.run("get-or-create-sandbox", async () => {
+      const convexHttpUrl = getConvexHttpUrl();
+      let contextLost = false;
 
-    //     for (const message of messages) {
-    //       formattedMessages.push({
-    //         type: "text",
-    //         role: message.role === "ASSISTANT" ? "assistant" : "user",
-    //         content: message.content,
-    //       });
-    //     }
-    //     return formattedMessages;
-    //   }
-    // );
+      if (!shouldCreateNewSandbox(screen)) {
+        // Try to connect to existing sandbox (handles resume automatically)
+        try {
+          const sandbox = await Sandbox.connect(screen!.sandboxId!, {
+            timeoutMs: SANDBOX_AUTO_PAUSE_TIMEOUT_MS,
+          });
+          return { sandboxId: sandbox.sandboxId, contextLost: false };
+        } catch (error) {
+          console.warn(
+            "Failed to connect to existing sandbox, creating new one:",
+            error
+          );
+          // Mark that context was lost due to sandbox failure
+          contextLost = true;
+        }
+      }
 
-    // add this after implementing above step
-    // const state = createState<AgentState>(
-    //   {
-    //     summary: "",
-    //     files: {},
-    //   },
-    //   { messages: previosMessages }
-    // );
+      // Create new sandbox with auto-pause using beta API
+      const sandbox = await Sandbox.betaCreate("unitset-sandbox-v1", {
+        autoPause: true,
+        timeoutMs: SANDBOX_AUTO_PAUSE_TIMEOUT_MS,
+      });
+
+      // Store sandboxId in screen record
+      await fetch(`${convexHttpUrl}/inngest/updateScreen`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ screenId, sandboxId: sandbox.sandboxId }),
+      });
+
+      return { sandboxId: sandbox.sandboxId, contextLost };
+    });
+
+    const sandboxId = sandboxResult.sandboxId;
+    const contextLost = sandboxResult.contextLost;
+
+    // Notify user if context was lost due to sandbox failure
+    if (contextLost && screenId) {
+      await step.run("notify-context-lost", async () => {
+        const convexHttpUrl = getConvexHttpUrl();
+        await fetch(`${convexHttpUrl}/inngest/createMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            screenId,
+            role: "assistant",
+            content:
+              "Note: The previous sandbox session expired. I've created a new environment, so some context from our earlier conversation may be lost. I'll do my best to help based on the message history.",
+          }),
+        });
+      });
+    }
+
+    // Step 3: Get previous messages for context
+    const previousMessages = await step.run(
+      "get-previous-messages",
+      async () => {
+        const convexHttpUrl = getConvexHttpUrl();
+        const response = await fetch(`${convexHttpUrl}/inngest/getMessages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ screenId, limit: 10 }),
+        });
+        if (!response.ok) {
+          console.error("Failed to get messages");
+          return [];
+        }
+        const messages = (await response.json()) as ConvexMessage[];
+        return formatMessagesForAgent(messages);
+      }
+    );
+
+    // Create state with previous messages for agent context
+    const state = createState<AgentState>(
+      {
+        summary: "",
+        filesSummary: "",
+        files: screen?.files || {},
+      },
+      { messages: previousMessages }
+    );
 
     // UI Coding Agent
     const chatAgent = createAgent<AgentState>({
@@ -209,7 +290,12 @@ After ALL tool calls complete AND validation passes, respond with ONLY:
 Brief description of what was created or changed.
 </task_summary>
 
-Do not include this until the task is 100% complete and validation has passed.`,
+<files_summary>
+List each file you created or modified with a one-line description:
+- path/to/file.tsx: Brief description of what this file does
+</files_summary>
+
+Do not include these tags until the task is 100% complete and validation has passed.`,
       model: openrouter({ model: "x-ai/grok-4.1-fast:free" }),
       tools: [
         createTool({
@@ -312,8 +398,16 @@ Do not include this until the task is 100% complete and validation has passed.`,
           const lastAssistantTextMessageText =
             lastAssistantTextMessageContent(result);
           if (lastAssistantTextMessageText && network) {
+            // Extract task_summary
             if (lastAssistantTextMessageText.includes("<task_summary>")) {
               network.state.data.summary = lastAssistantTextMessageText;
+            }
+            // Extract files_summary
+            const filesSummaryMatch = lastAssistantTextMessageText.match(
+              /<files_summary>([\s\S]*?)<\/files_summary>/
+            );
+            if (filesSummaryMatch) {
+              network.state.data.filesSummary = filesSummaryMatch[0];
             }
           }
           return result;
@@ -325,7 +419,7 @@ Do not include this until the task is 100% complete and validation has passed.`,
       name: "chat-agent-network",
       agents: [chatAgent],
       maxIter: 15,
-      // defaultState: state  (add this after adding state code above)
+      defaultState: state,
       router: async ({ network }) => {
         const summary = network.state.data.summary;
         if (summary) {
@@ -335,8 +429,7 @@ Do not include this until the task is 100% complete and validation has passed.`,
       },
     });
 
-    const result = await network.run(message);
-    // const result = await network.run(message, {state}); (Use this after adding state)
+    const result = await network.run(message, { state });
 
     const isError =
       !result.state.data.summary ||
@@ -348,7 +441,7 @@ Do not include this until the task is 100% complete and validation has passed.`,
       return `https://${host}`;
     });
 
-    // Update screen in Convex with sandbox URL, files, and title
+    // Update screen in Convex with sandbox URL, sandboxId, files, and title
     if (!isError && screenId) {
       await step.run("update-screen-in-convex", async () => {
         const convexHttpUrl = getConvexHttpUrl();
@@ -360,6 +453,7 @@ Do not include this until the task is 100% complete and validation has passed.`,
           body: JSON.stringify({
             screenId,
             sandboxUrl,
+            sandboxId,
             files: result.state.data.files,
             title,
           }),
@@ -373,15 +467,27 @@ Do not include this until the task is 100% complete and validation has passed.`,
         return { success: true };
       });
 
-      // Create assistant message with summary
+      // Create assistant message with summary and files_summary for context
       await step.run("create-assistant-message", async () => {
         const convexHttpUrl = getConvexHttpUrl();
 
-        // Clean up the summary for display
+        // Clean up the summary for display (remove tags)
         const cleanSummary = (result.state.data.summary || "")
           .replace(/<task_summary>/gi, "")
           .replace(/<\/task_summary>/gi, "")
+          .replace(/<files_summary>[\s\S]*?<\/files_summary>/gi, "")
           .trim();
+
+        // Get the agent-generated files_summary (keep the tags for parsing later)
+        const filesSummary = result.state.data.filesSummary || "";
+
+        // Combine summary with files_summary for storage
+        // The files_summary is not displayed to user but provides context for follow-up messages
+        const messageContent = filesSummary
+          ? `${
+              cleanSummary || "UI generation completed successfully."
+            }\n\n${filesSummary}`
+          : cleanSummary || "UI generation completed successfully.";
 
         const response = await fetch(`${convexHttpUrl}/inngest/createMessage`, {
           method: "POST",
@@ -389,7 +495,7 @@ Do not include this until the task is 100% complete and validation has passed.`,
           body: JSON.stringify({
             screenId,
             role: "assistant",
-            content: cleanSummary || "UI generation completed successfully.",
+            content: messageContent,
           }),
         });
 

@@ -1,5 +1,10 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import {
+  mutation,
+  query,
+  internalMutation,
+  internalQuery,
+} from "./_generated/server";
 
 /**
  * Create a new message in a screen's chat thread
@@ -147,5 +152,34 @@ export const internalCreateMessage = internalMutation({
     });
 
     return messageId;
+  },
+});
+
+/**
+ * Internal query to get messages for a screen (called by Inngest workflow)
+ * Does not require authentication - used for server-to-server calls
+ * Returns messages ordered by creation time (oldest first)
+ */
+export const internalGetMessages = internalQuery({
+  args: {
+    screenId: v.id("screens"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // Verify screen exists
+    const screen = await ctx.db.get(args.screenId);
+    if (!screen) {
+      return [];
+    }
+
+    // Query messages in descending order and take limit
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_screenId", (q) => q.eq("screenId", args.screenId))
+      .order("desc")
+      .take(args.limit || 10);
+
+    // Reverse to get chronological order (oldest first)
+    return messages.reverse();
   },
 });

@@ -22,7 +22,7 @@ import {
   LayersSidebar,
   LayersSidebarToggle,
 } from "@/components/canvas/LayersSidebar";
-import { AISidebar, AISidebarToggle } from "@/components/canvas/AISidebar";
+import { AISidebar } from "@/components/canvas/AISidebar";
 import { getShapeCenter } from "@/lib/canvas/layers-sidebar-utils";
 
 // Import shape components
@@ -197,7 +197,6 @@ function CanvasContent({ projectId }: { projectId: string }) {
 
   // Sidebar states
   const [isLayersSidebarOpen, setIsLayersSidebarOpen] = useState(true);
-  const [isAISidebarOpen, setIsAISidebarOpen] = useState(false);
 
   // Delete screen modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -228,6 +227,15 @@ function CanvasContent({ projectId }: { projectId: string }) {
       },
     ])
   );
+
+  // AI Sidebar opens when a screen is selected
+  const selectedScreenShape = selectedShapesList.find(
+    (s) => s.type === "screen"
+  );
+  const selectedScreenId = selectedScreenShape
+    ? screenDataMap.get(selectedScreenShape.id)?._id
+    : undefined;
+  const isAISidebarOpen = !!selectedScreenShape;
 
   // Handle screen tool click - create screen in Convex and add to canvas
   useEffect(() => {
@@ -260,8 +268,8 @@ function CanvasContent({ projectId }: { projectId: string }) {
           },
         });
 
-        // Open the AI sidebar for the new screen
-        setIsAISidebarOpen(true);
+        // Select the new screen shape - this will automatically open the AI sidebar
+        dispatchShapes({ type: "SELECT_SHAPE", payload: shapeId });
       } catch (error) {
         console.error("Failed to create screen:", error);
       }
@@ -398,19 +406,16 @@ function CanvasContent({ projectId }: { projectId: string }) {
         isDeleting={isDeleting}
       />
 
-      {/* AI Sidebar */}
+      {/* AI Sidebar - opens when a screen is selected */}
       <AISidebar
         isOpen={isAISidebarOpen}
-        onClose={() => setIsAISidebarOpen(false)}
-        selectedScreenId={(() => {
-          // Find the selected screen shape and get its Convex screen ID
-          const selectedScreen = selectedShapesList.find(
-            (s) => s.type === "screen"
-          );
-          if (!selectedScreen) return undefined;
-          const screenData = screenDataMap.get(selectedScreen.id);
-          return screenData?._id;
-        })()}
+        onClose={() => {
+          // Deselect the screen to close the sidebar
+          if (selectedScreenShape) {
+            dispatchShapes({ type: "CLEAR_SELECTION" });
+          }
+        }}
+        selectedScreenId={selectedScreenId}
         projectId={projectId}
       />
 
@@ -450,13 +455,9 @@ function CanvasContent({ projectId }: { projectId: string }) {
         isOpen={isLayersSidebarOpen}
       />
 
-      {/* Back to Dashboard + AI Toggle + Properties Bar */}
+      {/* Back to Dashboard + Properties Bar */}
       <div className="absolute top-3 left-3 z-50 flex items-center gap-2">
         <BackButton />
-        <AISidebarToggle
-          isOpen={isAISidebarOpen}
-          onToggle={() => setIsAISidebarOpen(!isAISidebarOpen)}
-        />
         <ShapePropertiesBar
           currentTool={activeTool}
           selectedShapes={selectedShapesList}
@@ -557,7 +558,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
                   onClick={() => {
                     dispatchShapes({ type: "CLEAR_SELECTION" });
                     dispatchShapes({ type: "SELECT_SHAPE", payload: shape.id });
-                    setIsAISidebarOpen(true);
+                    // AI sidebar opens automatically when screen is selected
                   }}
                 />
               );

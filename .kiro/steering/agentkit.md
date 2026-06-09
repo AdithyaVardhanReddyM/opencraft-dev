@@ -1,5 +1,5 @@
 ---
-inclusion: manual
+inclusion: auto
 ---
 
 # AgentKit by Inngest - Coding Agent Guide

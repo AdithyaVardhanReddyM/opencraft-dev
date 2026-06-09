@@ -6,6 +6,7 @@ import type {
   RectShape,
   TextShape,
   FrameShape,
+  ScreenShape,
 } from "@/types/canvas";
 import {
   type ShapeDefaultProperties,
@@ -387,8 +388,12 @@ function getDimensionsFromShapes(shapes: Shape[]): {
     ): s is
       | FrameShape
       | RectShape
+      | ScreenShape
       | (Shape & { type: "ellipse"; w: number; h: number }) =>
-      s.type === "frame" || s.type === "rect" || s.type === "ellipse"
+      s.type === "frame" ||
+      s.type === "rect" ||
+      s.type === "ellipse" ||
+      s.type === "screen"
   );
 
   if (dimensionShapes.length === 0) return { width: 0, height: 0 };

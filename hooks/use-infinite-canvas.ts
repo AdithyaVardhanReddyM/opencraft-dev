@@ -50,6 +50,7 @@ export interface UseInfiniteCanvasReturn {
   selectedShapes: SelectionMap;
   isSidebarOpen: boolean;
   hasSelectedText: boolean;
+  hasSelectedScreen: boolean;
 
   // History state
   canUndo: boolean;
@@ -188,18 +189,16 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     return shape?.type === "text";
   });
 
+  const hasSelectedScreen = Object.keys(selectedShapes).some((id) => {
+    const shape = shapesState.shapes.entities[id];
+    return shape?.type === "screen";
+  });
+
   // History state
   const canUndo = checkCanUndo(shapesState.historyPointer);
   const canRedo = checkCanRedo(shapesState.history, shapesState.historyPointer);
 
-  // Auto-open sidebar for text selection
-  useEffect(() => {
-    if (hasSelectedText && !isSidebarOpen) {
-      setIsSidebarOpen(true);
-    } else if (!hasSelectedText) {
-      setIsSidebarOpen(false);
-    }
-  }, [hasSelectedText, isSidebarOpen]);
+  // Note: AI sidebar state is now managed in the canvas page based on screen selection
 
   // Keyboard event handlers
   useEffect(() => {
@@ -823,10 +822,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
               dispatchShapes({ type: "SELECT_SHAPE", payload: hitShape.id });
             }
 
-            // Open sidebar when clicking on a screen shape
-            if (hitShape.type === "screen") {
-              setIsSidebarOpen(true);
-            }
+            // Note: AI sidebar opens automatically in canvas page when screen is selected
 
             isMovingRef.current = true;
             moveStartRef.current = world;
@@ -1321,6 +1317,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     selectedShapes,
     isSidebarOpen,
     hasSelectedText,
+    hasSelectedScreen,
     canUndo,
     canRedo,
     onPointerDown,

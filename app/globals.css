@@ -544,3 +544,18 @@ html[data-scroll-behavior="smooth"] {
 .cursor-grabbing {
   cursor: grabbing;
 }
+
+[data-slot="input-group"][data-variant="plain"] {
+  border-width: 0;
+  box-shadow: none;
+  background-color: transparent;
+}
+
+[data-slot="input-group"][data-variant="plain"]:focus-within {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+[data-slot="input-group-control"]:focus-visible {
+  outline: none;
+}

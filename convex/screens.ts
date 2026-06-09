@@ -1,5 +1,10 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import {
+  mutation,
+  query,
+  internalMutation,
+  internalQuery,
+} from "./_generated/server";
 
 /**
  * Create a new screen record
@@ -203,6 +208,7 @@ export const internalUpdateScreen = internalMutation({
   args: {
     screenId: v.id("screens"),
     sandboxUrl: v.optional(v.string()),
+    sandboxId: v.optional(v.string()),
     files: v.optional(v.any()),
     title: v.optional(v.string()),
   },
@@ -216,6 +222,7 @@ export const internalUpdateScreen = internalMutation({
     // Build patch object with only provided fields
     const patch: {
       sandboxUrl?: string;
+      sandboxId?: string;
       files?: unknown;
       title?: string;
       updatedAt: number;
@@ -225,6 +232,9 @@ export const internalUpdateScreen = internalMutation({
 
     if (args.sandboxUrl !== undefined) {
       patch.sandboxUrl = args.sandboxUrl;
+    }
+    if (args.sandboxId !== undefined) {
+      patch.sandboxId = args.sandboxId;
     }
     if (args.files !== undefined) {
       patch.files = args.files;
@@ -236,5 +246,19 @@ export const internalUpdateScreen = internalMutation({
     await ctx.db.patch(args.screenId, patch);
 
     return { success: true };
+  },
+});
+
+/**
+ * Internal query to get a screen by ID (called by Inngest workflow)
+ * Does not require authentication - used for server-to-server calls
+ */
+export const internalGetScreen = internalQuery({
+  args: {
+    screenId: v.id("screens"),
+  },
+  handler: async (ctx, args) => {
+    const screen = await ctx.db.get(args.screenId);
+    return screen;
   },
 });

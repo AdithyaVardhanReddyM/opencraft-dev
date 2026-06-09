@@ -31,6 +31,7 @@ export default defineSchema({
     projectId: v.id("projects"), // Parent project reference
     title: v.optional(v.string()), // Screen title (from AI summary)
     sandboxUrl: v.optional(v.string()), // E2B sandbox URL for iframe
+    sandboxId: v.optional(v.string()), // E2B sandbox ID for persistence and lifecycle management
     files: v.optional(v.any()), // Generated files JSON: { [path: string]: string }
     createdAt: v.number(), // Creation timestamp
     updatedAt: v.number(), // Last update timestamp

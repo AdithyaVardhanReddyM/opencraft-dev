@@ -13,7 +13,8 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     try {
-      const { screenId, sandboxUrl, files, title } = await request.json();
+      const { screenId, sandboxUrl, sandboxId, files, title } =
+        await request.json();
 
       if (!screenId) {
         return new Response(JSON.stringify({ error: "screenId is required" }), {
@@ -25,6 +26,7 @@ http.route({
       await ctx.runMutation(internal.screens.internalUpdateScreen, {
         screenId,
         sandboxUrl,
+        sandboxId,
         files,
         title,
       });
@@ -86,6 +88,92 @@ http.route({
       });
     } catch (error) {
       console.error("Error creating message:", error);
+      return new Response(
+        JSON.stringify({
+          error: error instanceof Error ? error.message : "Internal error",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+  }),
+});
+
+/**
+ * HTTP endpoint for Inngest workflow to get screen data
+ * This endpoint is called to fetch screen with sandboxId for reuse
+ */
+http.route({
+  path: "/inngest/getScreen",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const { screenId } = await request.json();
+
+      if (!screenId) {
+        return new Response(JSON.stringify({ error: "screenId is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const screen = await ctx.runQuery(internal.screens.internalGetScreen, {
+        screenId,
+      });
+
+      return new Response(JSON.stringify(screen), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error getting screen:", error);
+      return new Response(
+        JSON.stringify({
+          error: error instanceof Error ? error.message : "Internal error",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+  }),
+});
+
+/**
+ * HTTP endpoint for Inngest workflow to get message history
+ * This endpoint is called to fetch previous messages for agent context
+ */
+http.route({
+  path: "/inngest/getMessages",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const { screenId, limit } = await request.json();
+
+      if (!screenId) {
+        return new Response(JSON.stringify({ error: "screenId is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const messages = await ctx.runQuery(
+        internal.messages.internalGetMessages,
+        {
+          screenId,
+          limit: limit || 10,
+        }
+      );
+
+      return new Response(JSON.stringify(messages), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error getting messages:", error);
       return new Response(
         JSON.stringify({
           error: error instanceof Error ? error.message : "Internal error",
