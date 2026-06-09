@@ -23,6 +23,7 @@ import z from "zod";
 interface AgentState {
   summary: string;
   filesSummary: string;
+  title: string;
   files: { [path: string]: string };
 }
 
@@ -45,13 +46,21 @@ const getConvexHttpUrl = () => {
   return convexUrl.replace(".convex.cloud", ".convex.site");
 };
 
-// Extract title from task summary
-const extractTitleFromSummary = (summary: string): string => {
-  // Try to extract a meaningful title from the summary
-  // Remove the <task_summary> tags first
-  const cleanSummary = summary
+// Extract title from explicit <title> tag or fall back to task summary
+const extractTitle = (content: string): string => {
+  // First, try to extract from explicit <title> tag
+  const titleMatch = content.match(/<title>([\s\S]*?)<\/title>/i);
+  if (titleMatch && titleMatch[1]?.trim()) {
+    const title = titleMatch[1].trim();
+    return title.length > 50 ? title.substring(0, 47) + "..." : title;
+  }
+
+  // Fall back to extracting from task_summary
+  const cleanSummary = content
     .replace(/<task_summary>/gi, "")
     .replace(/<\/task_summary>/gi, "")
+    .replace(/<title>[\s\S]*?<\/title>/gi, "")
+    .replace(/<files_summary>[\s\S]*?<\/files_summary>/gi, "")
     .trim();
 
   // Take the first sentence or first 50 characters
@@ -178,6 +187,7 @@ export const runChatAgent = inngest.createFunction(
       {
         summary: "",
         filesSummary: "",
+        title: "",
         files: screen?.files || {},
       },
       { messages: previousMessages }
@@ -294,6 +304,10 @@ DO NOT output the task_summary until the validation passes successfully.
 ## Final Output
 After ALL tool calls complete AND validation passes, respond with ONLY:
 
+<title>
+A short, descriptive title for this app/project (2-5 words, e.g., "Task Manager Dashboard", "E-commerce Landing Page")
+</title>
+
 <task_summary>
 Brief description of what was created or changed.
 </task_summary>
@@ -407,6 +421,13 @@ Do not include these tags until the task is 100% complete and validation has pas
             if (lastAssistantTextMessageText.includes("<task_summary>")) {
               network.state.data.summary = lastAssistantTextMessageText;
             }
+            // Extract title
+            const titleMatch = lastAssistantTextMessageText.match(
+              /<title>([\s\S]*?)<\/title>/i
+            );
+            if (titleMatch && titleMatch[1]?.trim()) {
+              network.state.data.title = titleMatch[1].trim();
+            }
             // Extract files_summary
             const filesSummaryMatch = lastAssistantTextMessageText.match(
               /<files_summary>([\s\S]*?)<\/files_summary>/
@@ -462,11 +483,17 @@ Do not include these tags until the task is 100% complete and validation has pas
       return `https://${host}`;
     });
 
-    // Update screen in Convex with sandbox URL, sandboxId, files, and title
+    // Update screen in Convex with sandbox URL, sandboxId, files, and title (only if no existing title)
     if (!isError && screenId) {
       await step.run("update-screen-in-convex", async () => {
         const convexHttpUrl = getConvexHttpUrl();
-        const title = extractTitleFromSummary(result.state.data.summary || "");
+
+        // Only set title if screen doesn't already have one
+        const shouldUpdateTitle = !screen?.title;
+        const title = shouldUpdateTitle
+          ? result.state.data.title ||
+            extractTitle(result.state.data.summary || "")
+          : undefined;
 
         const response = await fetch(`${convexHttpUrl}/inngest/updateScreen`, {
           method: "POST",
@@ -476,7 +503,7 @@ Do not include these tags until the task is 100% complete and validation has pas
             sandboxUrl,
             sandboxId,
             files: result.state.data.files,
-            title,
+            ...(title && { title }),
           }),
         });
 
@@ -496,6 +523,7 @@ Do not include these tags until the task is 100% complete and validation has pas
         const cleanSummary = (result.state.data.summary || "")
           .replace(/<task_summary>/gi, "")
           .replace(/<\/task_summary>/gi, "")
+          .replace(/<title>[\s\S]*?<\/title>/gi, "")
           .replace(/<files_summary>[\s\S]*?<\/files_summary>/gi, "")
           .trim();
 
