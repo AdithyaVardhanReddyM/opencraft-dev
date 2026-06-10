@@ -138,6 +138,8 @@ export function Screen({
               }}
               title={title}
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              data-sandbox-preview="true"
+              data-sandbox-id={screenData?.sandboxId}
             />
           )}
 

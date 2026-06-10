@@ -3,7 +3,6 @@
 import { useState, useCallback } from "react";
 import {
   MessageSquare,
-  Pencil,
   AlertCircle,
   RefreshCw,
   Sparkles,
@@ -33,6 +32,8 @@ import {
 import { StreamingIndicator } from "@/components/canvas/StreamingIndicator";
 import { useChatStreaming, type ChatMessage } from "@/hooks/use-chat-streaming";
 import { CodeExplorer } from "@/components/canvas/code-explorer";
+import { EditModeProvider } from "@/contexts/EditModeContext";
+import { EditModePanel } from "@/components/canvas/EditModePanel";
 
 type ChatInputStatus = "submitted" | "streaming" | "ready" | "error";
 
@@ -52,6 +53,7 @@ export function AISidebar({
   selectedScreenId,
   projectId,
   sandboxId,
+  sandboxUrl,
   cachedFiles,
 }: {
   isOpen: boolean;
@@ -59,6 +61,7 @@ export function AISidebar({
   selectedScreenId?: string;
   projectId?: string;
   sandboxId?: string;
+  sandboxUrl?: string;
   cachedFiles?: Record<string, string>;
 }) {
   const [activeTab, setActiveTab] = useState("chat");
@@ -196,11 +199,18 @@ export function AISidebar({
             value="edit"
             className="flex-1 flex flex-col overflow-hidden mt-0 data-[state=inactive]:hidden"
           >
-            <ComingSoonPlaceholder
-              icon={Pencil}
-              title="Edit Mode"
-              description="Select and edit elements on your canvas with AI assistance. Coming soon!"
-            />
+            <EditModeProvider
+              sandboxId={sandboxId}
+              screenId={selectedScreenId}
+              sandboxUrl={sandboxUrl}
+              isActive={activeTab === "edit"}
+            >
+              <EditModePanel
+                screenId={selectedScreenId}
+                sandboxId={sandboxId}
+                sandboxUrl={sandboxUrl}
+              />
+            </EditModeProvider>
           </TabsContent>
 
           {/* Code Tab */}
@@ -461,36 +471,6 @@ function ChatInput({
           />
         </PromptInputFooter>
       </PromptInput>
-    </div>
-  );
-}
-
-function ComingSoonPlaceholder({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: React.ElementType;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-      <div className="relative mb-4">
-        <div className="h-14 w-14 rounded-xl bg-muted/50 flex items-center justify-center border border-border/40">
-          <Icon className="h-7 w-7 text-muted-foreground/60" />
-        </div>
-        <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-          <Sparkles className="h-3 w-3 text-primary" />
-        </div>
-      </div>
-      <h3 className="text-sm font-medium text-foreground mb-1">{title}</h3>
-      <p className="text-xs text-muted-foreground max-w-[220px]">
-        {description}
-      </p>
-      <div className="mt-4 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
-        <span className="text-xs font-medium text-primary">Coming Soon</span>
-      </div>
     </div>
   );
 }

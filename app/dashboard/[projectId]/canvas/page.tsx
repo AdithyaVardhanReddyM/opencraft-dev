@@ -468,6 +468,11 @@ function CanvasContent({ projectId }: { projectId: string }) {
             ? screenDataMap.get(selectedScreenShape.id)?.sandboxId
             : undefined
         }
+        sandboxUrl={
+          selectedScreenShape
+            ? screenDataMap.get(selectedScreenShape.id)?.sandboxUrl
+            : undefined
+        }
         cachedFiles={
           selectedScreenShape
             ? (screensData?.find((s) => s.shapeId === selectedScreenShape.id)
