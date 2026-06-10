@@ -229,6 +229,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
         sandboxUrl: screen.sandboxUrl,
         sandboxId: screen.sandboxId,
         title: screen.title,
+        theme: screen.theme,
       },
     ])
   );

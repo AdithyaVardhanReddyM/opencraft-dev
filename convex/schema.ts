@@ -33,6 +33,7 @@ export default defineSchema({
     sandboxUrl: v.optional(v.string()), // E2B sandbox URL for iframe
     sandboxId: v.optional(v.string()), // E2B sandbox ID for persistence and lifecycle management
     files: v.optional(v.any()), // Generated files JSON: { [path: string]: string }
+    theme: v.optional(v.string()), // Selected theme ID (default, claude, vercel, etc.)
     createdAt: v.number(), // Creation timestamp
     updatedAt: v.number(), // Last update timestamp
   })

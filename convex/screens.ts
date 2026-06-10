@@ -43,7 +43,7 @@ export const createScreen = mutation({
 });
 
 /**
- * Update a screen record with sandbox URL, files, and title
+ * Update a screen record with sandbox URL, files, title, and theme
  * Called by Inngest workflow after AI generation completes
  */
 export const updateScreen = mutation({
@@ -52,6 +52,7 @@ export const updateScreen = mutation({
     sandboxUrl: v.optional(v.string()),
     files: v.optional(v.any()),
     title: v.optional(v.string()),
+    theme: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -76,6 +77,7 @@ export const updateScreen = mutation({
       sandboxUrl?: string;
       files?: unknown;
       title?: string;
+      theme?: string;
       updatedAt: number;
     } = {
       updatedAt: Date.now(),
@@ -89,6 +91,9 @@ export const updateScreen = mutation({
     }
     if (args.title !== undefined) {
       patch.title = args.title;
+    }
+    if (args.theme !== undefined) {
+      patch.theme = args.theme;
     }
 
     await ctx.db.patch(args.screenId, patch);

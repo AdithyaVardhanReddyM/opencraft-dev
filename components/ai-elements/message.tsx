@@ -1,10 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  ButtonGroup,
-  ButtonGroupText,
-} from "@/components/ui/button-group";
+import { ButtonGroup, ButtonGroupText } from "@/components/ui/button-group";
 import {
   Tooltip,
   TooltipContent,
@@ -311,6 +308,13 @@ export const MessageResponse = memo(
     <Streamdown
       className={cn(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+        // Tighter spacing for markdown elements
+        "[&_p]:mb-2 [&_p]:leading-relaxed",
+        "[&_ul]:my-1.5 [&_ul]:space-y-0.5",
+        "[&_ol]:my-1.5 [&_ol]:space-y-0.5",
+        "[&_li]:leading-snug",
+        "[&_h1]:mb-2 [&_h2]:mb-2 [&_h3]:mb-1.5 [&_h4]:mb-1",
+        "[&_strong]:font-semibold",
         className
       )}
       {...props}

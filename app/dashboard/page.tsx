@@ -9,19 +9,18 @@ import { ProjectSortOption } from "@/types/project";
 const SORT_PREFERENCE_KEY = "dashboard-sort-preference";
 
 export default function DashboardPage() {
-  // Initialize sort preference from sessionStorage or default to "newest"
-  const [sortBy, setSortBy] = useState<ProjectSortOption>(() => {
-    if (typeof window !== "undefined") {
-      const stored = sessionStorage.getItem(SORT_PREFERENCE_KEY);
-      if (stored) {
-        return stored as ProjectSortOption;
-      }
-    }
-    return "newest";
-  });
-
+  // Always initialize with default to avoid hydration mismatch
+  const [sortBy, setSortBy] = useState<ProjectSortOption>("newest");
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  // Load sort preference from sessionStorage after hydration
+  useEffect(() => {
+    const stored = sessionStorage.getItem(SORT_PREFERENCE_KEY);
+    if (stored) {
+      setSortBy(stored as ProjectSortOption);
+    }
+  }, []);
 
   // Persist sort preference to sessionStorage whenever it changes
   useEffect(() => {

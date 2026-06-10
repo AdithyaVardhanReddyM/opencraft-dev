@@ -28,7 +28,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      appearance={{
+        variables: {
+          colorPrimary: "#F08000",
+        },
+      }}
+    >
       <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}

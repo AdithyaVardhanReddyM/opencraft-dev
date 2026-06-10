@@ -33,6 +33,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { ThemeSelector } from "@/components/canvas/ThemeSelector";
 
 interface ScreenToolbarProps {
   shape: ScreenShape;
@@ -41,6 +42,7 @@ interface ScreenToolbarProps {
     sandboxUrl?: string;
     sandboxId?: string;
     title?: string;
+    theme?: string;
   };
   viewport: ViewportState;
   onDelete: () => void;
@@ -74,8 +76,39 @@ export function ScreenToolbar({
     autoResume: true,
   });
 
-  // Convex mutation for updating screen title
+  // Convex mutation for updating screen
   const updateScreen = useMutation(api.screens.updateScreen);
+
+  // Handle theme change - apply to sandbox and save to Convex
+  const handleThemeChange = useCallback(
+    async (themeId: string) => {
+      if (!screenData?.sandboxId || !screenData?._id) return;
+
+      // Call API to apply theme to sandbox
+      const response = await fetch("/api/sandbox/theme", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sandboxId: screenData.sandboxId,
+          themeId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to apply theme");
+      }
+
+      // Save theme to Convex
+      await updateScreen({
+        screenId: screenData._id,
+        theme: themeId,
+      });
+
+      // Refresh the iframe to show new theme
+      onRefresh();
+    },
+    [screenData, updateScreen, onRefresh]
+  );
 
   // Sync edited name with screen data
   useEffect(() => {
@@ -258,6 +291,13 @@ export function ScreenToolbar({
           })}
         </PopoverContent>
       </Popover>
+
+      {/* Theme Selector */}
+      <ThemeSelector
+        currentTheme={screenData?.theme || "default"}
+        onThemeChange={handleThemeChange}
+        disabled={!canRefresh}
+      />
 
       {/* Divider */}
       <div className="h-5 w-px bg-border/50 mx-1" aria-hidden />

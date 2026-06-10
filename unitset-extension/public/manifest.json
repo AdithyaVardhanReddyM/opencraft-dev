@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "UnitSet",
+  "description": "Capture HTML elements from any webpage for AI replication in UnitSet",
+  "icons": {
+    "32": "unitset-logo.png",
+    "48": "unitset-logo.png",
+    "128": "unitset-logo.png"
+  },
+  "version": "1.0.0",
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "UnitSet Element Selector"
+  },
+  "permissions": ["scripting", "activeTab", "clipboardWrite", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "web_accessible_resources": [
+    {
+      "resources": ["content-script.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

@@ -206,6 +206,7 @@ export const runChatAgent = inngest.createFunction(
 - layout.tsx already defined — never include <html>, <body>, or top-level layout
 - Tailwind CSS and PostCSS preconfigured
 - shadcn/ui components in @/components/ui (radix-ui, lucide-react, class-variance-authority, tailwind-merge pre-installed)
+- Theme system with CSS variables in globals.css — colors may change based on user's selected theme
 
 ## Tools
 
@@ -240,10 +241,17 @@ Read file contents.
 - Add "use client" as THE FIRST LINE for any file using React hooks or browser APIs
 - This includes app/page.tsx if it uses useState, useEffect, etc.
 
-### Styling
+### Styling — IMPORTANT
 - Use ONLY Tailwind CSS classes — never create .css, .scss, or .sass files
-- Use theme semantic colors: bg-background, text-foreground, bg-primary, bg-secondary, bg-muted, bg-accent, bg-destructive, border-border
-- Avoid multi-color gradients; prefer single-color opacity variations
+- **ALWAYS use semantic theme colors from globals.css** unless the user explicitly requests specific colors:
+  - Backgrounds: bg-background, bg-card, bg-popover, bg-primary, bg-secondary, bg-muted, bg-accent, bg-destructive
+  - Text: text-foreground, text-card-foreground, text-popover-foreground, text-primary-foreground, text-secondary-foreground, text-muted-foreground, text-accent-foreground, text-destructive-foreground
+  - Borders: border-border, border-input, border-ring
+  - Charts: bg-chart-1 through bg-chart-5
+  - Sidebar: bg-sidebar, text-sidebar-foreground, bg-sidebar-accent, text-sidebar-accent-foreground
+- These semantic colors automatically adapt to the user's selected theme (Claude, Vercel, Cyberpunk, etc.)
+- Only use hardcoded colors (like bg-blue-500, text-red-600) when the user explicitly requests a specific color
+- Avoid multi-color gradients; prefer single-color opacity variations (e.g., bg-primary/10)
 - Dark mode first (default theme)
 
 ### shadcn/ui Usage
@@ -309,7 +317,23 @@ A short, descriptive title for this app/project (2-5 words, e.g., "Task Manager 
 </title>
 
 <task_summary>
-Brief description of what was created or changed.
+Write a comprehensive but concise summary in **markdown format**. Structure it as follows:
+
+**What I Built**
+A brief paragraph describing the main feature or component.
+
+**Key Features**
+- Feature 1 with brief explanation
+- Feature 2 with brief explanation
+- Feature 3 (add more as needed)
+
+**Design Highlights**
+- Notable UI/UX choices
+- Responsive behavior
+- Accessibility considerations (if any)
+
+Use proper markdown: **bold** for emphasis, bullet points for lists, and clear paragraph breaks.
+Keep it informative but not overly long — this is shown directly to the user.
 </task_summary>
 
 <files_summary>
@@ -317,7 +341,51 @@ List each file you created or modified with a one-line description:
 - path/to/file.tsx: Brief description of what this file does
 </files_summary>
 
-Do not include these tags until the task is 100% complete and validation has passed.`,
+Do not include these tags until the task is 100% complete and validation has passed.
+
+## Captured Element Replication
+
+When a user sends a message containing \`[UNITSET_ELEMENT_CAPTURE]\` tags, they are providing HTML and CSS captured from a real webpage component they want you to replicate.
+
+### Recognition
+The captured data includes:
+- **HTML**: The complete outer HTML structure of the element
+- **Computed Styles**: All CSS styles as computed by the browser (actual pixel values, colors, etc.)
+- **Metadata**: Element tag name, dimensions, and position
+
+### Replication Guidelines — EXACT MATCH PRIORITY
+**IMPORTANT**: For captured elements, your goal is to replicate the component as EXACTLY as possible. This is different from normal requests where you use the theme system.
+
+1. **Use EXACT colors from the captured styles** — DO NOT convert to theme colors
+   - If the captured style shows \`background-color: rgb(59, 130, 246)\`, use \`bg-[#3b82f6]\` or the exact Tailwind color
+   - Preserve gradients, shadows, and opacity values exactly as captured
+   - Only use theme colors (bg-primary, etc.) if the user explicitly asks to adapt to the theme
+
+2. **Preserve exact dimensions and spacing**
+   - Use arbitrary values like \`w-[320px]\`, \`p-[18px]\` when needed for exact match
+   - Don't round to Tailwind scale if it changes the appearance
+
+3. **Handle images and assets**
+   - If the HTML contains \`<img>\` tags with external URLs, keep them as-is
+   - For background images, preserve the exact URL
+   - If images fail to load, use a placeholder div with the same dimensions
+
+4. **Analyze the HTML structure** and recreate it using React components
+   - Match the exact nesting and element structure
+   - Preserve class names as comments for reference
+
+5. **Use shadcn/ui components** only when they match the captured pattern exactly
+   - If the captured button looks different from shadcn Button, build a custom one
+
+6. **Preserve ALL visual details**
+   - Border radius, shadows, transitions
+   - Font sizes, weights, line heights
+   - Hover states if visible in styles
+
+7. **Make it functional** — add appropriate click handlers and state
+
+### Output
+Create a React component that is a PIXEL-PERFECT replica of the captured element. The goal is exact visual replication, not adaptation to the design system.`,
       model: openrouter({ model: "x-ai/grok-4.1-fast:free" }),
       tools: [
         createTool({

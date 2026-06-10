@@ -34,8 +34,44 @@ import { useChatStreaming, type ChatMessage } from "@/hooks/use-chat-streaming";
 import { CodeExplorer } from "@/components/canvas/code-explorer";
 import { EditModeProvider } from "@/contexts/EditModeContext";
 import { EditModePanel } from "@/components/canvas/EditModePanel";
+import { ExtensionChip } from "@/components/canvas/ExtensionChip";
+import {
+  isExtensionContentFormat,
+  parseExtensionContent,
+  formatForAI,
+  extractExtensionDataFromMessage,
+  getDisplayContentFromMessage,
+  type CapturedElement,
+  type ExtensionMetadataDisplay,
+} from "@/lib/extension-content";
 
 type ChatInputStatus = "submitted" | "streaming" | "ready" | "error";
+
+/** Display-only chip for showing extension content in messages */
+function ExtensionChipDisplay({
+  metadata,
+}: {
+  metadata: ExtensionMetadataDisplay;
+}) {
+  return (
+    <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-primary/20 border border-primary/30 text-xs">
+      <svg
+        className="w-3.5 h-3.5 text-primary"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+        <polyline points="15 3 21 3 21 9" />
+        <line x1="10" y1="14" x2="21" y2="3" />
+      </svg>
+      <span className="font-medium text-primary-foreground">
+        {metadata.tagName} • {metadata.width}×{metadata.height}px
+      </span>
+    </div>
+  );
+}
 
 const SUGGESTIONS = [
   "Create a landing page",
@@ -87,9 +123,19 @@ export function AISidebar({
   };
 
   const handleSubmit = useCallback(
-    (message: PromptInputMessage) => {
-      if (!message.text.trim()) return;
-      sendMessage(message.text);
+    (message: PromptInputMessage, extensionData?: CapturedElement) => {
+      if (!message.text.trim() && !extensionData) return;
+
+      // If extension data is present, format it for AI
+      let finalMessage = message.text.trim();
+      if (extensionData) {
+        const formattedExtension = formatForAI(extensionData);
+        finalMessage = finalMessage
+          ? `${finalMessage}\n\n${formattedExtension}`
+          : `Replicate this element:\n\n${formattedExtension}`;
+      }
+
+      sendMessage(finalMessage);
     },
     [sendMessage]
   );
@@ -330,6 +376,14 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Check if user message contains extension content
+  const extensionData = isUser
+    ? extractExtensionDataFromMessage(message.content)
+    : null;
+  const displayContent = isUser
+    ? getDisplayContentFromMessage(message.content)
+    : message.content;
+
   // User message - right-aligned glassy bubble with primary tint
   if (isUser) {
     return (
@@ -337,7 +391,12 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
         <div className="group relative max-w-[85%]">
           <div className="relative rounded-[14px] rounded-br-[2px] px-3.5 py-2.5 text-sm leading-relaxed bg-primary/10 text-primary shadow-sm">
             <div className="absolute inset-0 rounded-[14px] rounded-br-[2px] bg-linear-to-br from-white/5 to-transparent pointer-events-none" />
-            <span className="relative">{message.content}</span>
+            <div className="relative flex flex-col gap-2">
+              {extensionData && (
+                <ExtensionChipDisplay metadata={extensionData} />
+              )}
+              {displayContent && <span>{displayContent}</span>}
+            </div>
           </div>
           <button
             onClick={handleCopy}
@@ -374,7 +433,7 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
         </div>
         <div
           className={cn(
-            "flex-1 text-sm leading-relaxed",
+            "flex-1 text-sm",
             isError ? "text-destructive" : "text-foreground"
           )}
         >
@@ -418,10 +477,15 @@ function ChatInput({
   onSubmit,
   status,
 }: {
-  onSubmit: (message: PromptInputMessage) => void;
+  onSubmit: (
+    message: PromptInputMessage,
+    extensionData?: CapturedElement
+  ) => void;
   status: ChatInputStatus;
 }) {
   const [inputValue, setInputValue] = useState("");
+  const [extensionContent, setExtensionContent] =
+    useState<CapturedElement | null>(null);
 
   // Auto-capitalize first character
   const handleInputChange = useCallback(
@@ -436,12 +500,34 @@ function ChatInput({
     []
   );
 
+  // Handle paste to detect extension content
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const pastedText = e.clipboardData.getData("text");
+
+      // Check if it's extension content
+      if (isExtensionContentFormat(pastedText)) {
+        e.preventDefault();
+        const parsed = parseExtensionContent(pastedText);
+        if (parsed.isExtensionContent && parsed.data) {
+          setExtensionContent(parsed.data);
+        }
+      }
+    },
+    []
+  );
+
+  const handleRemoveExtensionContent = useCallback(() => {
+    setExtensionContent(null);
+  }, []);
+
   const handleSubmit = useCallback(
     (message: PromptInputMessage) => {
-      onSubmit(message);
+      onSubmit(message, extensionContent || undefined);
       setInputValue("");
+      setExtensionContent(null);
     },
-    [onSubmit]
+    [onSubmit, extensionContent]
   );
 
   return (
@@ -455,11 +541,25 @@ function ChatInput({
         )}
       >
         <PromptInputBody>
+          {/* Extension Chip */}
+          {extensionContent && (
+            <div className="px-3 pt-3">
+              <ExtensionChip
+                content={extensionContent}
+                onRemove={handleRemoveExtensionContent}
+              />
+            </div>
+          )}
           <PromptInputTextarea
-            placeholder="Ask AI anything..."
+            placeholder={
+              extensionContent
+                ? "Add instructions for replication..."
+                : "Ask AI anything..."
+            }
             className="min-h-[36px] max-h-[120px] text-sm placeholder:text-muted-foreground/50 bg-transparent border-none shadow-none focus-visible:ring-0"
             value={inputValue}
             onChange={handleInputChange}
+            onPaste={handlePaste}
           />
         </PromptInputBody>
         <PromptInputFooter className="justify-end px-2 pb-2">
