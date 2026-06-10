@@ -4,1124 +4,1260 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   ArrowRight,
+  ArrowUpRight,
   Layers,
   Layout,
-  MousePointer2,
-  Sparkles,
-  Wand2,
   Zap,
-  CheckCircle2,
-  Play,
-  Star,
-  Users,
-  Globe,
-  Palette,
-  Code2,
-  Cpu,
-  ChevronRight,
-  Quote,
-  Check,
-  X,
+  Sparkles,
+  CreditCard,
+  Gem,
+  History,
+  CheckCircle,
+  Headphones,
+  Wallet,
+  MessageCircle,
 } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
-
-// Animated counter component
-function AnimatedCounter({
-  end,
-  duration = 2000,
-  suffix = "",
-}: {
-  end: number;
-  duration?: number;
-  suffix?: string;
-}) {
-  const [count, setCount] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!isVisible) return;
-
-    let startTime: number;
-    const animate = (currentTime: number) => {
-      if (!startTime) startTime = currentTime;
-      const progress = Math.min((currentTime - startTime) / duration, 1);
-      setCount(Math.floor(progress * end));
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-    requestAnimationFrame(animate);
-  }, [isVisible, end, duration]);
-
-  return (
-    <span ref={ref}>
-      {count.toLocaleString()}
-      {suffix}
-    </span>
-  );
-}
-
-// Floating orb component
-function FloatingOrb({
-  className,
-  delay = 0,
-}: {
-  className?: string;
-  delay?: number;
-}) {
-  return (
-    <div
-      className={`absolute rounded-full blur-3xl animate-pulse ${className}`}
-      style={{ animationDelay: `${delay}ms`, animationDuration: "4s" }}
-    />
-  );
-}
+import { useEffect, useRef } from "react";
+import Script from "next/script";
 
 export default function Page() {
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [scrollY, setScrollY] = useState(0);
+  const spotlightRefs = useRef<HTMLDivElement[]>([]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
+      spotlightRefs.current.forEach((card) => {
+        if (!card) return;
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        card.style.setProperty("--mouse-x", `${x}px`);
+        card.style.setProperty("--mouse-y", `${y}px`);
+      });
     };
 
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("scroll", handleScroll);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("scroll", handleScroll);
-    };
+    document.addEventListener("mousemove", handleMouseMove);
+    return () => document.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
-  return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-primary/20 selection:text-primary overflow-hidden">
-      {/* Animated Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <FloatingOrb
-          className="w-[800px] h-[800px] bg-primary/8 top-[-200px] left-[-200px]"
-          delay={0}
-        />
-        <FloatingOrb
-          className="w-[600px] h-[600px] bg-purple-500/8 top-[20%] right-[-100px]"
-          delay={1000}
-        />
-        <FloatingOrb
-          className="w-[500px] h-[500px] bg-blue-500/8 bottom-[10%] left-[10%]"
-          delay={2000}
-        />
-        <FloatingOrb
-          className="w-[400px] h-[400px] bg-primary/5 bottom-[-100px] right-[20%]"
-          delay={3000}
-        />
+  const addSpotlightRef = (el: HTMLDivElement | null) => {
+    if (el && !spotlightRefs.current.includes(el)) {
+      spotlightRefs.current.push(el);
+    }
+  };
 
-        {/* Grid pattern */}
+  return (
+    <div className="landing-page min-h-screen overflow-x-hidden selection:bg-primary selection:text-primary-foreground relative bg-[#030303] text-white">
+      {/* Animated Background - UnicornStudio */}
+      <div
+        className="fixed inset-0 w-full h-screen z-0 pointer-events-none"
+        style={{
+          maskImage:
+            "linear-gradient(transparent, black 0%, black 80%, transparent)",
+          filter: "hue-rotate(190deg) saturate(1.2)",
+        }}
+      >
         <div
-          className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_70%)]"
-          style={{ transform: `translateY(${scrollY * 0.1}px)` }}
+          data-us-project="FixNvEwvWwbu3QX9qC3F"
+          className="absolute inset-0 w-full h-full"
+          style={{ minHeight: "100vh" }}
         />
       </div>
+      <Script
+        id="unicorn-studio"
+        strategy="afterInteractive"
+        dangerouslySetInnerHTML={{
+          __html: `
+            !function(){if(!window.UnicornStudio){window.UnicornStudio={isInitialized:!1};var i=document.createElement("script");i.src="https://cdn.jsdelivr.net/gh/hiunicornstudio/unicornstudio.js@v1.4.29/dist/unicornStudio.umd.js",i.onload=function(){window.UnicornStudio.isInitialized||(UnicornStudio.init(),window.UnicornStudio.isInitialized=!0)},(document.head || document.body).appendChild(i)}}();
+          `,
+        }}
+      />
 
-      {/* Navigation */}
-      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/60 backdrop-blur-xl supports-[backdrop-filter]:bg-background/40">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-2.5 font-bold text-xl tracking-tighter">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/25">
-              <Layout className="h-5 w-5 text-primary-foreground" />
+      {/* Background Effects */}
+      <div className="fixed inset-0 landing-grid-bg pointer-events-none z-[1]" />
+
+      {/* Navigation: Pill Shaped & Floating */}
+      <nav className="fixed -translate-x-1/2 flex shadow-black/50 transition-all duration-300 hover:border-white/20 hover:shadow-primary/5 bg-gradient-to-br from-white/10 to-white/0 w-full lg:w-fit max-w-[90vw] z-50 rounded-full ring-white/10 ring-1 pt-1.5 pr-1.5 pb-1.5 pl-4 top-6 left-1/2 shadow-[0_2.8px_2.2px_rgba(0,_0,_0,_0.034),_0_6.7px_5.3px_rgba(0,_0,_0,_0.048),_0_12.5px_10px_rgba(0,_0,_0,_0.06),_0_22.3px_17.9px_rgba(0,_0,_0,_0.072),_0_41.8px_33.4px_rgba(0,_0,_0,_0.086),_0_100px_80px_rgba(0,_0,_0,_0.12)] backdrop-blur-xl items-center justify-between">
+        {/* Logo Area */}
+        <div className="flex gap-2.5 items-center mr-8">
+          <div className="relative flex items-center justify-center">
+            <div className="h-6 w-6 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
+              <Layout className="h-3.5 w-3.5 text-primary-foreground" />
             </div>
-            <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-              unit{" "}
-              <span className="text-muted-foreground font-normal">{`{set}`}</span>
-            </span>
           </div>
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
-            <Link
-              href="#features"
-              className="hover:text-foreground transition-colors relative group"
-            >
-              Features
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all group-hover:w-full" />
-            </Link>
-            <Link
-              href="#how-it-works"
-              className="hover:text-foreground transition-colors relative group"
-            >
-              How it Works
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all group-hover:w-full" />
-            </Link>
-            <Link
-              href="#pricing"
-              className="hover:text-foreground transition-colors relative group"
-            >
-              Pricing
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all group-hover:w-full" />
-            </Link>
-            <Link
-              href="#testimonials"
-              className="hover:text-foreground transition-colors relative group"
-            >
-              Testimonials
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all group-hover:w-full" />
-            </Link>
-          </nav>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/sign-in"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground hidden sm:block transition-colors"
-            >
-              Log in
-            </Link>
-            <Button
-              asChild
-              size="sm"
-              className="rounded-full px-6 shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-shadow"
-            >
-              <Link href="/sign-up">
-                Get Started
-                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-              </Link>
-            </Button>
+          <span className="font-sans font-medium text-base tracking-tight text-white">
+            unit <span className="text-white/50 font-normal">{`{set}`}</span>
+          </span>
+        </div>
+
+        {/* Links (Hidden on small screens) */}
+        <div className="hidden md:flex items-center gap-6 mr-8">
+          <Link
+            href="#features"
+            className="text-xs font-medium text-white/50 hover:text-white transition-colors"
+          >
+            Features
+          </Link>
+          <Link
+            href="#how-it-works"
+            className="text-xs font-medium text-white/50 hover:text-white transition-colors"
+          >
+            How it Works
+          </Link>
+          <Link
+            href="#pricing"
+            className="text-xs font-medium text-white/50 hover:text-white transition-colors"
+          >
+            Pricing
+          </Link>
+        </div>
+
+        {/* Action Button */}
+        <Button
+          asChild
+          size="sm"
+          className="flex gap-2 hover:bg-primary transition-colors group text-xs font-semibold text-primary-foreground bg-white rounded-full py-2 px-4 items-center"
+        >
+          <Link href="/sign-up">
+            Get Started
+            <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+          </Link>
+        </Button>
+      </nav>
+
+      {/* Main Content */}
+      <main className="container lg:px-12 lg:pt-0 min-h-[1100px] flex flex-col lg:flex-row z-10 mx-auto pt-0 px-6 relative items-center">
+        {/* Left Column: Copy */}
+        <div className="lg:w-1/2 flex flex-col lg:py-0 lg:mt-0 w-full mt-16 pt-12 pb-20 justify-center">
+          <h4 className="text-xs font-mono tracking-[0.2em] text-white/40 uppercase mb-8 flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+            </span>
+            AI-Powered Design
+          </h4>
+
+          <h1 className="lg:text-7xl leading-[1.1] text-primary landing-text-glow text-5xl italic tracking-tight font-serif mb-6">
+            Design at the
+            <br />
+            <span className="text-white opacity-90">speed of thought.</span>
+          </h1>
+
+          <p className="font-sans text-xl lg:text-2xl font-light text-white/70 leading-relaxed tracking-tight max-w-xl mb-12">
+            The familiarity of Figma meets the generative power of AI. Create
+            stunning interfaces just by{" "}
+            <span className="text-white font-medium">describing the vibe</span>.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
+            {/* Animated Shiny CTA Button */}
+            <button className="landing-shiny-cta focus:outline-hidden">
+              <span>Start Designing Free</span>
+            </button>
+
+            {/* Secondary Button */}
+            <button className="hover:bg-white/10 hover:text-white transition-all flex text-sm font-medium text-slate-300 bg-white/5 rounded-full py-3 px-6 gap-2 items-center group landing-border-gradient">
+              <span className="text-sm font-medium tracking-tight">
+                Watch Demo
+              </span>
+              <ArrowRight className="h-4 w-4 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+            </button>
           </div>
         </div>
-      </header>
 
-      <main className="flex-1 relative">
-        {/* Hero Section */}
-        <section className="relative pt-20 pb-32 md:pt-32 md:pb-48 overflow-hidden">
-          <div className="container relative mx-auto px-4 md:px-6 flex flex-col items-center text-center z-10">
-            {/* Badge */}
-            <div className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-lg shadow-primary/10">
-              <Sparkles className="mr-2 h-4 w-4 animate-pulse" />
-              <span>Introducing AI-Powered Vibe Design</span>
-              <ChevronRight className="ml-1 h-3.5 w-3.5" />
+        {/* Right Column: Abstract UI Visualization with Sonar */}
+        <div className="lg:w-1/2 lg:h-[800px] flex w-full h-[500px] relative items-center justify-center">
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible"
+            viewBox="0 0 600 600"
+          >
+            {/* Gradient Definitions */}
+            <defs>
+              <linearGradient
+                id="beam-gradient"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="0%"
+              >
+                <stop offset="0%" stopColor="transparent" />
+                <stop offset="50%" stopColor="oklch(var(--primary))" />
+                <stop offset="100%" stopColor="transparent" />
+              </linearGradient>
+              <radialGradient id="center-glow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="oklch(var(--primary) / 0.3)" />
+                <stop offset="100%" stopColor="transparent" />
+              </radialGradient>
+            </defs>
+
+            {/* Connecting Beams */}
+            <g>
+              <path
+                d="M -50 150 C 100 150, 100 300, 300 300"
+                fill="none"
+                stroke="white"
+                strokeWidth="1"
+                className="opacity-[0.08]"
+              />
+              <path
+                d="M -50 150 C 100 150, 100 300, 300 300"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                className="landing-beam-line landing-animate-beam opacity-60 text-primary"
+              />
+            </g>
+            <g>
+              <path
+                d="M -50 450 C 100 450, 100 300, 300 300"
+                fill="none"
+                stroke="white"
+                strokeWidth="1"
+                className="opacity-[0.08]"
+              />
+              <path
+                d="M -50 450 C 100 450, 100 300, 300 300"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                className="landing-beam-line landing-animate-beam opacity-60 text-primary"
+                style={{ animationDelay: "-1s" }}
+              />
+            </g>
+            <g>
+              <path
+                d="M 650 100 C 500 100, 500 300, 300 300"
+                fill="none"
+                stroke="white"
+                strokeWidth="1"
+                className="opacity-[0.08]"
+              />
+              <path
+                d="M 650 100 C 500 100, 500 300, 300 300"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                className="landing-beam-line landing-animate-beam opacity-60 text-primary"
+                style={{ animationDelay: "-2s" }}
+              />
+            </g>
+            <g>
+              <path
+                d="M 650 500 C 500 500, 500 300, 300 300"
+                fill="none"
+                stroke="white"
+                strokeWidth="1"
+                className="opacity-[0.08]"
+              />
+              <path
+                d="M 650 500 C 500 500, 500 300, 300 300"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                className="landing-beam-line landing-animate-beam opacity-60 text-primary"
+                style={{ animationDelay: "-1.5s" }}
+              />
+            </g>
+
+            {/* CENTRAL NODE DETAIL */}
+            <g transform="translate(300, 300)">
+              {/* Ambient Glow */}
+              <circle
+                r="120"
+                fill="url(#center-glow)"
+                className="animate-pulse"
+              />
+
+              {/* Sonar Waves */}
+              <circle
+                r="20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1"
+                opacity="0.5"
+                className="landing-animate-sonar text-primary"
+              />
+              <circle
+                r="20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1"
+                opacity="0.5"
+                className="landing-animate-sonar text-primary landing-delay-1000"
+              />
+              <circle
+                r="20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1"
+                opacity="0.5"
+                className="landing-animate-sonar text-primary landing-delay-2000"
+              />
+
+              {/* Technical Rings */}
+              <circle
+                r="65"
+                fill="none"
+                stroke="white"
+                strokeOpacity="0.1"
+                strokeWidth="1"
+                strokeDasharray="10 20"
+                className="landing-animate-spin-slow"
+              />
+              <circle
+                r="45"
+                fill="none"
+                stroke="currentColor"
+                strokeOpacity="0.2"
+                strokeWidth="1"
+                strokeDasharray="4 6"
+                className="landing-animate-spin-slow-reverse text-primary"
+              />
+
+              {/* Crosshair Markers */}
+              <g
+                className="landing-animate-spin-slow"
+                style={{ animationDuration: "20s" }}
+              >
+                <path d="M -80 0 L -70 0" stroke="white" strokeOpacity="0.2" />
+                <path d="M 80 0 L 70 0" stroke="white" strokeOpacity="0.2" />
+                <path d="M 0 -80 L 0 -70" stroke="white" strokeOpacity="0.2" />
+                <path d="M 0 80 L 0 70" stroke="white" strokeOpacity="0.2" />
+              </g>
+
+              {/* Core */}
+              <circle
+                r="8"
+                fill="#0A0A0A"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="text-primary"
+              />
+              <circle
+                r="4"
+                fill="currentColor"
+                className="landing-animate-pulse-fast text-primary"
+              />
+            </g>
+          </svg>
+
+          {/* Floating Labels */}
+          <div className="absolute top-[20%] lg:top-[25%] left-[10%] lg:left-[15%] flex flex-col items-end">
+            <span className="text-xs font-mono text-primary tracking-widest mb-1 opacity-80">
+              AI GENERATION
+            </span>
+            <div className="h-[1px] w-12 bg-gradient-to-l from-primary to-transparent" />
+          </div>
+
+          <div className="absolute bottom-[20%] lg:bottom-[25%] right-[10%] lg:right-[15%] flex flex-col items-start">
+            <span className="text-xs font-mono text-primary tracking-widest mb-1 opacity-80">
+              REAL-TIME
+            </span>
+            <div className="h-[1px] w-12 bg-gradient-to-r from-primary to-transparent" />
+          </div>
+
+          {/* Extra Data Decoration */}
+          <div className="absolute top-[50%] right-[15%] hidden lg:flex flex-col gap-1">
+            <div className="flex gap-1">
+              <div className="w-1 h-1 bg-white/20" />
+              <div className="w-1 h-1 bg-white/20" />
+              <div className="w-1 h-1 bg-primary animate-pulse" />
             </div>
+          </div>
+        </div>
 
-            {/* Main Headline */}
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tighter max-w-5xl mb-8 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
-              <span className="bg-gradient-to-b from-foreground via-foreground to-foreground/40 bg-clip-text text-transparent">
-                Design at the
-              </span>
-              <br />
-              <span className="relative">
-                <span className="bg-gradient-to-r from-primary via-primary to-orange-400 bg-clip-text text-transparent">
-                  speed of thought
-                </span>
+        {/* Logo Marquee Section */}
+        <section className="w-[95%] z-20 pb-8 absolute bottom-0">
+          <div className="flex flex-col lg:flex-row overflow-hidden opacity-50 w-full pt-6 gap-6 items-center justify-between">
+            {/* Infinite Marquee Section */}
+            <div className="flex-1 overflow-hidden landing-mask-gradient-fade w-full relative">
+              <div className="flex landing-animate-marquee hover:[animation-play-state:paused] w-max gap-x-32 items-center">
+                {/* Original Set */}
                 <svg
-                  className="absolute -bottom-2 left-0 w-full"
-                  viewBox="0 0 300 12"
-                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="124"
+                  height="28"
+                  viewBox="0 0 512 90"
+                  className="w-[124px] h-[28px]"
+                  aria-hidden="true"
+                >
+                  <g fill="#ffffff">
+                    <path
+                      fillOpacity=".6"
+                      d="m33.83 8.897l6.176 18.062l-10.965 31.634a78.3 78.3 0 0 0 13.112 1.02a83 83 0 0 0 9.038-.475l3.768 11.744c-4.066.411-8.5.709-12.75.709a122 122 0 0 1-16.88-1.219l-6.254 18.332H0L29.835 8.897z"
+                    />
+                    <path d="M481.258 26.959c19.21 0 30.742 8.96 30.742 31.57c0 2.833-.078 5.907-.15 6.311h-44.227c-.078 9.102 7.664 13.076 19.741 13.076c8.132 0 14.613-1.898 18.983-3.188l.708 11.815c-3.62 1.353-11.453 3.322-22.149 3.322c-21.2.029-35.671-7.777-35.671-31.407c0-15.271 6.028-25.457 18.232-29.537v24.791h26.527c.07-11-4.144-15.753-13.26-15.753c-4.25 0-7.388 1.02-9.57 3.195V27.908a50.7 50.7 0 0 1 10.094-.95M201.561 2.309v56.22c0 12.042 2.487 19.415 13.26 19.415s14.089-7.402 14.089-19.415s-3.315-19.422-14.089-19.422c-4.519 0-7.536 1.289-9.57 3.669v-11.95c3.464-2.174 8.14-3.598 14.543-3.598c16.277 0 26.895 9.3 26.895 31.23c0 21.958-10.625 31.167-27.044 31.167c-10.172 0-16.05-3.542-19.366-8.082l-.828 7.132h-15.442V13.99h-7.841V2.31zm131.161 25.11c10.32 0 16.2 3.599 19.437 8.146l.906-7.473h15.371l.021 60.583h-17.56V58.53c0-12.042-2.485-19.422-13.259-19.422s-14.089 7.402-14.089 19.422s3.315 19.387 14.089 19.387c4.526 0 7.537-1.29 9.57-3.662V86.07c-3.464 2.167-8.21 3.541-14.542 3.541c-16.42 0-26.917-9.165-26.917-31.095s10.476-31.096 26.973-31.096M55.306 8.897l29.835 79.778H65.173l-27.2-79.778zm57.318 19.21V76.98h7.083v11.694H95.093V39.801h-7.834V28.106zm57.247-1.084a24.4 24.4 0 0 1 5.015.474l-.227 13.855c-1.417-.142-3.315-.276-4.958-.276c-5.2 0-8.89 1.225-11.454 3.124c-5.669 4.193-5.871 11.983-5.879 16.243v28.232H134.88V39.801h-7.842V28.106h23.283l1.133 9.712c3.167-6.177 9.039-10.795 18.417-10.795m127.003 0a24.4 24.4 0 0 1 5.05.474l-.227 13.855c-1.416-.142-3.314-.276-4.958-.276c-5.199 0-8.89 1.225-11.453 3.124c-5.663 4.193-5.865 11.983-5.872 16.243v28.232h-17.496V39.801h-7.841V28.106h23.282l1.134 9.712c3.166-6.177 9.038-10.795 18.38-10.795M402.59 2.309v86.366h-17.55V13.99h-7.834V2.31zm42.288 25.77l-21.491 28.275l24.19 32.321h-20.57l-23.134-32.009l21.171-28.588zM103.076 0c5.425 0 9.42 3.542 9.42 8.422s-3.995 8.415-9.42 8.415c-5.426 0-9.414-3.528-9.414-8.415h-.021C93.662 3.542 97.65 0 103.076 0" />
+                  </g>
+                </svg>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="96"
+                  height="30"
+                  viewBox="0 0 512 58"
+                  className="w-[96px] h-[30px]"
+                  aria-hidden="true"
                 >
                   <path
-                    d="M2 10C50 4 100 2 150 6C200 10 250 4 298 8"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    className="text-primary/40"
+                    fill="#ffffff"
+                    d="M499.297 37.878c-2.064 5.4-6.192 8.497-11.829 8.497c-9.368 0-15.084-6.67-15.084-17.55c0-11.037 5.716-17.708 15.084-17.708c5.637 0 9.765 3.097 11.83 8.497h12.623C508.824 7.703 499.536 0 487.468 0c-16.037 0-27.39 11.911-27.39 28.825c0 16.755 11.353 28.667 27.39 28.667c12.147 0 21.436-7.782 24.532-19.614zM423.39.97l22.163 55.588h12.153L435.544.97zm-25.634 24.697h-14.695V11.69h14.695c5.878 0 8.976 2.382 8.976 6.988s-3.098 6.988-8.976 6.988M398.312.97h-27.167v55.588h11.916v-20.17h15.251c12.63 0 20.336-6.671 20.336-17.71c0-11.037-7.705-17.708-20.336-17.708m-65.535 45.405c-9.367 0-15.083-6.67-15.083-17.55c0-11.037 5.716-17.708 15.083-17.708c9.288 0 14.924 6.67 14.924 17.708c0 10.88-5.636 17.55-14.924 17.55m0-46.375c-16.036 0-27.388 11.911-27.388 28.825c0 16.755 11.352 28.667 27.388 28.667c15.956 0 27.23-11.912 27.23-28.667C360.006 11.911 348.732 0 332.776 0m-72.068 11.69h14.691c5.877 0 8.974 2.145 8.974 6.195s-3.097 6.194-8.974 6.194h-14.691zm35.577 6.195c0-10.483-7.703-16.915-20.33-16.915h-27.16v55.588h11.913V34.799h13.261l11.913 21.759h13.183l-13.19-23.416c6.62-2.545 10.41-7.905 10.41-15.257m-74.095 5.241h-26.2V.97h-11.909v55.588h11.91V33.846h26.2v22.712h11.908V.97H222.19zM125.296 11.69h18.659v44.868h11.91V11.69h18.658V.97h-49.227zm-21.034 28.191L79.253.971H65.756v55.587h11.512V17.646l25.01 38.912h13.496V.97h-11.512zM20.93 34.56l7.582-19.534l7.583 19.535zM22.158.97L0 56.558h12.39l4.532-11.674h23.182l4.53 11.674h12.39L34.867.97z"
                   />
                 </svg>
-              </span>
-            </h1>
-
-            {/* Subheadline */}
-            <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200 leading-relaxed">
-              The familiarity of Figma meets the generative power of AI. Create
-              stunning interfaces just by{" "}
-              <span className="text-foreground font-medium">
-                describing the vibe
-              </span>
-              .
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-center gap-4 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
-              <Button
-                size="lg"
-                className="h-14 px-10 rounded-full text-base font-semibold group bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all duration-300"
-              >
-                Start Designing Free
-                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="h-14 px-10 rounded-full text-base font-medium bg-background/50 backdrop-blur-sm border-border/50 hover:bg-muted/50 hover:border-primary/30 transition-all duration-300"
-              >
-                <Play className="mr-2 h-5 w-5 fill-primary text-primary" />
-                Watch Demo
-              </Button>
-            </div>
-
-            {/* Stats */}
-            <div className="flex flex-wrap justify-center gap-8 md:gap-16 mt-16 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-400">
-              {[
-                { value: 50000, suffix: "+", label: "Designers" },
-                { value: 2, suffix: "M+", label: "Designs Created" },
-                { value: 99, suffix: "%", label: "Satisfaction" },
-              ].map((stat, i) => (
-                <div key={i} className="text-center">
-                  <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
-                    <AnimatedCounter end={stat.value} suffix={stat.suffix} />
-                  </div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    {stat.label}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Hero Visual / UI Mockup */}
-            <div className="mt-20 relative w-full max-w-6xl mx-auto animate-in fade-in zoom-in-95 duration-1000 delay-500">
-              {/* Glow effect */}
-              <div className="absolute -inset-4 bg-gradient-to-r from-primary/30 via-purple-500/20 to-blue-500/30 rounded-3xl blur-3xl -z-10 opacity-60" />
-
-              <div className="relative rounded-2xl border border-border/50 bg-background/80 backdrop-blur-xl shadow-2xl overflow-hidden aspect-[16/10] group">
-                {/* Mockup Header */}
-                <div className="h-12 border-b border-border/50 bg-muted/30 flex items-center px-4 gap-3">
-                  <div className="flex gap-2">
-                    <div className="w-3 h-3 rounded-full bg-red-500/80 hover:bg-red-500 transition-colors cursor-pointer" />
-                    <div className="w-3 h-3 rounded-full bg-yellow-500/80 hover:bg-yellow-500 transition-colors cursor-pointer" />
-                    <div className="w-3 h-3 rounded-full bg-green-500/80 hover:bg-green-500 transition-colors cursor-pointer" />
-                  </div>
-                  <div className="flex-1 flex justify-center">
-                    <div className="h-6 w-64 rounded-lg bg-muted/50 flex items-center justify-center text-xs text-muted-foreground">
-                      unit-set.design/canvas/new-project
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="h-6 w-6 rounded bg-muted/50" />
-                    <div className="h-6 w-6 rounded bg-muted/50" />
-                  </div>
-                </div>
-
-                {/* Mockup Body */}
-                <div className="flex h-[calc(100%-48px)]">
-                  {/* Sidebar */}
-                  <div className="w-56 border-r border-border/50 bg-muted/20 p-4 hidden md:flex flex-col gap-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Layers className="h-4 w-4" />
-                      Layers
-                    </div>
-                    <div className="space-y-2">
-                      {[
-                        "Hero Section",
-                        "Navigation",
-                        "Card Component",
-                        "Button Group",
-                      ].map((layer, i) => (
-                        <div
-                          key={i}
-                          className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs ${
-                            i === 2
-                              ? "bg-primary/10 text-primary"
-                              : "text-muted-foreground hover:bg-muted/50"
-                          } transition-colors cursor-pointer`}
-                        >
-                          <div
-                            className={`w-2 h-2 rounded-sm ${
-                              i === 2 ? "bg-primary" : "bg-muted-foreground/30"
-                            }`}
-                          />
-                          {layer}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-auto pt-4 border-t border-border/50">
-                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                        <Palette className="h-4 w-4" />
-                        Colors
-                      </div>
-                      <div className="flex gap-1.5">
-                        {[
-                          "bg-primary",
-                          "bg-purple-500",
-                          "bg-blue-500",
-                          "bg-green-500",
-                          "bg-foreground",
-                        ].map((color, i) => (
-                          <div
-                            key={i}
-                            className={`w-6 h-6 rounded-md ${color} cursor-pointer hover:scale-110 transition-transform`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Canvas */}
-                  <div className="flex-1 p-8 relative bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:24px_24px]">
-                    {/* Floating Card 1 */}
-                    <div
-                      className="absolute top-8 left-8 w-72 h-44 rounded-xl border border-primary/40 bg-background/90 shadow-xl p-5 transform -rotate-2 transition-all duration-500 group-hover:-rotate-3 group-hover:scale-105"
-                      style={{
-                        transform: `rotate(-2deg) translate(${
-                          mousePosition.x * 0.01
-                        }px, ${mousePosition.y * 0.01}px)`,
-                      }}
-                    >
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center">
-                          <Users className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                          <div className="h-3 w-24 rounded bg-foreground/80" />
-                          <div className="h-2 w-16 rounded bg-muted-foreground/30 mt-1.5" />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="h-2.5 w-full rounded bg-muted-foreground/20" />
-                        <div className="h-2.5 w-full rounded bg-muted-foreground/20" />
-                        <div className="h-2.5 w-3/4 rounded bg-muted-foreground/20" />
-                      </div>
-                      <div className="flex gap-2 mt-4">
-                        <div className="h-8 flex-1 rounded-lg bg-primary/20 flex items-center justify-center text-xs text-primary font-medium">
-                          Accept
-                        </div>
-                        <div className="h-8 flex-1 rounded-lg bg-muted/50 flex items-center justify-center text-xs text-muted-foreground">
-                          Decline
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Floating Card 2 */}
-                    <div
-                      className="absolute top-16 right-12 w-64 h-72 rounded-xl border border-purple-500/40 bg-background/90 shadow-xl p-5 transform rotate-3 transition-all duration-500 group-hover:rotate-4 group-hover:scale-105 z-10"
-                      style={{
-                        transform: `rotate(3deg) translate(${
-                          mousePosition.x * -0.01
-                        }px, ${mousePosition.y * 0.01}px)`,
-                      }}
-                    >
-                      <div className="w-full h-28 rounded-lg bg-gradient-to-br from-purple-500/20 to-blue-500/20 mb-4 flex items-center justify-center overflow-hidden">
-                        <Wand2 className="h-10 w-10 text-purple-500/60 animate-pulse" />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="h-3 w-28 rounded bg-foreground/80" />
-                        <div className="h-2.5 w-full rounded bg-muted-foreground/20" />
-                        <div className="h-2.5 w-full rounded bg-muted-foreground/20" />
-                      </div>
-                      <div className="mt-4">
-                        <div className="h-10 w-full rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-xs text-white font-medium">
-                          Generate with AI
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* AI Prompt Input */}
-                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[80%] max-w-lg">
-                      <div className="relative">
-                        <div className="h-14 rounded-2xl border border-primary/30 bg-background/90 shadow-lg flex items-center px-5 gap-3">
-                          <Sparkles className="h-5 w-5 text-primary animate-pulse" />
-                          <span className="text-muted-foreground text-sm flex-1">
-                            Create a modern dashboard with dark theme...
-                            <span className="animate-pulse">|</span>
-                          </span>
-                          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                            <ArrowRight className="h-4 w-4 text-primary-foreground" />
-                          </div>
-                        </div>
-                        <div className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-primary text-[10px] text-primary-foreground font-medium">
-                          AI
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Cursor */}
-                    <div
-                      className="absolute top-1/2 left-1/2 transform translate-x-16 translate-y-8 animate-bounce"
-                      style={{ animationDuration: "2s" }}
-                    >
-                      <MousePointer2 className="h-6 w-6 text-primary fill-primary drop-shadow-lg" />
-                      <div className="ml-5 -mt-1 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold shadow-lg">
-                        Generating...
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Properties Panel */}
-                  <div className="w-64 border-l border-border/50 bg-muted/20 p-4 hidden lg:flex flex-col gap-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Code2 className="h-4 w-4" />
-                      Properties
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-2">
-                          Position
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="h-8 rounded-md bg-muted/50 flex items-center justify-center text-xs">
-                            X: 120
-                          </div>
-                          <div className="h-8 rounded-md bg-muted/50 flex items-center justify-center text-xs">
-                            Y: 240
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-2">
-                          Size
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="h-8 rounded-md bg-muted/50 flex items-center justify-center text-xs">
-                            W: 288
-                          </div>
-                          <div className="h-8 rounded-md bg-muted/50 flex items-center justify-center text-xs">
-                            H: 176
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-2">
-                          AI Context
-                        </div>
-                        <div className="h-24 rounded-lg bg-gradient-to-br from-primary/10 to-purple-500/10 border border-dashed border-primary/30 flex flex-col items-center justify-center text-xs text-muted-foreground p-3">
-                          <Cpu className="h-5 w-5 text-primary mb-2" />
-                          <span className="text-center">
-                            Drop reference images or describe your vibe
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Logos Section */}
-        <section className="py-16 border-y border-border/40 bg-muted/20">
-          <div className="container mx-auto px-4 md:px-6">
-            <p className="text-center text-sm font-medium text-muted-foreground mb-10 uppercase tracking-widest">
-              Trusted by forward-thinking design teams worldwide
-            </p>
-            <div className="flex flex-wrap justify-center items-center gap-x-16 gap-y-8">
-              {[
-                { name: "Vercel", icon: "▲" },
-                { name: "Stripe", icon: "◈" },
-                { name: "Notion", icon: "◻" },
-                { name: "Linear", icon: "◇" },
-                { name: "Figma", icon: "◎" },
-                { name: "Framer", icon: "◉" },
-              ].map((company) => (
-                <div
-                  key={company.name}
-                  className="flex items-center gap-2 text-lg font-semibold text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer"
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="100"
+                  height="32"
+                  viewBox="0 0 256 256"
+                  className="w-[100px] h-[32px]"
+                  aria-hidden="true"
                 >
-                  <span className="text-2xl">{company.icon}</span>
-                  {company.name}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Features Grid */}
-        <section id="features" className="py-32 relative">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="text-center max-w-3xl mx-auto mb-20">
-              <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary mb-6">
-                <Zap className="mr-2 h-3.5 w-3.5" />
-                Powerful Features
-              </div>
-              <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">
-                Everything you need to{" "}
-                <span className="bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
-                  create magic
-                </span>
-              </h2>
-              <p className="text-xl text-muted-foreground leading-relaxed">
-                Unit {`{set}`} combines the precision of professional design
-                tools with the intuition of generative AI.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                {
-                  icon: <Wand2 className="h-6 w-6" />,
-                  title: "AI-Driven Generation",
-                  description:
-                    "Describe your interface in plain English. Watch as unit {set} generates fully editable, layer-based designs in seconds.",
-                  gradient: "from-primary/20 to-orange-500/20",
-                  iconBg: "from-primary to-orange-500",
-                },
-                {
-                  icon: <Layers className="h-6 w-6" />,
-                  title: "Figma-Style Editing",
-                  description:
-                    "Don't settle for static images. Every AI generation produces real vectors, auto-layout frames, and components.",
-                  gradient: "from-purple-500/20 to-blue-500/20",
-                  iconBg: "from-purple-500 to-blue-500",
-                },
-                {
-                  icon: <Palette className="h-6 w-6" />,
-                  title: "Vibe Matching",
-                  description:
-                    "Upload a moodboard or reference image. Our engine extracts the 'vibe'—colors, typography, spacing—and applies it.",
-                  gradient: "from-pink-500/20 to-rose-500/20",
-                  iconBg: "from-pink-500 to-rose-500",
-                },
-                {
-                  icon: <Layout className="h-6 w-6" />,
-                  title: "Smart Layouts",
-                  description:
-                    "Responsive by default. Elements automatically adjust as you resize, just like you'd expect from a modern design tool.",
-                  gradient: "from-green-500/20 to-emerald-500/20",
-                  iconBg: "from-green-500 to-emerald-500",
-                },
-                {
-                  icon: <Users className="h-6 w-6" />,
-                  title: "Real-time Collaboration",
-                  description:
-                    "Work with your team in real-time. See cursors, leave comments, and iterate together on the infinite canvas.",
-                  gradient: "from-blue-500/20 to-cyan-500/20",
-                  iconBg: "from-blue-500 to-cyan-500",
-                },
-                {
-                  icon: <Sparkles className="h-6 w-6" />,
-                  title: "Design System Sync",
-                  description:
-                    "Automatically generate a design system from your explorations. Colors, type scales, and components, ready to export.",
-                  gradient: "from-amber-500/20 to-yellow-500/20",
-                  iconBg: "from-amber-500 to-yellow-500",
-                },
-              ].map((feature, i) => (
-                <div
-                  key={i}
-                  className="group relative p-8 rounded-2xl border border-border/50 bg-background/50 backdrop-blur-sm hover:border-primary/30 transition-all duration-500 overflow-hidden"
-                >
-                  <div
-                    className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}
+                  <path
+                    fill="#ffffff"
+                    d="M128 0C57.308 0 0 57.308 0 128s57.308 128 128 128s128-57.308 128-128S198.692 0 128 0m0 234.667c-58.91 0-106.667-47.756-106.667-106.667S69.09 21.333 128 21.333S234.667 69.09 234.667 128S186.91 234.667 128 234.667"
                   />
-                  <div className="relative z-10">
-                    <div
-                      className={`h-14 w-14 rounded-2xl bg-gradient-to-br ${feature.iconBg} flex items-center justify-center text-white mb-6 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 shadow-lg`}
-                    >
-                      {feature.icon}
-                    </div>
-                    <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors">
-                      {feature.title}
-                    </h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      {feature.description}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* How it Works */}
-        <section
-          id="how-it-works"
-          className="py-32 bg-muted/30 relative overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(var(--primary),0.1),transparent_50%)]" />
-
-          <div className="container mx-auto px-4 md:px-6 relative">
-            <div className="text-center max-w-3xl mx-auto mb-20">
-              <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary mb-6">
-                <Play className="mr-2 h-3.5 w-3.5" />
-                How it Works
-              </div>
-              <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">
-                From idea to design in{" "}
-                <span className="bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
-                  three steps
-                </span>
-              </h2>
-              <p className="text-xl text-muted-foreground leading-relaxed">
-                No more staring at blank canvases. Just describe what you want
-                and let AI do the heavy lifting.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-8 relative">
-              {/* Connection line */}
-              <div className="hidden md:block absolute top-24 left-[20%] right-[20%] h-0.5 bg-gradient-to-r from-primary/50 via-purple-500/50 to-blue-500/50" />
-
-              {[
-                {
-                  step: "01",
-                  title: "Describe Your Vision",
-                  description:
-                    "Type a natural language prompt describing the interface you want. Be as detailed or as vague as you like.",
-                  icon: <Wand2 className="h-8 w-8" />,
-                  color: "primary",
-                },
-                {
-                  step: "02",
-                  title: "AI Generates Design",
-                  description:
-                    "Our AI understands design principles and creates a fully layered, editable design matching your description.",
-                  icon: <Cpu className="h-8 w-8" />,
-                  color: "purple-500",
-                },
-                {
-                  step: "03",
-                  title: "Refine & Export",
-                  description:
-                    "Fine-tune every detail with familiar design tools. Export to code, Figma, or production-ready assets.",
-                  icon: <Code2 className="h-8 w-8" />,
-                  color: "blue-500",
-                },
-              ].map((item, i) => (
-                <div key={i} className="relative">
-                  <div className="text-center">
-                    <div
-                      className={`relative mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-${item.color} to-${item.color}/60 flex items-center justify-center text-white mb-8 shadow-xl shadow-${item.color}/30 z-10`}
-                    >
-                      {item.icon}
-                      <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-background border-2 border-border flex items-center justify-center text-sm font-bold">
-                        {item.step}
-                      </div>
-                    </div>
-                    <h3 className="text-2xl font-bold mb-4">{item.title}</h3>
-                    <p className="text-muted-foreground leading-relaxed max-w-sm mx-auto">
-                      {item.description}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Testimonials */}
-        <section id="testimonials" className="py-32 relative">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="text-center max-w-3xl mx-auto mb-20">
-              <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary mb-6">
-                <Star className="mr-2 h-3.5 w-3.5 fill-primary" />
-                Testimonials
-              </div>
-              <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">
-                Loved by{" "}
-                <span className="bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
-                  designers worldwide
-                </span>
-              </h2>
-              <p className="text-xl text-muted-foreground leading-relaxed">
-                See what our community has to say about their experience with
-                Unit {`{set}`}.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-6">
-              {[
-                {
-                  quote:
-                    "Unit {set} has completely transformed my workflow. I can prototype ideas 10x faster than before. The AI understands exactly what I'm looking for.",
-                  author: "Sarah Chen",
-                  role: "Lead Designer at Vercel",
-                  avatar: "SC",
-                  rating: 5,
-                },
-                {
-                  quote:
-                    "The vibe matching feature is incredible. I upload a moodboard and it captures the essence perfectly. It's like having a design assistant that reads my mind.",
-                  author: "Marcus Johnson",
-                  role: "Creative Director at Linear",
-                  avatar: "MJ",
-                  rating: 5,
-                },
-                {
-                  quote:
-                    "Finally, a tool that bridges the gap between ideation and execution. The AI-generated designs are actually usable, not just pretty mockups.",
-                  author: "Emily Rodriguez",
-                  role: "Product Designer at Stripe",
-                  avatar: "ER",
-                  rating: 5,
-                },
-              ].map((testimonial, i) => (
-                <div
-                  key={i}
-                  className="relative p-8 rounded-2xl border border-border/50 bg-background/50 backdrop-blur-sm hover:border-primary/30 transition-all duration-300 group"
+                </svg>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="100"
+                  height="32"
+                  viewBox="0 0 256 256"
+                  className="w-[100px] h-[32px]"
+                  aria-hidden="true"
                 >
-                  <Quote className="absolute top-6 right-6 h-8 w-8 text-primary/20 group-hover:text-primary/40 transition-colors" />
-                  <div className="flex gap-1 mb-6">
-                    {[...Array(testimonial.rating)].map((_, j) => (
-                      <Star
-                        key={j}
-                        className="h-5 w-5 fill-primary text-primary"
-                      />
-                    ))}
-                  </div>
-                  <p className="text-foreground/90 leading-relaxed mb-8">
-                    &ldquo;{testimonial.quote}&rdquo;
-                  </p>
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center text-white font-bold">
-                      {testimonial.avatar}
-                    </div>
-                    <div>
-                      <div className="font-semibold">{testimonial.author}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {testimonial.role}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Pricing */}
-        <section
-          id="pricing"
-          className="py-32 bg-muted/30 relative overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,rgba(var(--primary),0.1),transparent_50%)]" />
-
-          <div className="container mx-auto px-4 md:px-6 relative">
-            <div className="text-center max-w-3xl mx-auto mb-20">
-              <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary mb-6">
-                <Sparkles className="mr-2 h-3.5 w-3.5" />
-                Simple Pricing
-              </div>
-              <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">
-                Choose your{" "}
-                <span className="bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
-                  perfect plan
-                </span>
-              </h2>
-              <p className="text-xl text-muted-foreground leading-relaxed">
-                Start free and scale as you grow. No hidden fees, no surprises.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-              {[
-                {
-                  name: "Starter",
-                  price: "Free",
-                  description: "Perfect for trying out Unit {set}",
-                  features: [
-                    "5 AI generations per day",
-                    "Basic design tools",
-                    "Export to PNG/SVG",
-                    "Community support",
-                  ],
-                  notIncluded: [
-                    "Unlimited generations",
-                    "Team collaboration",
-                    "Priority support",
-                  ],
-                  cta: "Get Started",
-                  popular: false,
-                },
-                {
-                  name: "Pro",
-                  price: "$19",
-                  period: "/month",
-                  description: "For professional designers",
-                  features: [
-                    "Unlimited AI generations",
-                    "Advanced design tools",
-                    "Export to Figma/Code",
-                    "Vibe matching",
-                    "Design system generation",
-                    "Priority support",
-                  ],
-                  notIncluded: [],
-                  cta: "Start Free Trial",
-                  popular: true,
-                },
-                {
-                  name: "Team",
-                  price: "$49",
-                  period: "/month",
-                  description: "For design teams",
-                  features: [
-                    "Everything in Pro",
-                    "Unlimited team members",
-                    "Real-time collaboration",
-                    "Shared design systems",
-                    "Admin controls",
-                    "Dedicated support",
-                  ],
-                  notIncluded: [],
-                  cta: "Contact Sales",
-                  popular: false,
-                },
-              ].map((plan, i) => (
-                <div
-                  key={i}
-                  className={`relative p-8 rounded-2xl border ${
-                    plan.popular
-                      ? "border-primary bg-gradient-to-b from-primary/10 to-background shadow-xl shadow-primary/20"
-                      : "border-border/50 bg-background/50"
-                  } backdrop-blur-sm transition-all duration-300 hover:border-primary/50`}
+                  <path
+                    fill="#ffffff"
+                    d="M128 0C57.308 0 0 57.308 0 128s57.308 128 128 128s128-57.308 128-128S198.692 0 128 0m0 234.667c-58.91 0-106.667-47.756-106.667-106.667S69.09 21.333 128 21.333S234.667 69.09 234.667 128S186.91 234.667 128 234.667"
+                  />
+                </svg>
+                {/* Duplicated Set for Loop */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="124"
+                  height="28"
+                  viewBox="0 0 512 90"
+                  className="w-[124px] h-[28px]"
+                  aria-hidden="true"
                 >
-                  {plan.popular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-primary text-primary-foreground text-sm font-medium">
-                      Most Popular
-                    </div>
-                  )}
-                  <div className="text-center mb-8">
-                    <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-                    <p className="text-muted-foreground text-sm mb-4">
-                      {plan.description}
-                    </p>
-                    <div className="flex items-baseline justify-center gap-1">
-                      <span className="text-5xl font-bold">{plan.price}</span>
-                      {plan.period && (
-                        <span className="text-muted-foreground">
-                          {plan.period}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <ul className="space-y-4 mb-8">
-                    {plan.features.map((feature, j) => (
-                      <li key={j} className="flex items-center gap-3 text-sm">
-                        <Check className="h-5 w-5 text-primary flex-shrink-0" />
-                        {feature}
-                      </li>
-                    ))}
-                    {plan.notIncluded.map((feature, j) => (
-                      <li
-                        key={j}
-                        className="flex items-center gap-3 text-sm text-muted-foreground"
-                      >
-                        <X className="h-5 w-5 text-muted-foreground/50 flex-shrink-0" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    className={`w-full h-12 rounded-xl font-semibold ${
-                      plan.popular
-                        ? "bg-primary hover:bg-primary/90 shadow-lg shadow-primary/30"
-                        : "bg-muted hover:bg-muted/80"
-                    }`}
-                    variant={plan.popular ? "default" : "secondary"}
-                  >
-                    {plan.cta}
-                  </Button>
-                </div>
-              ))}
+                  <g fill="#ffffff">
+                    <path
+                      fillOpacity=".6"
+                      d="m33.83 8.897l6.176 18.062l-10.965 31.634a78.3 78.3 0 0 0 13.112 1.02a83 83 0 0 0 9.038-.475l3.768 11.744c-4.066.411-8.5.709-12.75.709a122 122 0 0 1-16.88-1.219l-6.254 18.332H0L29.835 8.897z"
+                    />
+                    <path d="M481.258 26.959c19.21 0 30.742 8.96 30.742 31.57c0 2.833-.078 5.907-.15 6.311h-44.227c-.078 9.102 7.664 13.076 19.741 13.076c8.132 0 14.613-1.898 18.983-3.188l.708 11.815c-3.62 1.353-11.453 3.322-22.149 3.322c-21.2.029-35.671-7.777-35.671-31.407c0-15.271 6.028-25.457 18.232-29.537v24.791h26.527c.07-11-4.144-15.753-13.26-15.753c-4.25 0-7.388 1.02-9.57 3.195V27.908a50.7 50.7 0 0 1 10.094-.95M201.561 2.309v56.22c0 12.042 2.487 19.415 13.26 19.415s14.089-7.402 14.089-19.415s-3.315-19.422-14.089-19.422c-4.519 0-7.536 1.289-9.57 3.669v-11.95c3.464-2.174 8.14-3.598 14.543-3.598c16.277 0 26.895 9.3 26.895 31.23c0 21.958-10.625 31.167-27.044 31.167c-10.172 0-16.05-3.542-19.366-8.082l-.828 7.132h-15.442V13.99h-7.841V2.31zm131.161 25.11c10.32 0 16.2 3.599 19.437 8.146l.906-7.473h15.371l.021 60.583h-17.56V58.53c0-12.042-2.485-19.422-13.259-19.422s-14.089 7.402-14.089 19.422s3.315 19.387 14.089 19.387c4.526 0 7.537-1.29 9.57-3.662V86.07c-3.464 2.167-8.21 3.541-14.542 3.541c-16.42 0-26.917-9.165-26.917-31.095s10.476-31.096 26.973-31.096M55.306 8.897l29.835 79.778H65.173l-27.2-79.778zm57.318 19.21V76.98h7.083v11.694H95.093V39.801h-7.834V28.106zm57.247-1.084a24.4 24.4 0 0 1 5.015.474l-.227 13.855c-1.417-.142-3.315-.276-4.958-.276c-5.2 0-8.89 1.225-11.454 3.124c-5.669 4.193-5.871 11.983-5.879 16.243v28.232H134.88V39.801h-7.842V28.106h23.283l1.133 9.712c3.167-6.177 9.039-10.795 18.417-10.795m127.003 0a24.4 24.4 0 0 1 5.05.474l-.227 13.855c-1.416-.142-3.314-.276-4.958-.276c-5.199 0-8.89 1.225-11.453 3.124c-5.663 4.193-5.865 11.983-5.872 16.243v28.232h-17.496V39.801h-7.841V28.106h23.282l1.134 9.712c3.166-6.177 9.038-10.795 18.38-10.795M402.59 2.309v86.366h-17.55V13.99h-7.834V2.31zm42.288 25.77l-21.491 28.275l24.19 32.321h-20.57l-23.134-32.009l21.171-28.588zM103.076 0c5.425 0 9.42 3.542 9.42 8.422s-3.995 8.415-9.42 8.415c-5.426 0-9.414-3.528-9.414-8.415h-.021C93.662 3.542 97.65 0 103.076 0" />
+                  </g>
+                </svg>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="96"
+                  height="30"
+                  viewBox="0 0 512 58"
+                  className="w-[96px] h-[30px]"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill="#ffffff"
+                    d="M499.297 37.878c-2.064 5.4-6.192 8.497-11.829 8.497c-9.368 0-15.084-6.67-15.084-17.55c0-11.037 5.716-17.708 15.084-17.708c5.637 0 9.765 3.097 11.83 8.497h12.623C508.824 7.703 499.536 0 487.468 0c-16.037 0-27.39 11.911-27.39 28.825c0 16.755 11.353 28.667 27.39 28.667c12.147 0 21.436-7.782 24.532-19.614zM423.39.97l22.163 55.588h12.153L435.544.97zm-25.634 24.697h-14.695V11.69h14.695c5.878 0 8.976 2.382 8.976 6.988s-3.098 6.988-8.976 6.988M398.312.97h-27.167v55.588h11.916v-20.17h15.251c12.63 0 20.336-6.671 20.336-17.71c0-11.037-7.705-17.708-20.336-17.708m-65.535 45.405c-9.367 0-15.083-6.67-15.083-17.55c0-11.037 5.716-17.708 15.083-17.708c9.288 0 14.924 6.67 14.924 17.708c0 10.88-5.636 17.55-14.924 17.55m0-46.375c-16.036 0-27.388 11.911-27.388 28.825c0 16.755 11.352 28.667 27.388 28.667c15.956 0 27.23-11.912 27.23-28.667C360.006 11.911 348.732 0 332.776 0m-72.068 11.69h14.691c5.877 0 8.974 2.145 8.974 6.195s-3.097 6.194-8.974 6.194h-14.691zm35.577 6.195c0-10.483-7.703-16.915-20.33-16.915h-27.16v55.588h11.913V34.799h13.261l11.913 21.759h13.183l-13.19-23.416c6.62-2.545 10.41-7.905 10.41-15.257m-74.095 5.241h-26.2V.97h-11.909v55.588h11.91V33.846h26.2v22.712h11.908V.97H222.19zM125.296 11.69h18.659v44.868h11.91V11.69h18.658V.97h-49.227zm-21.034 28.191L79.253.971H65.756v55.587h11.512V17.646l25.01 38.912h13.496V.97h-11.512zM20.93 34.56l7.582-19.534l7.583 19.535zM22.158.97L0 56.558h12.39l4.532-11.674h23.182l4.53 11.674h12.39L34.867.97z"
+                  />
+                </svg>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="100"
+                  height="32"
+                  viewBox="0 0 256 256"
+                  className="w-[100px] h-[32px]"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill="#ffffff"
+                    d="M128 0C57.308 0 0 57.308 0 128s57.308 128 128 128s128-57.308 128-128S198.692 0 128 0m0 234.667c-58.91 0-106.667-47.756-106.667-106.667S69.09 21.333 128 21.333S234.667 69.09 234.667 128S186.91 234.667 128 234.667"
+                  />
+                </svg>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="100"
+                  height="32"
+                  viewBox="0 0 256 256"
+                  className="w-[100px] h-[32px]"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill="#ffffff"
+                    d="M128 0C57.308 0 0 57.308 0 128s57.308 128 128 128s128-57.308 128-128S198.692 0 128 0m0 234.667c-58.91 0-106.667-47.756-106.667-106.667S69.09 21.333 128 21.333S234.667 69.09 234.667 128S186.91 234.667 128 234.667"
+                  />
+                </svg>
+              </div>
             </div>
-          </div>
-        </section>
 
-        {/* CTA Section */}
-        <section className="py-32 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-purple-500/5 to-blue-500/10" />
-          <FloatingOrb
-            className="w-[600px] h-[600px] bg-primary/20 -top-48 -right-48"
-            delay={0}
-          />
-          <FloatingOrb
-            className="w-[400px] h-[400px] bg-purple-500/20 -bottom-24 -left-24"
-            delay={1500}
-          />
-
-          <div className="container relative mx-auto px-4 md:px-6 text-center">
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-5xl md:text-7xl font-bold tracking-tighter mb-8">
-                Ready to set the{" "}
-                <span className="bg-gradient-to-r from-primary via-orange-400 to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
-                  vibe
-                </span>
-                ?
-              </h2>
-              <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed">
-                Join thousands of designers who are shipping faster and
-                exploring further with unit {`{set}`}.
-              </p>
-              <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-                <Button
-                  size="lg"
-                  className="h-16 px-12 rounded-full text-lg font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all duration-300 group"
-                >
-                  Get Started for Free
-                  <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="h-16 px-12 rounded-full text-lg font-medium bg-background/50 backdrop-blur-sm border-border/50 hover:bg-muted/50 hover:border-primary/30"
-                >
-                  Contact Sales
-                </Button>
-              </div>
-              <div className="mt-10 flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
-                  <span>No credit card required</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
-                  <span>Free tier available forever</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
-                  <span>Cancel anytime</span>
-                </div>
-              </div>
+            {/* Trusted By Label */}
+            <div className="flex items-center gap-3 text-white/30 text-xs font-mono shrink-0 relative z-10 bg-[#030303] pl-4 lg:bg-transparent lg:pl-0">
+              <span className="text-white tracking-wide">
+                [ <span className="text-primary">✓</span> ] TRUSTED BY INDUSTRY
+                LEADERS
+              </span>
             </div>
           </div>
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-border/40 bg-muted/20 py-16">
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-16">
-            <div className="col-span-2">
-              <div className="flex items-center gap-2.5 font-bold text-xl tracking-tighter mb-4">
-                <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/25">
-                  <Layout className="h-5 w-5 text-primary-foreground" />
+      {/* Features Section */}
+      <section className="flex flex-col overflow-hidden lg:px-12 z-10 bg-black/50 w-full border-white/5 border-t pt-32 px-6 pb-32 relative backdrop-blur-3xl items-center">
+        {/* Clean Background Line */}
+        <div className="absolute top-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+        {/* Section Header */}
+        <div className="flex flex-col items-center text-center max-w-3xl mb-24 relative z-10">
+          <div className="flex items-center gap-3 mb-8 px-4 py-1.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm">
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+            </span>
+            <span className="text-xs font-mono text-primary uppercase tracking-[0.2em] font-medium">
+              Powerful Features
+            </span>
+          </div>
+
+          <h2 className="text-5xl md:text-6xl lg:text-7xl font-serif font-medium tracking-tight text-white mb-8">
+            Design intelligence
+            <span className="text-white/60"> made effortless.</span>
+          </h2>
+
+          <p className="text-xl text-white/60 leading-relaxed max-w-2xl font-light tracking-tight">
+            Streamline your design workflow with AI-driven tools designed to
+            simplify, automate, and enhance your creative process.
+          </p>
+        </div>
+
+        {/* Feature Cards Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 z-10 w-full max-w-7xl relative">
+          {/* Card 1: AI Generation */}
+          <div
+            ref={addSpotlightRef}
+            className="landing-spotlight-card group relative flex flex-col p-10 rounded-[32px] border border-white/10 bg-white/[0.02] overflow-hidden transition-all duration-500"
+          >
+            <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[32px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+            <h3 className="text-2xl font-semibold tracking-tight text-white mb-4 relative z-10">
+              AI-Driven Generation
+            </h3>
+            <p className="text-base text-white/50 leading-relaxed mb-12 relative z-10 font-light">
+              Describe your interface in plain English. Watch as unit {`{set}`}{" "}
+              generates fully editable, layer-based designs in seconds.
+            </p>
+
+            {/* Visual: Chat/Terminal UI */}
+            <div className="relative z-10 mt-auto w-full h-72 rounded-2xl border border-white/10 bg-[#0A0A0A] overflow-hidden flex flex-col shadow-2xl">
+              <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between bg-white/5">
+                <div className="flex items-center gap-2 opacity-50">
+                  <div className="w-2 h-2 rounded-full bg-white/40" />
+                  <div className="w-2 h-2 rounded-full bg-white/40" />
                 </div>
-                <span>
-                  unit{" "}
-                  <span className="text-muted-foreground font-normal">{`{set}`}</span>
+                <span className="text-xs text-white/30 font-mono">
+                  UNIT_SET v1.0
                 </span>
               </div>
-              <p className="text-muted-foreground max-w-xs mb-6">
-                The AI-powered design tool for the modern web. Create stunning
-                interfaces at the speed of thought.
-              </p>
-              <div className="flex gap-4">
-                {["Twitter", "GitHub", "Discord", "LinkedIn"].map((social) => (
-                  <Link
-                    key={social}
-                    href="#"
-                    className="w-10 h-10 rounded-lg bg-muted/50 hover:bg-primary/10 hover:text-primary flex items-center justify-center transition-colors"
-                  >
-                    <Globe className="h-5 w-5" />
-                  </Link>
-                ))}
+              <div className="p-6 flex flex-col gap-5 relative h-full">
+                {/* User Message */}
+                <div className="self-end max-w-[90%] bg-white/10 backdrop-blur-sm rounded-2xl rounded-tr-sm p-4 border border-white/5">
+                  <p className="text-xs text-white/90 font-light leading-relaxed">
+                    Create a{" "}
+                    <span className="text-white font-medium">
+                      modern dashboard
+                    </span>{" "}
+                    with <span className="text-primary">dark theme</span>.
+                  </p>
+                </div>
+
+                {/* System Message */}
+                <div className="self-start max-w-[90%] bg-white/[0.03] backdrop-blur-md rounded-2xl rounded-tl-sm p-5 border border-white/10 relative overflow-hidden group-hover:border-primary/20 transition-colors duration-500">
+                  <div className="flex items-center gap-2 mb-3 text-primary font-mono text-[10px] uppercase tracking-wider">
+                    <Sparkles className="h-3.5 w-3.5" /> AI Assistant
+                  </div>
+                  <p className="mb-4 text-xs text-white/80 font-light">
+                    Generating dashboard layout with sidebar navigation...
+                  </p>
+
+                  {/* Progress Bar */}
+                  <div className="w-full bg-black/40 rounded-full h-1.5 mb-2 overflow-hidden">
+                    <div className="bg-primary h-full w-[85%] animate-pulse" />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-primary/60 font-mono">
+                    <span>GENERATING</span>
+                    <span>85%</span>
+                  </div>
+                </div>
               </div>
             </div>
-            <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                {[
-                  "Features",
-                  "Integrations",
-                  "Pricing",
-                  "Changelog",
-                  "Roadmap",
-                ].map((item) => (
-                  <li key={item}>
-                    <Link
-                      href="#"
-                      className="hover:text-foreground transition-colors"
-                    >
-                      {item}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+          </div>
+
+          {/* Card 2: Smart Layouts (Featured) */}
+          <div
+            ref={addSpotlightRef}
+            className="landing-spotlight-card relative flex flex-col p-[1px] rounded-[32px] overflow-hidden lg:-mt-8 lg:mb-8 z-20 group"
+          >
+            <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-transparent rounded-[32px]" />
+            <div className="absolute inset-0 bg-[#050505] rounded-[31px] m-[1px] overflow-hidden">
+              <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />
             </div>
-            <div>
-              <h4 className="font-semibold mb-4">Resources</h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                {[
-                  "Documentation",
-                  "Tutorials",
-                  "Blog",
-                  "Community",
-                  "Help Center",
-                ].map((item) => (
-                  <li key={item}>
-                    <Link
-                      href="#"
-                      className="hover:text-foreground transition-colors"
-                    >
-                      {item}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                {["About", "Careers", "Press", "Legal", "Contact"].map(
-                  (item) => (
-                    <li key={item}>
-                      <Link
-                        href="#"
-                        className="hover:text-foreground transition-colors"
-                      >
-                        {item}
-                      </Link>
-                    </li>
-                  )
-                )}
-              </ul>
+            <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[32px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-50" />
+
+            <div className="relative z-10 flex flex-col h-full p-10 group">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  <Zap className="h-6 w-6 text-primary relative z-10" />
+                </div>
+                <h3 className="text-2xl font-semibold tracking-tight text-white group-hover:text-white transition-colors">
+                  Smart Layouts
+                </h3>
+              </div>
+              <p className="text-base text-white/50 leading-relaxed mb-12 font-light group-hover:text-white/70 transition-colors">
+                Responsive by default. Elements automatically adjust as you
+                resize, just like you&apos;d expect from a modern design tool.
+              </p>
+
+              {/* Visual: Orbit Animation */}
+              <div className="mt-auto relative w-full h-80 flex items-center justify-center">
+                {/* Sonar Rings */}
+                <div
+                  className="absolute w-96 h-96 border border-primary/5 rounded-full animate-ping opacity-10"
+                  style={{ animationDuration: "4s" }}
+                />
+                <div
+                  className="absolute w-80 h-80 border border-white/5 rounded-full animate-ping opacity-20"
+                  style={{ animationDuration: "3s", animationDelay: "0.7s" }}
+                />
+
+                {/* Rotating Rings */}
+                <div
+                  className="absolute w-64 h-64 border border-white/5 rounded-full landing-animate-spin-slow"
+                  style={{ animationDuration: "40s" }}
+                >
+                  <div className="absolute top-1/2 -right-1 w-2 h-2 bg-white/10 rounded-full" />
+                  <div className="absolute top-1/2 -left-1 w-2 h-2 bg-white/10 rounded-full" />
+                </div>
+                <div
+                  className="absolute w-60 h-60 border border-white/10 rounded-full landing-animate-spin-slow"
+                  style={{ animationDuration: "30s" }}
+                />
+                <div
+                  className="absolute w-44 h-44 border border-white/5 rounded-full landing-animate-spin-slow-reverse border-dashed"
+                  style={{ animationDuration: "20s" }}
+                />
+                <div
+                  className="absolute w-36 h-36 border border-primary/20 rounded-full landing-animate-spin-slow opacity-0 group-hover:opacity-100 transition-opacity duration-700"
+                  style={{ animationDuration: "15s" }}
+                >
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-primary mt-[-3px] rounded-full shadow-[0_0_10px_rgba(var(--primary),1)]" />
+                </div>
+
+                {/* Orbiting Elements */}
+                <div
+                  className="absolute w-60 h-60 landing-animate-spin-slow"
+                  style={{ animationDuration: "30s" }}
+                >
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#050505] p-2.5 rounded-full border border-white/10 group-hover:border-primary/30 group-hover:shadow-[0_0_20px_rgba(var(--primary),0.1)] transition-all duration-500">
+                    <Gem className="h-4 w-4 text-white/40 group-hover:text-primary transition-colors" />
+                  </div>
+                  <div className="absolute bottom-0 right-1/2 translate-x-1/2 translate-y-1/2 bg-[#050505] p-2.5 rounded-full border border-white/10 group-hover:border-primary/30 group-hover:shadow-[0_0_20px_rgba(var(--primary),0.1)] transition-all duration-500">
+                    <CreditCard className="h-4 w-4 text-white/40 group-hover:text-primary transition-colors" />
+                  </div>
+                </div>
+
+                {/* Central Hub */}
+                <div className="z-10 flex group-hover:border-primary/40 transition-colors duration-500 bg-[#0F110E] w-24 h-24 border-white/10 border rounded-3xl relative items-center justify-center overflow-hidden shadow-2xl">
+                  <Layers className="h-8 w-8 text-white relative z-20 group-hover:text-primary transition-colors duration-500" />
+                  <div className="animate-pulse bg-gradient-to-tr from-transparent via-primary/10 to-transparent absolute inset-0 z-10" />
+                  <div
+                    className="absolute inset-0 opacity-20 z-0"
+                    style={{
+                      backgroundImage:
+                        "radial-gradient(#fff 0.5px, transparent 0.5px)",
+                      backgroundSize: "18px 18px",
+                    }}
+                  />
+                </div>
+
+                <div className="absolute bottom-4 flex flex-col items-center">
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5 group-hover:border-primary/20 transition-colors">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
+                    </span>
+                    <div className="text-[10px] text-white/40 font-mono tracking-widest uppercase group-hover:text-white/70 transition-colors">
+                      System Active
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-border/40 text-sm text-muted-foreground">
-            <p>&copy; 2024 Unit Set Inc. All rights reserved.</p>
-            <div className="flex gap-6 mt-4 md:mt-0">
-              <Link
-                href="#"
-                className="hover:text-foreground transition-colors"
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                href="#"
-                className="hover:text-foreground transition-colors"
-              >
-                Terms of Service
-              </Link>
-              <Link
-                href="#"
-                className="hover:text-foreground transition-colors"
-              >
-                Cookie Policy
-              </Link>
+
+          {/* Card 3: Real-time Collaboration */}
+          <div
+            ref={addSpotlightRef}
+            className="landing-spotlight-card group relative flex flex-col p-10 rounded-[32px] border border-white/10 bg-white/[0.02] overflow-hidden transition-all duration-500"
+          >
+            <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[32px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+            <h3 className="text-2xl font-semibold tracking-tight text-white mb-4 relative z-10">
+              Real-time Collaboration
+            </h3>
+            <p className="text-base text-white/50 leading-relaxed mb-12 relative z-10 font-light">
+              Work with your team in real-time. See cursors, leave comments, and
+              iterate together on the infinite canvas.
+            </p>
+
+            {/* Visual: Dashboard UI */}
+            <div className="relative mt-auto w-full h-72 rounded-2xl border border-white/10 bg-[#0A0A0A] p-7 flex flex-col justify-center gap-6 shadow-2xl">
+              {/* Team Header */}
+              <div className="flex justify-between items-center pb-4 border-b border-white/5">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-none" />
+                  <span className="text-xs text-white/50 font-mono uppercase tracking-wider">
+                    Project_V2
+                  </span>
+                </div>
+                <div className="flex -space-x-2">
+                  <div className="w-7 h-7 rounded-full border border-[#0A0A0A] bg-white/10 flex items-center justify-center text-white/80 text-[10px] font-medium">
+                    JD
+                  </div>
+                  <div className="w-7 h-7 rounded-full border border-[#0A0A0A] bg-primary/20 flex items-center justify-center text-primary text-[10px] font-medium">
+                    AS
+                  </div>
+                  <div className="w-7 h-7 rounded-full border border-[#0A0A0A] bg-white/5 flex items-center justify-center text-[9px] text-white/40">
+                    +3
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Slider */}
+              <div className="relative py-1">
+                <div className="flex justify-between text-[10px] text-white/40 mb-2 font-mono uppercase">
+                  <span>Design Progress</span>
+                  <span className="text-primary">75% Complete</span>
+                </div>
+                <div className="w-full h-2 bg-white/10 rounded-full relative flex items-center">
+                  <div className="absolute left-0 h-full w-[75%] bg-white/80 rounded-full" />
+                  <div className="absolute left-[75%] w-4 h-4 bg-white rounded-full z-10 transform -translate-x-1/2 border-2 border-[#0A0A0A] cursor-grab" />
+                  <div className="absolute left-[75%] -top-9 -translate-x-1/2 bg-[#151515] border border-white/10 text-white text-[10px] px-2.5 py-1.5 rounded shadow-lg whitespace-nowrap animate-bounce">
+                    Editing...
+                    <div className="absolute bottom-[-4px] left-1/2 -translate-x-1/2 w-2 h-2 bg-[#151515] border-r border-b border-white/10 transform rotate-45" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 transition-colors cursor-pointer">
+                  <History className="h-3.5 w-3.5 text-white/40" />
+                  <span className="text-xs text-white/60 font-medium">
+                    History
+                  </span>
+                </div>
+                <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20 cursor-pointer hover:bg-primary/20 transition-colors">
+                  <CheckCircle className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs text-primary font-medium">
+                    Approve
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </footer>
 
-      {/* Custom Styles */}
-      <style jsx global>{`
-        @keyframes gradient {
-          0%,
-          100% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
-        }
-        .animate-gradient {
-          animation: gradient 3s ease infinite;
-        }
-      `}</style>
+        {/* CTA Button */}
+        <div className="mt-24 relative z-10">
+          <button className="group relative px-9 py-4 rounded-full bg-white text-black font-semibold text-sm transition-all duration-300 hover:bg-[#e5e5e5] flex items-center gap-3 overflow-hidden tracking-tight">
+            <span className="relative z-10">Explore All Features</span>
+            <ArrowRight className="h-4 w-4 relative z-10 transition-transform duration-300 group-hover:translate-x-1" />
+            <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 to-transparent z-0" />
+          </button>
+        </div>
+      </section>
+
+      {/* Testimonial Section */}
+      <section className="overflow-hidden flex flex-col px-6 md:px-8 lg:px-12 z-10 bg-[#030303]/80 w-full border-white/5 border-t pt-32 pb-32 relative backdrop-blur-xl items-center">
+        {/* Subtle Background Grid */}
+        <div className="absolute inset-0 landing-grid-bg opacity-50 pointer-events-none" />
+
+        <div className="max-w-7xl w-full relative z-10">
+          {/* Header Group */}
+          <div className="flex flex-col gap-8 mb-24 max-w-5xl">
+            <span className="text-xs font-mono text-white/40 uppercase tracking-[0.2em] font-medium pl-1 flex items-center gap-3">
+              <span className="w-1 h-1 bg-primary rounded-full shadow-[0_0_10px_rgba(var(--primary),0.8)]" />
+              Built for Modern Designers
+            </span>
+
+            <h2 className="text-4xl md:text-5xl lg:text-7xl font-serif font-medium tracking-tight text-white leading-[1.1]">
+              The modern designer doesn&apos;t fit in a single tool —
+              <span className="text-white/50">
+                {" "}
+                they sketch, they iterate, they ship fast.
+              </span>{" "}
+              This platform was made for them.
+            </h2>
+          </div>
+
+          {/* Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-end">
+            {/* Visual / Portrait Block */}
+            <div className="lg:col-span-4 relative group">
+              <div className="relative w-full aspect-[3.5/4] rounded-[24px] overflow-hidden border border-white/10 bg-white/[0.02]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=1000&fit=crop&crop=face"
+                  alt="Designer Profile"
+                  className="w-full h-full object-cover grayscale mix-blend-luminosity opacity-60 group-hover:opacity-80 group-hover:scale-105 transition-all duration-700 ease-out"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-transparent opacity-80" />
+                <div className="absolute top-5 left-5 right-5 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                  <div className="flex gap-1.5">
+                    <div className="w-1 h-1 bg-white/40 rounded-full" />
+                    <div className="w-1 h-1 bg-white/40 rounded-full" />
+                  </div>
+                  <div className="px-2 py-0.5 rounded border border-white/10 bg-black/20 backdrop-blur-md">
+                    <span className="text-[9px] font-mono text-primary tracking-wider">
+                      LIVE
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Testimony & Actions Block */}
+            <div className="lg:col-span-8 flex flex-col justify-end h-full relative">
+              {/* Quote */}
+              <blockquote className="mb-12 relative">
+                <svg
+                  className="absolute -top-6 -left-8 w-6 h-6 text-white/10"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M14.017 21L14.017 18C14.017 16.8954 14.9124 16 16.017 16H19.017C19.5693 16 20.017 15.5523 20.017 15V9C20.017 8.44772 19.5693 8 19.017 8H15.017C14.4647 8 14.017 8.44772 14.017 9V11C14.017 11.5523 13.5693 12 13.017 12H12.017V5H22.017V15C22.017 18.3137 19.3307 21 16.017 21H14.017ZM5.0166 21L5.0166 18C5.0166 16.8954 5.91203 16 7.0166 16H10.0166C10.5689 16 11.0166 15.5523 11.0166 15V9C11.0166 8.44772 10.5689 8 10.0166 8H6.0166C5.46432 8 5.0166 8.44772 5.0166 9V11C5.0166 11.5523 4.56889 12 4.0166 12H3.0166V5H13.0166V15C13.0166 18.3137 10.3303 21 7.0166 21H5.0166Z" />
+                </svg>
+                <p className="text-xl md:text-2xl lg:text-3xl text-white/80 font-light leading-relaxed tracking-tight">
+                  &quot;I used to juggle between Figma, code editors, and AI
+                  tools. This platform keeps it simple — I describe what I want
+                  and get production-ready designs without the cognitive
+                  load.&quot;
+                </p>
+              </blockquote>
+
+              {/* Author */}
+              <div className="mb-12 flex items-center gap-4">
+                <div className="h-px w-8 bg-primary/30" />
+              </div>
+
+              {/* Bottom Row: Stat & CTA */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-t border-white/5 pt-8">
+                {/* Metric Pill */}
+                <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-full border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-colors group cursor-default">
+                  <span className="text-[10px] md:text-xs text-white/50 font-mono uppercase tracking-wide group-hover:text-white/70 transition-colors">
+                    Design Speed Up <span className="text-primary">10x</span>{" "}
+                    since launch
+                  </span>
+                  <ArrowUpRight className="h-3 w-3 text-primary transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+
+                {/* CTA Button */}
+                <button className="landing-shiny-cta group !px-7 !py-3">
+                  <span className="text-sm font-medium">Start Designing</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Exchange/Product Section */}
+      <section className="lg:px-12 flex flex-col overflow-hidden z-10 bg-[#030303]/50 w-full border-white/5 border-t px-6 py-32 relative backdrop-blur-xl items-center">
+        {/* Background Texture */}
+        <div className="absolute inset-0 landing-grid-bg opacity-70 pointer-events-none" />
+
+        <div className="max-w-7xl w-full relative z-10">
+          {/* Header Section */}
+          <div className="flex flex-col lg:flex-row justify-between lg:items-end gap-12 mb-20">
+            <div className="flex flex-col gap-6 max-w-3xl">
+              <div className="flex items-center gap-4">
+                <span className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 text-xs font-mono text-white/50">
+                  03
+                </span>
+                <span className="text-xs font-mono text-primary/90 uppercase tracking-[0.2em]">
+                  Design Infrastructure
+                </span>
+              </div>
+
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-medium tracking-tight text-white leading-[1.1]">
+                Create & Export
+                <span className="text-white/40 italic">
+                  {" "}
+                  Production-Ready Code.
+                </span>
+              </h2>
+            </div>
+
+            <div className="max-w-sm pb-2">
+              <p className="text-white/50 text-sm leading-relaxed font-light">
+                Direct design-to-code pipeline with clean, semantic output.
+                Export to React, Vue, or vanilla HTML/CSS with zero friction.
+              </p>
+            </div>
+          </div>
+
+          {/* Main Feature Card */}
+          <div className="w-full rounded-[24px] border border-white/10 bg-[#080808] overflow-hidden flex flex-col lg:flex-row relative group">
+            {/* Left Column: Content */}
+            <div className="lg:w-1/2 p-8 md:p-12 lg:p-16 flex flex-col justify-center items-start z-10 relative bg-[#080808]">
+              <h3 className="text-3xl md:text-4xl font-serif font-medium text-white mb-6 tracking-tight">
+                Design, Generate & Ship Components.
+              </h3>
+              <p className="text-white/60 mb-10 leading-relaxed font-light max-w-md text-base">
+                Initialize your project and generate components across multiple
+                frameworks. One interface for design, code, and deployment.
+              </p>
+
+              <div className="flex flex-wrap gap-4 w-full sm:w-auto">
+                <Button className="px-8 py-3.5 bg-primary text-primary-foreground font-semibold text-sm rounded-full hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 min-w-[140px]">
+                  Get Started
+                </Button>
+                <Button
+                  variant="outline"
+                  className="px-8 py-3.5 border border-white/10 text-white font-medium text-sm rounded-full hover:bg-white/5 transition-colors flex items-center justify-center gap-2 min-w-[140px] bg-transparent"
+                >
+                  View Examples
+                </Button>
+              </div>
+            </div>
+
+            {/* Right Column: Technical Illustration */}
+            <div className="lg:w-1/2 bg-[#050505] relative min-h-[400px] border-t lg:border-t-0 lg:border-l border-white/5 overflow-hidden flex items-center justify-center">
+              <div
+                className="absolute inset-0 opacity-[0.03]"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+                  backgroundSize: "48px 96px",
+                }}
+              />
+
+              <div className="relative w-full h-full flex items-center justify-center p-12">
+                <div className="relative w-72 h-56 transform hover:rotate-0 transition-transform duration-700 ease-out">
+                  {/* Background Panel */}
+                  <div className="absolute top-0 right-0 w-56 h-36 bg-[#0A0A0A] border border-white/10 rounded-xl shadow-2xl z-0 overflow-hidden">
+                    <div className="h-8 border-b border-white/5 flex items-center px-3 gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                    </div>
+                    <div className="p-4 grid grid-cols-2 gap-3">
+                      <div className="h-12 bg-white/5 rounded border border-white/5" />
+                      <div className="h-12 bg-white/5 rounded border border-white/5" />
+                    </div>
+                  </div>
+
+                  {/* Foreground Panel */}
+                  <div className="absolute bottom-4 left-4 w-44 h-32 bg-[#0F0F0F] border border-white/10 rounded-xl shadow-[0_20px_40px_-15px_rgba(0,0,0,1)] z-10 flex flex-col overflow-hidden">
+                    <div className="flex justify-between items-center p-4 border-b border-white/5 bg-white/[0.01]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                          <svg
+                            className="w-2.5 h-2.5 text-black"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </div>
+                        <span className="text-[10px] font-mono text-white/60">
+                          Component
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-primary">
+                        Ready
+                      </span>
+                    </div>
+                    <div className="p-4 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-white/40">Export</span>
+                        <span className="text-xs text-white font-mono">
+                          React
+                        </span>
+                      </div>
+                      <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div className="w-2/3 h-full bg-primary" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Floating Icon */}
+                  <div
+                    className="absolute -top-6 -left-6 w-12 h-12 bg-[#050505] border border-white/10 rounded-full flex items-center justify-center z-20 shadow-xl animate-bounce"
+                    style={{ animationDuration: "4s" }}
+                  >
+                    <svg
+                      className="w-5 h-5 text-white/80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                    >
+                      <path d="M12 2v20M2 12h20" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Banner Section */}
+      <section className="flex lg:px-12 bg-[#030303]/80 w-full z-10 border-white/5 border-t px-6 py-32 relative backdrop-blur-xl justify-center">
+        <div className="w-full max-w-7xl bg-primary rounded-[32px] relative overflow-hidden flex flex-col lg:flex-row items-start lg:items-end justify-between p-10 lg:p-24 group">
+          {/* Animated Effects */}
+          <div className="absolute inset-0 opacity-20 mix-blend-soft-light bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E')]" />
+          <div className="absolute -right-40 -top-40 w-[600px] h-[600px] bg-white/20 blur-[120px] rounded-full pointer-events-none opacity-60 mix-blend-overlay group-hover:scale-110 transition-transform duration-1000" />
+          <div className="absolute bottom-0 left-0 w-full h-full bg-[radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.15),transparent_60%)] pointer-events-none" />
+
+          {/* Left Content */}
+          <div className="relative z-10 flex flex-col max-w-2xl mb-12 lg:mb-0">
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-medium tracking-tight text-[#030303] mb-8 leading-[1.05]">
+              Ready to transform your{" "}
+              <span className="opacity-60 italic">design workflow?</span>
+            </h2>
+
+            {/* Interaction Card */}
+            <Link
+              href="/sign-up"
+              className="group/card relative mt-4 w-full sm:w-80 h-36 bg-[#030303]/5 border border-[#030303]/10 rounded-2xl p-6 flex flex-col justify-between hover:bg-[#030303]/10 hover:border-[#030303]/20 hover:scale-[1.02] transition-all duration-300"
+            >
+              <div className="flex justify-between items-start">
+                <MessageCircle className="h-8 w-8 text-[#030303] opacity-80" />
+                <ArrowUpRight className="h-6 w-6 text-[#030303] opacity-40 group-hover/card:opacity-100 group-hover/card:translate-x-1 group-hover/card:-translate-y-1 transition-all" />
+              </div>
+              <div>
+                <span className="block text-[#030303] font-semibold text-lg tracking-tight">
+                  Start Free Trial
+                </span>
+                <span className="text-[#030303]/60 text-xs font-medium uppercase tracking-wider">
+                  No credit card required
+                </span>
+              </div>
+            </Link>
+          </div>
+
+          {/* Right Content */}
+          <div className="relative z-10 max-w-md pb-2 lg:text-right flex flex-col items-start lg:items-end gap-6">
+            <p className="text-[#030303]/70 text-lg lg:text-xl font-medium leading-relaxed">
+              Our AI-powered design tools are ready to help you create stunning
+              interfaces in minutes, not hours.
+            </p>
+
+            {/* Abstract Decor Lines */}
+            <div className="hidden lg:flex gap-1.5 opacity-30">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#030303]" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[#030303]" />
+              <div className="w-12 h-1.5 rounded-full bg-[#030303]" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="lg:px-12 flex flex-col z-10 overflow-hidden bg-[#030303] w-full border-white/5 border-t pt-12 px-6 pb-12 relative items-center">
+        {/* Background Grid */}
+        <div className="absolute inset-0 landing-grid-bg [mask-image:linear-gradient(to_bottom,transparent,black_20%)] pointer-events-none" />
+
+        <div className="w-full max-w-7xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-8 relative z-10">
+          {/* Brand Column */}
+          <div className="lg:col-span-3 flex flex-col gap-8">
+            <div className="flex items-center gap-3">
+              <div className="relative flex items-center justify-center w-10 h-10 bg-white/5 rounded-xl border border-white/10 shadow-[0_0_15px_rgba(var(--primary),0.15)]">
+                <Layout className="h-5 w-5 text-primary" />
+              </div>
+              <span className="font-serif font-medium text-2xl tracking-tight text-white">
+                unit {`{set}`}
+              </span>
+            </div>
+            <p className="text-white/40 text-sm leading-relaxed max-w-[280px] font-light">
+              Engineering the future of design. AI-powered, developer-friendly,
+              and infinitely scalable.
+            </p>
+            {/* Socials */}
+            <div className="flex gap-5 mt-4">
+              <a
+                href="#"
+                className="text-white/30 hover:text-white transition-colors"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="m17.687 3.063l-4.996 5.711l-4.32-5.711H2.112l7.477 9.776l-7.086 8.099h3.034l5.469-6.25l4.78 6.25h6.102l-7.794-10.304l6.625-7.571zm-1.064 16.06L5.654 4.782h1.803l10.846 14.34z" />
+                </svg>
+              </a>
+              <a
+                href="#"
+                className="text-white/30 hover:text-white transition-colors"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12.001 2c-5.525 0-10 4.475-10 10a9.99 9.99 0 0 0 6.837 9.488c.5.087.688-.213.688-.476c0-.237-.013-1.024-.013-1.862c-2.512.463-3.162-.612-3.362-1.175c-.113-.288-.6-1.175-1.025-1.413c-.35-.187-.85-.65-.013-.662c.788-.013 1.35.725 1.538 1.025c.9 1.512 2.337 1.087 2.912.825c.088-.65.35-1.087.638-1.337c-2.225-.25-4.55-1.113-4.55-4.938c0-1.088.387-1.987 1.025-2.687c-.1-.25-.45-1.275.1-2.65c0 0 .837-.263 2.75 1.024a9.3 9.3 0 0 1 2.5-.337c.85 0 1.7.112 2.5.337c1.913-1.3 2.75-1.024 2.75-1.024c.55 1.375.2 2.4.1 2.65c.637.7 1.025 1.587 1.025 2.687c0 3.838-2.337 4.688-4.562 4.938c.362.312.675.912.675 1.85c0 1.337-.013 2.412-.013 2.75c0 .262.188.574.688.474A10.02 10.02 0 0 0 22 12c0-5.525-4.475-10-10-10" />
+                </svg>
+              </a>
+              <a
+                href="#"
+                className="text-white/30 hover:text-white transition-colors"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M6.94 5a2 2 0 1 1-4-.002a2 2 0 0 1 4 .002M7 8.48H3V21h4zm6.32 0H9.34V21h3.94v-6.57c0-3.66 4.77-4 4.77 0V21H22v-7.93c0-6.17-7.06-5.94-8.72-2.91z" />
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          {/* Navigation Links */}
+          <div className="lg:col-span-2 flex flex-col gap-6 pt-2">
+            <h4 className="text-white font-medium text-sm tracking-wide">
+              Product
+            </h4>
+            <ul className="flex flex-col gap-3.5">
+              <li>
+                <a
+                  href="#"
+                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                >
+                  Documentation
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                >
+                  API Reference
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                >
+                  Changelog
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="flex items-center gap-2 text-white/40 hover:text-primary text-sm transition-colors font-light"
+                >
+                  System Status
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                  </span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div className="lg:col-span-2 flex flex-col gap-6 pt-2">
+            <h4 className="text-white font-medium text-sm tracking-wide">
+              Company
+            </h4>
+            <ul className="flex flex-col gap-3.5">
+              <li>
+                <a
+                  href="#"
+                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                >
+                  About
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                >
+                  Careers
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                >
+                  Press Kit
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                >
+                  Legal
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Large Action Buttons */}
+          <div className="lg:col-span-5 flex flex-col sm:flex-row lg:flex-row gap-4 mt-8 lg:mt-0">
+            <a
+              href="#"
+              className="flex-1 group relative p-7 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300 flex flex-col justify-between h-36 lg:h-40 overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="flex justify-between items-start relative z-10">
+                <span className="text-white font-medium text-sm tracking-wide">
+                  Contact Sales
+                </span>
+                <ArrowUpRight className="h-4 w-4 text-white/20 group-hover:text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-300" />
+              </div>
+              <div className="relative z-10 flex items-end justify-between">
+                <Wallet className="h-8 w-8 text-primary/60 group-hover:scale-110 transition-transform duration-300" />
+              </div>
+            </a>
+
+            <a
+              href="#"
+              className="flex-1 group relative p-7 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300 flex flex-col justify-between h-36 lg:h-40 overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="flex justify-between items-start relative z-10">
+                <span className="text-white font-medium text-sm tracking-wide">
+                  Help Center
+                </span>
+                <ArrowUpRight className="h-4 w-4 text-white/20 group-hover:text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-300" />
+              </div>
+              <div className="relative z-10 flex items-end justify-between">
+                <Headphones className="h-8 w-8 text-primary/60 group-hover:scale-110 transition-transform duration-300" />
+              </div>
+            </a>
+          </div>
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="w-full max-w-7xl mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
+          <span className="text-white/20 text-xs font-mono tracking-wide">
+            © 2024 Unit Set Technologies. All rights reserved.
+          </span>
+          <div className="flex items-center gap-8">
+            <span className="text-white/20 text-xs font-mono border-l border-white/10 pl-8">
+              SOC2 Type II Compliant
+            </span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

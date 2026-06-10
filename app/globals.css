@@ -592,3 +592,404 @@ html[data-scroll-behavior="smooth"] {
 [data-slot="input-group-control"]:focus-visible {
   outline: none;
 }
+
+/* Remove focus ring from cmdk command input */
+[cmdk-input]:focus,
+[cmdk-input]:focus-visible,
+[data-slot="command-input"]:focus,
+[data-slot="command-input"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+  ring: none;
+}
+
+/* ========================================
+   LANDING PAGE SPECIFIC STYLES
+   These styles only apply to elements with
+   landing-* class prefixes
+   ======================================== */
+
+/* Landing Page Text Glow */
+.landing-text-glow {
+  text-shadow: 0 0 25px oklch(var(--primary) / 0.4);
+}
+
+/* Landing Page Grid Background */
+.landing-grid-bg {
+  background-size: 100px 200px;
+  background-image: linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.03) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+}
+
+/* Landing Page Beam Animation */
+.landing-beam-line {
+  stroke-dasharray: 80 1000;
+  stroke-linecap: round;
+}
+
+@keyframes landing-beam {
+  0% {
+    stroke-dashoffset: 1000;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.landing-animate-beam {
+  animation: landing-beam 3s linear infinite;
+}
+
+/* Landing Page Sonar Animation */
+@keyframes landing-sonar-wave {
+  0% {
+    r: 10px;
+    opacity: 0.8;
+    stroke-width: 1px;
+  }
+  100% {
+    r: 80px;
+    opacity: 0;
+    stroke-width: 0px;
+  }
+}
+
+.landing-animate-sonar {
+  animation: landing-sonar-wave 3s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.landing-delay-1000 {
+  animation-delay: 1s;
+}
+.landing-delay-2000 {
+  animation-delay: 2s;
+}
+
+/* Landing Page Spin Animations */
+.landing-animate-spin-slow {
+  animation: spin 12s linear infinite;
+}
+
+.landing-animate-spin-slow-reverse {
+  animation: spin 15s linear infinite reverse;
+}
+
+/* Landing Page Pulse Fast */
+.landing-animate-pulse-fast {
+  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Landing Page Marquee Animation */
+@keyframes landing-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.landing-animate-marquee {
+  animation: landing-marquee 40s linear infinite;
+}
+
+.landing-mask-gradient-fade {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 10%,
+    black 90%,
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 10%,
+    black 90%,
+    transparent
+  );
+}
+
+/* Landing Page Shiny CTA Button */
+@property --landing-gradient-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes landing-border-spin {
+  to {
+    --landing-gradient-angle: 360deg;
+  }
+}
+
+@keyframes landing-shimmer {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@keyframes landing-breathe {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+}
+
+.landing-shiny-cta {
+  --landing-gradient-angle: 0deg;
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  padding: 1.25rem 2.5rem;
+  font-size: 1rem;
+  line-height: 1.2;
+  font-weight: 500;
+  color: #ffffff;
+  background: linear-gradient(#030303, #030303) padding-box,
+    conic-gradient(
+        from calc(var(--landing-gradient-angle) - 0deg),
+        transparent 0%,
+        oklch(var(--primary) / 0.8) 5%,
+        oklch(var(--primary)) 15%,
+        oklch(var(--primary) / 0.8) 30%,
+        transparent 40%,
+        transparent 100%
+      )
+      border-box;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px #1a1818;
+  cursor: pointer;
+  isolation: isolate;
+  font-family: var(--font-sans);
+  z-index: 0;
+  animation: landing-border-spin 2.5s linear infinite;
+  transition: box-shadow 0.3s;
+}
+
+.landing-shiny-cta:active {
+  transform: translateY(1px);
+}
+
+.landing-shiny-cta::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  --size: calc(100% - 6px);
+  --position: 2px;
+  --space: 4px;
+  width: var(--size);
+  height: var(--size);
+  background: radial-gradient(
+      circle at var(--position) var(--position),
+      white 0.5px,
+      transparent 0
+    )
+    padding-box;
+  background-size: var(--space) var(--space);
+  background-repeat: space;
+  mask-image: conic-gradient(
+    from calc(var(--landing-gradient-angle) + 45deg),
+    black,
+    transparent 10% 90%,
+    black
+  );
+  border-radius: inherit;
+  opacity: 0.4;
+}
+
+.landing-shiny-cta::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  width: 100%;
+  aspect-ratio: 1;
+  background: linear-gradient(
+    -50deg,
+    transparent,
+    oklch(var(--primary) / 0.6),
+    transparent
+  );
+  mask-image: radial-gradient(circle at bottom, transparent 40%, black);
+  opacity: 0.6;
+  animation: landing-shimmer 4s linear infinite;
+}
+
+.landing-shiny-cta span {
+  position: relative;
+  z-index: 2;
+  display: inline-block;
+}
+
+.landing-shiny-cta span::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: -1;
+  --size: calc(100% + 1rem);
+  width: var(--size);
+  height: var(--size);
+  box-shadow: inset 0 -1ex 2rem 4px oklch(var(--primary) / 0.6);
+  opacity: 0;
+  border-radius: inherit;
+  animation: landing-breathe 4.5s linear infinite;
+}
+
+/* Landing Page Border Gradient Button */
+.landing-border-gradient {
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.landing-border-gradient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: 9999px;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.15),
+    rgba(255, 255, 255, 0.05),
+    rgba(255, 255, 255, 0.15)
+  );
+  pointer-events: none;
+}
+
+/* Landing Page Spotlight Card Effect */
+.landing-spotlight-card {
+  --mouse-x: 50%;
+  --mouse-y: 50%;
+}
+
+.landing-spotlight-bg {
+  background: radial-gradient(
+    600px circle at var(--mouse-x) var(--mouse-y),
+    rgba(255, 255, 255, 0.06),
+    transparent 40%
+  );
+}
+
+.landing-spotlight-border {
+  mask-image: radial-gradient(
+    300px circle at var(--mouse-x) var(--mouse-y),
+    black,
+    transparent
+  );
+  -webkit-mask-image: radial-gradient(
+    300px circle at var(--mouse-x) var(--mouse-y),
+    black,
+    transparent
+  );
+}
+
+/* Landing Page Radial Glow Background */
+.landing-radial-glow {
+  background-image: radial-gradient(
+    circle at 70% 50%,
+    oklch(var(--primary) / 0.25) 0%,
+    rgba(5, 5, 5, 0) 60%
+  );
+}
+
+/* Landing Page Background Component */
+.landing-background-component {
+  pointer-events: none;
+}
+
+/* Landing Page Ambient Glow */
+.landing-ambient-glow {
+  filter: blur(60px);
+  opacity: 0.5;
+}
+
+/* Landing Page Card Hover Glow */
+.landing-card-glow {
+  transition: box-shadow 0.5s ease;
+}
+
+.landing-card-glow:hover {
+  box-shadow: 0 0 60px oklch(var(--primary) / 0.15);
+}
+
+/* Landing Page Floating Animation */
+@keyframes landing-float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.landing-animate-float {
+  animation: landing-float 6s ease-in-out infinite;
+}
+
+/* Landing Page Gradient Text */
+.landing-gradient-text {
+  background: linear-gradient(135deg, oklch(var(--primary)), #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Landing Page Noise Texture */
+.landing-noise-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
+}
+
+/* Landing Page Shimmer Button Effect */
+@keyframes landing-button-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.landing-button-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transform: translateX(-100%);
+}
+
+.landing-button-shimmer:hover::after {
+  animation: landing-button-shimmer 1.5s infinite;
+}

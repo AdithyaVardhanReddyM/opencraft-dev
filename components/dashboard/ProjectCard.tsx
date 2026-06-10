@@ -3,15 +3,14 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Layers, Trash2, Clock } from "lucide-react";
+import { Trash2, Clock, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/lib/date-utils";
+import { generateGradientThumbnail } from "@/lib/gradient-utils";
 import { Project } from "@/types/project";
 import { DeleteProjectDialog } from "@/components/dashboard/DeleteProjectDialog";
 import { Id } from "@/convex/_generated/dataModel";
-import { generateGradientThumbnail } from "@/lib/gradient-utils";
-import { BackgroundGradient } from "../ui/background-gradient";
 
 interface ProjectCardProps {
   project: Project;
@@ -28,7 +27,6 @@ export function ProjectCard({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
-  // Generate consistent gradient based on project number
   const gradientThumbnail = useMemo(() => {
     return generateGradientThumbnail(project.projectNumber);
   }, [project.projectNumber]);
@@ -42,103 +40,104 @@ export function ProjectCard({
     setDeleteDialogOpen(true);
   };
 
+  const isNewProject = project.lastModified === project.createdAt;
+
   return (
     <>
-      <BackgroundGradient>
-        <Card
-          className={`overflow-hidden py-0 cursor-pointer transition-all duration-300 hover:border-primary hover:shadow-xl hover:shadow-primary/10 group relative ${
-            isDeleting ? "opacity-0 scale-95" : "opacity-100 scale-100"
+      <Card
+        className={`overflow-hidden p-0 cursor-pointer transition-all duration-200 border-border/50 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 group relative bg-card ${
+          isDeleting ? "opacity-0 scale-95" : "opacity-100 scale-100"
+        }`}
+        onClick={handleCardClick}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* Delete Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`absolute top-3 right-3 z-10 size-8 bg-background/90 backdrop-blur-sm border border-border/50 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-all duration-200 ${
+            isHovered ? "opacity-100" : "opacity-0"
           }`}
-          onClick={handleCardClick}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
+          onClick={handleDeleteClick}
+          aria-label="Delete project"
         >
-          {/* Delete Button - Subtle, appears on hover */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`absolute top-2 right-2 z-10 size-8 bg-background/80 backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 ${
-              isHovered ? "opacity-100" : "opacity-0"
-            }`}
-            onClick={handleDeleteClick}
-            aria-label="Delete project"
-          >
-            <Trash2 className="size-4" />
-          </Button>
+          <Trash2 className="size-3.5" />
+        </Button>
 
-          {/* Gradient Thumbnail */}
-          <div className="relative aspect-video overflow-hidden">
-            {project.thumbnail ? (
+        {/* Thumbnail */}
+        <div className="relative aspect-16/10 overflow-hidden bg-muted">
+          {project.thumbnail ? (
+            <Image
+              src={project.thumbnail}
+              alt={project.name}
+              fill
+              className="object-cover"
+            />
+          ) : (
+            <>
               <Image
-                src={project.thumbnail}
+                src={gradientThumbnail}
                 alt={project.name}
                 fill
                 className="object-cover"
               />
-            ) : (
-              <>
+              {/* Logo overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
                 <Image
-                  src={gradientThumbnail}
-                  alt={project.name}
-                  fill
-                  className="object-cover"
+                  src="/unitset_logo.svg"
+                  alt="Unit Set"
+                  width={64}
+                  height={64}
+                  className="object-contain"
                 />
-                {/* Logo overlay */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Image
-                    src="/unitset_logo.svg"
-                    alt="Unit Set"
-                    width={80}
-                    height={80}
-                    className="object-contain opacity-30"
-                  />
-                </div>
-              </>
-            )}
-            {/* Fade overlay at bottom */}
-            <div className="absolute bottom-0 left-0 right-0 h-8 bg-linear-to-t from-card via-card/50 to-transparent pointer-events-none" />
-          </div>
-
-          {/* Project Details */}
-          <div className="px-4 relative z-10">
-            {/* Project Title */}
-            <h3 className="font-semibold text-base leading-tight line-clamp-1 mb-1">
-              {project.name}
-            </h3>
-
-            {/* Project Description */}
-            {project.description && (
-              <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-                {project.description}
-              </p>
-            )}
-
-            {/* Metadata Footer */}
-            <div className="flex flex-col gap-1 text-xs text-muted-foreground pt-1 pb-4">
-              <div className="flex items-center gap-1.5">
-                <Clock className="size-3.5" />
-                <span>Created {formatRelativeTime(project.createdAt)}</span>
               </div>
-              {project.lastModified !== project.createdAt && (
-                <div className="flex items-center gap-1.5">
-                  <Clock className="size-3.5" />
-                  <span>
-                    Modified {formatRelativeTime(project.lastModified)}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
+            </>
+          )}
+        </div>
 
-        {/* Delete Confirmation Dialog */}
-        <DeleteProjectDialog
-          project={project}
-          open={deleteDialogOpen}
-          onOpenChange={setDeleteDialogOpen}
-          onOptimisticDelete={onOptimisticDelete}
-        />
-      </BackgroundGradient>
+        {/* Project Details */}
+        <div className="px-3  pb-2.5 space-y-1.5">
+          {/* Title Row */}
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-semibold text-sm leading-tight line-clamp-1 text-foreground">
+              {project.name}
+            </h2>
+            {isNewProject && (
+              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded">
+                <Sparkles className="size-2.5" />
+                New
+              </span>
+            )}
+          </div>
+
+          {/* Description */}
+          <p className="text-xs text-muted-foreground line-clamp-2 leading-snug">
+            {project.description || "No description"}
+          </p>
+
+          {/* Metadata */}
+          <div className="flex items-center justify-between pt-1.5 border-t border-border/50">
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Clock className="size-3" />
+              <span>Created {formatRelativeTime(project.createdAt)}</span>
+            </div>
+            {!isNewProject && (
+              <span className="text-[11px] text-muted-foreground/70">
+                Edited {formatRelativeTime(project.lastModified)}
+              </span>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteProjectDialog
+        project={project}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onOptimisticDelete={onOptimisticDelete}
+      />
     </>
   );
 }

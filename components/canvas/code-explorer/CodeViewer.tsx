@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import type { CodeViewerProps } from "@/lib/canvas/code-explorer-types";
 import { getLanguageFromPath } from "@/lib/canvas/code-explorer-utils";
 import { codeToHtml, type BundledLanguage } from "shiki";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 
 /**
  * CodeViewer component - displays file content with syntax highlighting
@@ -144,14 +145,10 @@ export function CodeViewer({
           </div>
         )}
         {/* Loading content */}
-        <div className="flex flex-col items-center justify-center flex-1 gap-3">
-          <div className="relative">
-            <div className="absolute inset-0 bg-primary/20 rounded-full blur-lg animate-pulse" />
-            <Loader2 className="h-6 w-6 animate-spin text-primary/70 relative" />
-          </div>
-          <span className="text-xs text-muted-foreground/60">
+        <div className="flex flex-col items-center justify-center flex-1">
+          <Shimmer className="text-xs" duration={1.5} spread={3}>
             Loading file...
-          </span>
+          </Shimmer>
         </div>
       </div>
     );

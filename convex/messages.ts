@@ -7,6 +7,43 @@ import {
 } from "./_generated/server";
 
 /**
+ * Generate a short-lived upload URL for image uploads
+ */
+export const generateUploadUrl = mutation({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+/**
+ * Get a URL for an image stored in Convex storage
+ */
+export const getImageUrl = query({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    return await ctx.storage.getUrl(args.storageId);
+  },
+});
+
+/**
+ * Get URLs for multiple images stored in Convex storage
+ */
+export const getImageUrls = query({
+  args: { storageIds: v.array(v.id("_storage")) },
+  handler: async (ctx, args) => {
+    const urls: Record<string, string | null> = {};
+    for (const storageId of args.storageIds) {
+      urls[storageId] = await ctx.storage.getUrl(storageId);
+    }
+    return urls;
+  },
+});
+
+/**
  * Create a new message in a screen's chat thread
  */
 export const createMessage = mutation({
@@ -14,6 +51,8 @@ export const createMessage = mutation({
     screenId: v.id("screens"),
     role: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
+    modelId: v.optional(v.string()),
+    imageIds: v.optional(v.array(v.id("_storage"))),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -37,6 +76,8 @@ export const createMessage = mutation({
       screenId: args.screenId,
       role: args.role,
       content: args.content,
+      modelId: args.modelId,
+      imageIds: args.imageIds,
       createdAt: Date.now(),
     });
 
@@ -136,6 +177,8 @@ export const internalCreateMessage = internalMutation({
     screenId: v.id("screens"),
     role: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
+    modelId: v.optional(v.string()),
+    imageIds: v.optional(v.array(v.id("_storage"))),
   },
   handler: async (ctx, args) => {
     // Verify screen exists
@@ -148,6 +191,8 @@ export const internalCreateMessage = internalMutation({
       screenId: args.screenId,
       role: args.role,
       content: args.content,
+      modelId: args.modelId,
+      imageIds: args.imageIds,
       createdAt: Date.now(),
     });
 

@@ -14,6 +14,8 @@ export interface ChatMessage {
   timestamp: Date;
   isError?: boolean;
   isStreaming?: boolean;
+  imageIds?: string[];
+  modelId?: string;
 }
 
 export interface UseChatStreamingOptions {
@@ -30,6 +32,20 @@ export interface StreamingStep {
   timestamp: Date;
 }
 
+/** Image attachment for sending with messages */
+export interface ImageAttachment {
+  id: string;
+  file: File;
+  previewUrl: string;
+  storageId?: string;
+}
+
+/** Options for sending a message */
+export interface SendMessageOptions {
+  modelId?: string;
+  images?: ImageAttachment[];
+}
+
 export interface UseChatStreamingReturn {
   messages: ChatMessage[];
   isLoading: boolean;
@@ -38,7 +54,7 @@ export interface UseChatStreamingReturn {
   statusText: string;
   streamingSteps: StreamingStep[];
   error: { message: string; canRetry: boolean } | null;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, options?: SendMessageOptions) => Promise<void>;
   retryLastMessage: () => void;
 }
 
@@ -54,6 +70,18 @@ function stripFilesSummary(content: string): string {
 interface ClientState {
   screenId: string;
   projectId: string;
+  modelId?: string;
+  imageUrls?: string[];
+}
+
+// Convert file to base64 data URL
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 /**
@@ -82,10 +110,16 @@ export function useChatStreaming({
 
   // Convex mutations and queries for persistence
   const createMessage = useMutation(api.messages.createMessage);
+  const generateUploadUrl = useMutation(api.messages.generateUploadUrl);
   const convexMessages = useQuery(
     api.messages.getMessages,
     screenId ? { screenId: screenId as Id<"screens"> } : "skip"
   );
+
+  // Track current model and images for retry and state
+  const lastOptionsRef = useRef<SendMessageOptions | undefined>(undefined);
+  const currentModelIdRef = useRef<string | undefined>(undefined);
+  const currentImageUrlsRef = useRef<string[]>([]);
 
   // Use the useAgents hook from @inngest/use-agent (note: plural)
   // Don't pass channelKey - let it use userId from AgentProvider (default behavior)
@@ -99,6 +133,8 @@ export function useChatStreaming({
     state: (): ClientState => ({
       screenId: screenId || "",
       projectId: projectId || "",
+      modelId: currentModelIdRef.current,
+      imageUrls: currentImageUrlsRef.current,
     }),
     onEvent: (event) => {
       const eventType = event.event;
@@ -229,6 +265,8 @@ export function useChatStreaming({
         role: msg.role,
         content: stripFilesSummary(msg.content),
         timestamp: new Date(msg.createdAt),
+        imageIds: msg.imageIds as string[] | undefined,
+        modelId: msg.modelId,
       })) ?? [],
     [convexMessages]
   );
@@ -341,9 +379,12 @@ export function useChatStreaming({
 
   // Send message - saves to Convex and triggers agent via useAgents hook
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, options?: SendMessageOptions) => {
       const trimmedContent = content.trim();
-      if (!trimmedContent || isLoading) return;
+      const { modelId, images = [] } = options || {};
+
+      if (!trimmedContent && images.length === 0) return;
+      if (isLoading) return;
 
       if (!screenId || !projectId) {
         setError({
@@ -355,13 +396,14 @@ export function useChatStreaming({
 
       setError(null);
       lastMessageRef.current = trimmedContent;
+      lastOptionsRef.current = options;
       pendingUserMessageRef.current = trimmedContent;
-      setStatusText("Starting...");
+      setStatusText(images.length > 0 ? "Uploading images..." : "Starting...");
       // Create initial step immediately so UI shows activity right away
       setStreamingSteps([
         {
           id: `initial-${Date.now()}`,
-          text: "Starting...",
+          text: images.length > 0 ? "Uploading images..." : "Starting...",
           status: "pending" as const,
           timestamp: new Date(),
         },
@@ -370,18 +412,48 @@ export function useChatStreaming({
       lastConvexMessageCountRef.current = convexMessages?.length || 0;
 
       try {
-        // Save user message to Convex first
+        // Upload images to Convex storage and convert to base64 for API
+        const imageStorageIds: Id<"_storage">[] = [];
+        const imageBase64Urls: string[] = [];
+
+        for (const image of images) {
+          // Upload to Convex storage
+          const uploadUrl = await generateUploadUrl({});
+          const uploadResult = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": image.file.type },
+            body: image.file,
+          });
+          const { storageId } = await uploadResult.json();
+          imageStorageIds.push(storageId as Id<"_storage">);
+
+          // Convert to base64 for API
+          const base64 = await fileToBase64(image.file);
+          imageBase64Urls.push(base64);
+        }
+
+        setStatusText("Starting...");
+
+        // Save user message to Convex with image IDs and model
         await createMessage({
           screenId: screenId as Id<"screens">,
           role: "user",
-          content: trimmedContent,
+          content:
+            trimmedContent || (images.length > 0 ? "[Image attached]" : ""),
+          modelId,
+          imageIds: imageStorageIds.length > 0 ? imageStorageIds : undefined,
         });
 
         // Update count after user message is saved
         lastConvexMessageCountRef.current = (convexMessages?.length || 0) + 1;
 
-        // Send message via the useAgents hook (this triggers the streaming)
-        await agentSendMessage(trimmedContent);
+        // Update refs before sending so state() picks up the values
+        currentModelIdRef.current = modelId;
+        currentImageUrlsRef.current = imageBase64Urls;
+
+        // Send message via the useAgents hook with model and images in state
+        // The state function will be called by useAgents to get current state
+        await agentSendMessage(trimmedContent || "[Image attached]");
 
         // Note: isWaitingForResponse will be cleared when Convex receives assistant message
         pendingUserMessageRef.current = null;
@@ -404,6 +476,7 @@ export function useChatStreaming({
       screenId,
       projectId,
       createMessage,
+      generateUploadUrl,
       agentSendMessage,
       convexMessages?.length,
     ]
@@ -412,7 +485,7 @@ export function useChatStreaming({
   // Retry last message
   const retryLastMessage = useCallback(() => {
     if (!error?.canRetry || !error.originalMessage) return;
-    sendMessage(error.originalMessage);
+    sendMessage(error.originalMessage, lastOptionsRef.current);
   }, [error, sendMessage]);
 
   return {

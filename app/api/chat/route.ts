@@ -118,12 +118,19 @@ async function handleUseAgentFormat(
 ) {
   const { userMessage, threadId, history, channelKey } = data;
 
-  // Extract screenId and projectId from state
+  // Extract screenId, projectId, modelId, and imageUrls from state
   const state = userMessage.state as
-    | { screenId?: string; projectId?: string }
+    | {
+        screenId?: string;
+        projectId?: string;
+        modelId?: string;
+        imageUrls?: string[];
+      }
     | undefined;
   const screenId = state?.screenId || threadId.replace("screen:", "");
   const projectId = state?.projectId || "";
+  const modelId = state?.modelId;
+  const imageUrls = state?.imageUrls || [];
 
   // Effective userId for data ownership
   const effectiveUserId = authUserId || channelKey;
@@ -138,9 +145,11 @@ async function handleUseAgentFormat(
       userId: effectiveUserId,
       channelKey: finalChannelKey,
       history,
-      // Also include screenId and projectId for our custom handling
+      // Also include screenId, projectId, modelId, and imageUrls for our custom handling
       screenId,
       projectId,
+      modelId,
+      imageUrls,
     },
   });
 

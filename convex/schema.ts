@@ -45,6 +45,8 @@ export default defineSchema({
     screenId: v.id("screens"), // Parent screen reference
     role: v.union(v.literal("user"), v.literal("assistant")), // Message sender
     content: v.string(), // Message content
+    modelId: v.optional(v.string()), // AI model used for this message
+    imageIds: v.optional(v.array(v.id("_storage"))), // Attached image storage IDs
     createdAt: v.number(), // Creation timestamp
   }).index("by_screenId", ["screenId"]),
 });

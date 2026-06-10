@@ -60,7 +60,11 @@ export const ModelSelectorInput = ({
   className,
   ...props
 }: ModelSelectorInputProps) => (
-  <CommandInput className={cn("h-auto py-3.5", className)} {...props} />
+  <CommandInput
+    className={cn("h-auto py-3.5", className)}
+    wrapperClassName="focus-within:ring-0 focus-within:outline-none"
+    {...props}
+  />
 );
 
 export type ModelSelectorListProps = ComponentProps<typeof CommandList>;

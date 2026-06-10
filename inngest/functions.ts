@@ -77,6 +77,9 @@ const extractTitle = (content: string): string => {
 // Auto-pause timeout for sandboxes (15 minutes)
 const SANDBOX_AUTO_PAUSE_TIMEOUT_MS = 15 * 60 * 1000;
 
+// Default model ID
+const DEFAULT_MODEL_ID = "x-ai/grok-4.1-fast:free";
+
 // Chat function - directly invoke agent without network
 export const runChatAgent = inngest.createFunction(
   { id: "run-chat-agent" },
@@ -90,10 +93,20 @@ export const runChatAgent = inngest.createFunction(
       projectId,
       channelKey,
       userId,
+      modelId: eventModelId,
+      imageUrls: eventImageUrls,
     } = event.data;
 
     // Extract message content - prefer userMessage.content, fall back to legacy message
     const message = userMessage?.content || legacyMessage;
+
+    // Extract modelId and imageUrls from state or event data
+    const stateModelId = userMessage?.state?.modelId as string | undefined;
+    const stateImageUrls = userMessage?.state?.imageUrls as
+      | string[]
+      | undefined;
+    const modelId = stateModelId || eventModelId || DEFAULT_MODEL_ID;
+    const imageUrls = stateImageUrls || eventImageUrls || [];
 
     // Step 1: Get screen to check for existing sandbox
     const screen = await step.run("get-screen", async () => {
@@ -386,7 +399,7 @@ The captured data includes:
 
 ### Output
 Create a React component that is a PIXEL-PERFECT replica of the captured element. The goal is exact visual replication, not adaptation to the design system.`,
-      model: openrouter({ model: "x-ai/grok-4.1-fast:free" }),
+      model: openrouter({ model: modelId }),
       tools: [
         createTool({
           name: "terminal",
@@ -529,8 +542,26 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
     // Priority: userId (what frontend subscribes to) > channelKey > screenId
     const targetChannel = userId || channelKey || screenId;
 
+    // Format message for the agent
+    // For vision models with images, create multimodal content array
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let runMessage: any = message;
+
+    if (imageUrls.length > 0) {
+      // Create multimodal content array with text and images
+      // Using OpenAI-compatible format (snake_case image_url)
+      runMessage = [
+        { type: "text", text: message },
+        ...imageUrls.map((url: string) => ({
+          type: "image_url",
+          image_url: { url },
+        })),
+      ];
+    }
+
     // Run the network with streaming enabled if we have a channel
-    const result = await network.run(message, {
+    // For multimodal content, AgentKit will pass it through to the model
+    const result = await network.run(runMessage, {
       state,
       ...(targetChannel && {
         streaming: {

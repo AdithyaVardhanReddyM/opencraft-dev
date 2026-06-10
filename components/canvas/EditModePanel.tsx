@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { MousePointer2, AlertCircle, Loader2 } from "lucide-react";
+import { MousePointer2, AlertCircle } from "lucide-react";
 import { useEditModeContext } from "@/contexts/EditModeContext";
 import { ElementPropertiesPanel } from "./ElementPropertiesPanel";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 
 // ============================================================================
 // Types
@@ -84,8 +85,9 @@ function ErrorState({ error }: { error: string }) {
 function LoadingState() {
   return (
     <div className="flex flex-col items-center justify-center flex-1 py-12 px-4">
-      <Loader2 className="h-8 w-8 text-muted-foreground animate-spin mb-4" />
-      <p className="text-xs text-muted-foreground">Enabling edit mode...</p>
+      <Shimmer className="text-xs" duration={1.5} spread={3}>
+        Enabling edit mode...
+      </Shimmer>
     </div>
   );
 }

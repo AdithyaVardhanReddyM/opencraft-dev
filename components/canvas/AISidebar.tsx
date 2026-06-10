@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   MessageSquare,
   AlertCircle,
@@ -8,6 +8,9 @@ import {
   Sparkles,
   Copy,
   Check,
+  ImageIcon,
+  X,
+  CheckIcon,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -23,12 +26,35 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
 import Image from "next/image";
 import {
   PromptInput,
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuTrigger,
   PromptInputBody,
+  PromptInputButton,
   PromptInputFooter,
   type PromptInputMessage,
   PromptInputSubmit,
   PromptInputTextarea,
+  PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
+import {
+  ModelSelector,
+  ModelSelectorContent,
+  ModelSelectorEmpty,
+  ModelSelectorGroup,
+  ModelSelectorInput,
+  ModelSelectorItem,
+  ModelSelectorList,
+  ModelSelectorLogo,
+  ModelSelectorName,
+  ModelSelectorTrigger,
+} from "@/components/ai-elements/model-selector";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { StreamingIndicator } from "@/components/canvas/StreamingIndicator";
 import { useChatStreaming, type ChatMessage } from "@/hooks/use-chat-streaming";
 import { CodeExplorer } from "@/components/canvas/code-explorer";
@@ -44,6 +70,17 @@ import {
   type CapturedElement,
   type ExtensionMetadataDisplay,
 } from "@/lib/extension-content";
+import {
+  AI_MODELS,
+  DEFAULT_MODEL_ID,
+  getModelById,
+  getProviders,
+  modelSupportsVision,
+} from "@/lib/ai-models";
+import { nanoid } from "nanoid";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 
 type ChatInputStatus = "submitted" | "streaming" | "ready" | "error";
 
@@ -123,8 +160,16 @@ export function AISidebar({
   };
 
   const handleSubmit = useCallback(
-    (message: PromptInputMessage, extensionData?: CapturedElement) => {
-      if (!message.text.trim() && !extensionData) return;
+    (
+      message: PromptInputMessage,
+      options: {
+        modelId: string;
+        images: ImageAttachment[];
+        extensionData?: CapturedElement;
+      }
+    ) => {
+      const { modelId, images, extensionData } = options;
+      if (!message.text.trim() && !extensionData && images.length === 0) return;
 
       // If extension data is present, format it for AI
       let finalMessage = message.text.trim();
@@ -135,7 +180,8 @@ export function AISidebar({
           : `Replicate this element:\n\n${formattedExtension}`;
       }
 
-      sendMessage(finalMessage);
+      // Pass modelId and images to sendMessage
+      sendMessage(finalMessage, { modelId, images });
     },
     [sendMessage]
   );
@@ -370,6 +416,14 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
   const isError = message.isError;
   const isStreaming = message.isStreaming;
 
+  // Fetch image URLs if message has images
+  const imageUrls = useQuery(
+    api.messages.getImageUrls,
+    message.imageIds && message.imageIds.length > 0
+      ? { storageIds: message.imageIds as Id<"_storage">[] }
+      : "skip"
+  );
+
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
     setCopied(true);
@@ -395,7 +449,17 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
               {extensionData && (
                 <ExtensionChipDisplay metadata={extensionData} />
               )}
-              {displayContent && <span>{displayContent}</span>}
+              {/* Display attached images */}
+              {imageUrls && Object.keys(imageUrls).length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(imageUrls).map(([id, url]) =>
+                    url ? <MessageImageThumbnail key={id} url={url} /> : null
+                  )}
+                </div>
+              )}
+              {displayContent && displayContent !== "[Image attached]" && (
+                <span>{displayContent}</span>
+              )}
             </div>
           </div>
           <button
@@ -473,19 +537,37 @@ function ErrorRetryButton({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+/** Image attachment type for pending uploads */
+interface ImageAttachment {
+  id: string;
+  file: File;
+  previewUrl: string;
+}
+
 function ChatInput({
   onSubmit,
   status,
 }: {
   onSubmit: (
     message: PromptInputMessage,
-    extensionData?: CapturedElement
+    options: {
+      modelId: string;
+      images: ImageAttachment[];
+      extensionData?: CapturedElement;
+    }
   ) => void;
   status: ChatInputStatus;
 }) {
   const [inputValue, setInputValue] = useState("");
   const [extensionContent, setExtensionContent] =
     useState<CapturedElement | null>(null);
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
+  const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedModelData = getModelById(selectedModel);
+  const providers = getProviders();
 
   // Auto-capitalize first character
   const handleInputChange = useCallback(
@@ -500,7 +582,7 @@ function ChatInput({
     []
   );
 
-  // Handle paste to detect extension content
+  // Handle paste to detect extension content or images
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
       const pastedText = e.clipboardData.getData("text");
@@ -512,10 +594,68 @@ function ChatInput({
         if (parsed.isExtensionContent && parsed.data) {
           setExtensionContent(parsed.data);
         }
+        return;
+      }
+
+      // Check for pasted images
+      const items = e.clipboardData?.items;
+      if (items) {
+        const imageFiles: File[] = [];
+        for (const item of items) {
+          if (item.type.startsWith("image/")) {
+            const file = item.getAsFile();
+            if (file) {
+              imageFiles.push(file);
+            }
+          }
+        }
+        if (imageFiles.length > 0) {
+          e.preventDefault();
+          addImages(imageFiles);
+        }
       }
     },
     []
   );
+
+  // Add images to pending list
+  const addImages = useCallback((files: File[]) => {
+    const newAttachments: ImageAttachment[] = files.map((file) => ({
+      id: nanoid(),
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+    setPendingImages((prev) => [...prev, ...newAttachments]);
+  }, []);
+
+  // Remove image from pending list
+  const removeImage = useCallback((id: string) => {
+    setPendingImages((prev) => {
+      const found = prev.find((img) => img.id === id);
+      if (found) {
+        URL.revokeObjectURL(found.previewUrl);
+      }
+      return prev.filter((img) => img.id !== id);
+    });
+  }, []);
+
+  // Handle file input change
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        addImages(Array.from(files));
+      }
+      // Reset input to allow selecting same file again
+      e.target.value = "";
+    },
+    [addImages]
+  );
+
+  // Open file picker
+  const openFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
   const handleRemoveExtensionContent = useCallback(() => {
     setExtensionContent(null);
@@ -523,15 +663,57 @@ function ChatInput({
 
   const handleSubmit = useCallback(
     (message: PromptInputMessage) => {
-      onSubmit(message, extensionContent || undefined);
+      onSubmit(message, {
+        modelId: selectedModel,
+        images: pendingImages,
+        extensionData: extensionContent || undefined,
+      });
       setInputValue("");
       setExtensionContent(null);
+      // Clear images and revoke URLs
+      pendingImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+      setPendingImages([]);
     },
-    [onSubmit, extensionContent]
+    [onSubmit, extensionContent, selectedModel, pendingImages]
   );
+
+  // Handle drag and drop
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) {
+        const imageFiles = Array.from(files).filter((f) =>
+          f.type.startsWith("image/")
+        );
+        if (imageFiles.length > 0) {
+          addImages(imageFiles);
+        }
+      }
+    },
+    [addImages]
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+
+  // Check if model supports vision when images are attached
+  const showVisionWarning =
+    pendingImages.length > 0 && !modelSupportsVision(selectedModel);
 
   return (
     <div className="p-3 pt-2">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       <PromptInput
         onSubmit={handleSubmit}
         className={cn(
@@ -539,6 +721,8 @@ function ChatInput({
           "focus-within:bg-muted/50 focus-within:border-border/60",
           "focus-within:ring-[3px] focus-within:ring-primary/70 focus-within:ring-offset-0 focus-within:shadow-[0_0_24px_rgba(249,115,22,0.35)]"
         )}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
       >
         <PromptInputBody>
           {/* Extension Chip */}
@@ -550,10 +734,35 @@ function ChatInput({
               />
             </div>
           )}
+
+          {/* Image Attachments */}
+          {pendingImages.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-3 pt-3">
+              {pendingImages.map((img) => (
+                <ImageAttachmentChip
+                  key={img.id}
+                  attachment={img}
+                  onRemove={() => removeImage(img.id)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Vision warning */}
+          {showVisionWarning && (
+            <div className="px-3 pt-2">
+              <p className="text-xs text-amber-500">
+                ⚠️ {selectedModelData?.name} may not process images
+              </p>
+            </div>
+          )}
+
           <PromptInputTextarea
             placeholder={
               extensionContent
                 ? "Add instructions for replication..."
+                : pendingImages.length > 0
+                ? "Describe what you want to do with these images..."
                 : "Ask AI anything..."
             }
             className="min-h-[36px] max-h-[120px] text-sm placeholder:text-muted-foreground/50 bg-transparent border-none shadow-none focus-visible:ring-0"
@@ -562,7 +771,74 @@ function ChatInput({
             onPaste={handlePaste}
           />
         </PromptInputBody>
-        <PromptInputFooter className="justify-end px-2 pb-2">
+        <PromptInputFooter className="justify-between px-2 pb-2">
+          <PromptInputTools>
+            {/* Add Image Button - hide for xAI Grok (free tier doesn't support vision) */}
+            {selectedModel !== DEFAULT_MODEL_ID && (
+              <PromptInputActionMenu>
+                <PromptInputActionMenuTrigger />
+                <PromptInputActionMenuContent>
+                  <DropdownMenuItem onSelect={openFilePicker}>
+                    <ImageIcon className="mr-2 size-4" />
+                    Add photos
+                  </DropdownMenuItem>
+                </PromptInputActionMenuContent>
+              </PromptInputActionMenu>
+            )}
+
+            {/* Model Selector */}
+            <ModelSelector
+              open={modelSelectorOpen}
+              onOpenChange={setModelSelectorOpen}
+            >
+              <ModelSelectorTrigger asChild>
+                <PromptInputButton>
+                  {selectedModelData?.providerSlug && (
+                    <ModelSelectorLogo
+                      provider={selectedModelData.providerSlug}
+                    />
+                  )}
+                  <ModelSelectorName className="max-w-[80px] text-xs">
+                    {selectedModelData?.name || "Select model"}
+                  </ModelSelectorName>
+                </PromptInputButton>
+              </ModelSelectorTrigger>
+              <ModelSelectorContent>
+                <ModelSelectorInput
+                  placeholder="Search models..."
+                  className="focus-visible:ring-0"
+                />
+                <ModelSelectorList>
+                  <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
+                  {providers.map((provider) => (
+                    <ModelSelectorGroup heading={provider} key={provider}>
+                      {AI_MODELS.filter((m) => m.provider === provider).map(
+                        (model) => (
+                          <ModelSelectorItem
+                            key={model.id}
+                            value={model.id}
+                            onSelect={() => {
+                              setSelectedModel(model.id);
+                              setModelSelectorOpen(false);
+                            }}
+                          >
+                            <ModelSelectorLogo provider={model.providerSlug} />
+                            <ModelSelectorName>{model.name}</ModelSelectorName>
+                            {selectedModel === model.id ? (
+                              <CheckIcon className="ml-auto size-4" />
+                            ) : (
+                              <div className="ml-auto size-4" />
+                            )}
+                          </ModelSelectorItem>
+                        )
+                      )}
+                    </ModelSelectorGroup>
+                  ))}
+                </ModelSelectorList>
+              </ModelSelectorContent>
+            </ModelSelector>
+          </PromptInputTools>
+
           <PromptInputSubmit
             status={status}
             size="icon-sm"
@@ -571,5 +847,85 @@ function ChatInput({
         </PromptInputFooter>
       </PromptInput>
     </div>
+  );
+}
+
+/** Image attachment chip with preview and remove button */
+function ImageAttachmentChip({
+  attachment,
+  onRemove,
+}: {
+  attachment: ImageAttachment;
+  onRemove: () => void;
+}) {
+  return (
+    <HoverCard>
+      <HoverCardTrigger asChild>
+        <div className="group relative flex h-8 cursor-pointer select-none items-center gap-1.5 rounded-md border border-border px-1.5 font-medium text-sm transition-all hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50">
+          <div className="relative size-5 shrink-0">
+            <div className="absolute inset-0 flex size-5 items-center justify-center overflow-hidden rounded bg-background transition-opacity group-hover:opacity-0">
+              <img
+                alt={attachment.file.name}
+                className="size-5 object-cover"
+                src={attachment.previewUrl}
+              />
+            </div>
+            <Button
+              aria-label="Remove image"
+              className="absolute inset-0 size-5 cursor-pointer rounded p-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 [&>svg]:size-2.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              type="button"
+              variant="ghost"
+            >
+              <X className="size-2.5" />
+            </Button>
+          </div>
+          <span className="flex-1 truncate max-w-[100px] text-xs">
+            {attachment.file.name}
+          </span>
+        </div>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-auto p-2" side="top">
+        <div className="flex max-h-64 max-w-64 items-center justify-center overflow-hidden rounded-md border">
+          <img
+            alt={attachment.file.name}
+            className="max-h-full max-w-full object-contain"
+            src={attachment.previewUrl}
+          />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground truncate">
+          {attachment.file.name}
+        </p>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
+/** Image thumbnail for displaying images in message history */
+function MessageImageThumbnail({ url }: { url: string }) {
+  return (
+    <HoverCard>
+      <HoverCardTrigger asChild>
+        <div className="relative size-12 cursor-pointer overflow-hidden rounded-md border border-border/50 hover:border-border transition-colors">
+          <img
+            alt="Attached image"
+            className="size-full object-cover"
+            src={url}
+          />
+        </div>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-auto p-2" side="top">
+        <div className="flex max-h-64 max-w-64 items-center justify-center overflow-hidden rounded-md border">
+          <img
+            alt="Attached image preview"
+            className="max-h-full max-w-full object-contain"
+            src={url}
+          />
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   );
 }

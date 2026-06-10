@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useState, useCallback, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -429,12 +429,9 @@ function CanvasContent({ projectId }: { projectId: string }) {
   if (isLoading) {
     return (
       <div className="relative h-screen w-full overflow-hidden bg-accent flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
-            Loading canvas...
-          </span>
-        </div>
+        <Shimmer className="text-sm" duration={1.5} spread={3}>
+          Loading canvas...
+        </Shimmer>
       </div>
     );
   }
