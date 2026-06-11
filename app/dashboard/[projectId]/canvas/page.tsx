@@ -24,6 +24,11 @@ import {
 } from "@/components/canvas/LayersSidebar";
 import { AISidebar } from "@/components/canvas/AISidebar";
 import { getShapeCenter } from "@/lib/canvas/layers-sidebar-utils";
+import { getFramesWithContainedShapes } from "@/lib/canvas/containment-utils";
+import { captureFrameAsImage } from "@/lib/canvas/canvas-capture";
+import { GenerateButton } from "@/components/canvas/GenerateButton";
+import { toast } from "sonner";
+import type { FrameShape } from "@/types/canvas";
 
 // Import shape components
 import { Frame } from "@/components/canvas/shapes/Frame";
@@ -36,7 +41,7 @@ import { Text } from "@/components/canvas/shapes/Text";
 import { Screen } from "@/components/canvas/shapes/Screen";
 import { DeleteScreenModal } from "@/components/canvas/DeleteScreenModal";
 import { ScreenToolbar } from "@/components/canvas/ScreenToolbar";
-import type { ScreenShape } from "@/types/canvas";
+import type { ScreenShape, Shape } from "@/types/canvas";
 
 // Import preview components
 import { FramePreview } from "@/components/canvas/shapes/FramePreview";
@@ -210,6 +215,12 @@ function CanvasContent({ projectId }: { projectId: string }) {
     title?: string;
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Generation context for frame-to-AI workflow
+  const [generationContext, setGenerationContext] = useState<{
+    image: Blob;
+    sourceFrameId: string;
+  } | null>(null);
 
   // Convex mutations and queries
   const deleteScreenMutation = useMutation(api.screens.deleteScreen);
@@ -421,6 +432,76 @@ function CanvasContent({ projectId }: { projectId: string }) {
     [shapes, dispatchViewport, dispatchShapes]
   );
 
+  // Get frames with contained shapes for GenerateButton rendering
+  const framesWithShapes = getFramesWithContainedShapes(shapes);
+
+  // Handle frame generation - capture frame and create screen
+  const handleFrameGenerate = useCallback(
+    async (frame: FrameShape, containedShapes: Shape[]) => {
+      try {
+        // Capture frame contents as image
+        const captureResult = await captureFrameAsImage(frame, containedShapes);
+
+        // Generate a unique shape ID for the screen
+        const { nanoid } = await import("nanoid");
+        const shapeId = nanoid();
+
+        // Create screen record in Convex
+        const convexScreenId = await createScreenMutation({
+          shapeId: shapeId,
+          projectId: projectId as Id<"projects">,
+        });
+
+        // Position screen to the right of the frame with 50px gap
+        const screenX = frame.x + frame.w + 50;
+        const screenY = frame.y;
+
+        // Add the screen shape to the canvas
+        dispatchShapes({
+          type: "ADD_SCREEN",
+          payload: {
+            x: screenX,
+            y: screenY,
+            w: SCREEN_DEFAULTS.width,
+            h: frame.h, // Use frame height
+            screenId: convexScreenId,
+            id: shapeId,
+          },
+        });
+
+        // Select the new screen shape (opens AI sidebar)
+        dispatchShapes({ type: "CLEAR_SELECTION" });
+        dispatchShapes({ type: "SELECT_SHAPE", payload: shapeId });
+
+        // Store generation context for AI sidebar
+        setGenerationContext({
+          image: captureResult.blob,
+          sourceFrameId: frame.id,
+        });
+      } catch (error) {
+        console.error("Failed to generate from frame:", error);
+        if (error instanceof Error) {
+          if (
+            error.message.includes("canvas") ||
+            error.message.includes("blob")
+          ) {
+            toast.error("Failed to capture frame contents");
+          } else if (
+            error.message.includes("Convex") ||
+            error.message.includes("screen")
+          ) {
+            toast.error("Failed to create screen");
+          } else {
+            toast.error("Failed to generate from frame");
+          }
+        } else {
+          toast.error("Failed to generate from frame");
+        }
+      }
+    },
+    [createScreenMutation, projectId, dispatchShapes]
+  );
+
   const draftShape = getDraftShape();
   const freeDrawPoints = getFreeDrawPoints();
   const selectionBox = getSelectionBox();
@@ -477,6 +558,10 @@ function CanvasContent({ projectId }: { projectId: string }) {
                 ?.files as Record<string, string> | undefined)
             : undefined
         }
+        initialImage={generationContext?.image}
+        initialPrompt={generationContext ? "Generate this" : undefined}
+        initialModelId={generationContext ? "openai/gpt-5.1" : undefined}
+        onInitialDataConsumed={() => setGenerationContext(null)}
       />
 
       {/* Toolbar */}
@@ -719,6 +804,17 @@ function CanvasContent({ projectId }: { projectId: string }) {
           )}
         </div>
       </div>
+
+      {/* Generate buttons for frames with contained shapes - outside canvas container */}
+      {framesWithShapes.map(({ frame, containedShapes }) => (
+        <GenerateButton
+          key={`generate-${frame.id}`}
+          frame={frame}
+          containedShapes={containedShapes}
+          viewport={viewport}
+          onGenerate={handleFrameGenerate}
+        />
+      ))}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   MessageSquare,
   AlertCircle,
@@ -50,11 +50,7 @@ import {
   ModelSelectorTrigger,
 } from "@/components/ai-elements/model-selector";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { StreamingIndicator } from "@/components/canvas/StreamingIndicator";
 import { useChatStreaming, type ChatMessage } from "@/hooks/use-chat-streaming";
 import { CodeExplorer } from "@/components/canvas/code-explorer";
@@ -128,6 +124,10 @@ export function AISidebar({
   sandboxId,
   sandboxUrl,
   cachedFiles,
+  initialImage,
+  initialPrompt,
+  initialModelId,
+  onInitialDataConsumed,
 }: {
   isOpen: boolean;
   onClose?: () => void;
@@ -136,6 +136,10 @@ export function AISidebar({
   sandboxId?: string;
   sandboxUrl?: string;
   cachedFiles?: Record<string, string>;
+  initialImage?: Blob;
+  initialPrompt?: string;
+  initialModelId?: string;
+  onInitialDataConsumed?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState("chat");
 
@@ -283,7 +287,14 @@ export function AISidebar({
             )}
 
             {/* Input */}
-            <ChatInput onSubmit={handleSubmit} status={chatStatus} />
+            <ChatInput
+              onSubmit={handleSubmit}
+              status={chatStatus}
+              initialImage={initialImage}
+              initialPrompt={initialPrompt}
+              initialModelId={initialModelId}
+              onInitialDataConsumed={onInitialDataConsumed}
+            />
           </TabsContent>
 
           {/* Edit Tab */}
@@ -547,6 +558,10 @@ interface ImageAttachment {
 function ChatInput({
   onSubmit,
   status,
+  initialImage,
+  initialPrompt,
+  initialModelId,
+  onInitialDataConsumed,
 }: {
   onSubmit: (
     message: PromptInputMessage,
@@ -557,6 +572,10 @@ function ChatInput({
     }
   ) => void;
   status: ChatInputStatus;
+  initialImage?: Blob;
+  initialPrompt?: string;
+  initialModelId?: string;
+  onInitialDataConsumed?: () => void;
 }) {
   const [inputValue, setInputValue] = useState("");
   const [extensionContent, setExtensionContent] =
@@ -565,9 +584,44 @@ function ChatInput({
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const initialDataProcessedRef = useRef(false);
 
   const selectedModelData = getModelById(selectedModel);
   const providers = getProviders();
+
+  // Handle initial data from frame generation
+  useEffect(() => {
+    if (initialDataProcessedRef.current) return;
+    if (!initialImage && !initialPrompt && !initialModelId) return;
+
+    initialDataProcessedRef.current = true;
+
+    // Set initial prompt
+    if (initialPrompt) {
+      setInputValue(initialPrompt);
+    }
+
+    // Set initial model
+    if (initialModelId) {
+      setSelectedModel(initialModelId);
+    }
+
+    // Convert blob to ImageAttachment
+    if (initialImage) {
+      const file = new File([initialImage], "frame-capture.png", {
+        type: "image/png",
+      });
+      const attachment: ImageAttachment = {
+        id: nanoid(),
+        file,
+        previewUrl: URL.createObjectURL(initialImage),
+      };
+      setPendingImages([attachment]);
+    }
+
+    // Notify parent that initial data has been consumed
+    onInitialDataConsumed?.();
+  }, [initialImage, initialPrompt, initialModelId, onInitialDataConsumed]);
 
   // Auto-capitalize first character
   const handleInputChange = useCallback(
@@ -858,74 +912,90 @@ function ImageAttachmentChip({
   attachment: ImageAttachment;
   onRemove: () => void;
 }) {
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
   return (
-    <HoverCard>
-      <HoverCardTrigger asChild>
-        <div className="group relative flex h-8 cursor-pointer select-none items-center gap-1.5 rounded-md border border-border px-1.5 font-medium text-sm transition-all hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50">
-          <div className="relative size-5 shrink-0">
-            <div className="absolute inset-0 flex size-5 items-center justify-center overflow-hidden rounded bg-background transition-opacity group-hover:opacity-0">
+    <>
+      <div
+        className="group relative flex h-8 cursor-pointer select-none items-center gap-1.5 rounded-md border border-border px-1.5 font-medium text-sm transition-all hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50"
+        onClick={() => setIsPreviewOpen(true)}
+      >
+        <div className="relative size-5 shrink-0">
+          <div className="absolute inset-0 flex size-5 items-center justify-center overflow-hidden rounded bg-background transition-opacity group-hover:opacity-0">
+            <img
+              alt={attachment.file.name}
+              className="size-5 object-cover"
+              src={attachment.previewUrl}
+            />
+          </div>
+          <Button
+            aria-label="Remove image"
+            className="absolute inset-0 size-5 cursor-pointer rounded p-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 [&>svg]:size-2.5"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            type="button"
+            variant="ghost"
+          >
+            <X className="size-2.5" />
+          </Button>
+        </div>
+        <span className="flex-1 truncate max-w-[100px] text-xs">
+          {attachment.file.name}
+        </span>
+      </div>
+
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-3xl p-2 bg-background/95 backdrop-blur-xl">
+          <DialogTitle className="sr-only">Image Preview</DialogTitle>
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex items-center justify-center overflow-hidden rounded-lg max-h-[70vh]">
               <img
                 alt={attachment.file.name}
-                className="size-5 object-cover"
+                className="max-h-[70vh] max-w-full object-contain"
                 src={attachment.previewUrl}
               />
             </div>
-            <Button
-              aria-label="Remove image"
-              className="absolute inset-0 size-5 cursor-pointer rounded p-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 [&>svg]:size-2.5"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove();
-              }}
-              type="button"
-              variant="ghost"
-            >
-              <X className="size-2.5" />
-            </Button>
+            <p className="text-sm text-muted-foreground truncate max-w-full">
+              {attachment.file.name}
+            </p>
           </div>
-          <span className="flex-1 truncate max-w-[100px] text-xs">
-            {attachment.file.name}
-          </span>
-        </div>
-      </HoverCardTrigger>
-      <HoverCardContent className="w-auto p-2" side="top">
-        <div className="flex max-h-64 max-w-64 items-center justify-center overflow-hidden rounded-md border">
-          <img
-            alt={attachment.file.name}
-            className="max-h-full max-w-full object-contain"
-            src={attachment.previewUrl}
-          />
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground truncate">
-          {attachment.file.name}
-        </p>
-      </HoverCardContent>
-    </HoverCard>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
 /** Image thumbnail for displaying images in message history */
 function MessageImageThumbnail({ url }: { url: string }) {
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
   return (
-    <HoverCard>
-      <HoverCardTrigger asChild>
-        <div className="relative size-12 cursor-pointer overflow-hidden rounded-md border border-border/50 hover:border-border transition-colors">
-          <img
-            alt="Attached image"
-            className="size-full object-cover"
-            src={url}
-          />
-        </div>
-      </HoverCardTrigger>
-      <HoverCardContent className="w-auto p-2" side="top">
-        <div className="flex max-h-64 max-w-64 items-center justify-center overflow-hidden rounded-md border">
-          <img
-            alt="Attached image preview"
-            className="max-h-full max-w-full object-contain"
-            src={url}
-          />
-        </div>
-      </HoverCardContent>
-    </HoverCard>
+    <>
+      <div
+        className="relative size-12 cursor-pointer overflow-hidden rounded-md border border-border/50 hover:border-border transition-colors"
+        onClick={() => setIsPreviewOpen(true)}
+      >
+        <img
+          alt="Attached image"
+          className="size-full object-cover"
+          src={url}
+        />
+      </div>
+
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-3xl p-2 bg-background/95 backdrop-blur-xl">
+          <DialogTitle className="sr-only">Image Preview</DialogTitle>
+          <div className="flex items-center justify-center overflow-hidden rounded-lg max-h-[70vh]">
+            <img
+              alt="Attached image preview"
+              className="max-h-[70vh] max-w-full object-contain"
+              src={url}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

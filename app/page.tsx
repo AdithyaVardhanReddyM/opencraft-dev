@@ -127,8 +127,8 @@ export default function Page() {
       {/* Main Content */}
       <main className="container lg:px-12 lg:pt-0 min-h-[1100px] flex flex-col lg:flex-row z-10 mx-auto pt-0 px-6 relative items-center">
         {/* Left Column: Copy */}
-        <div className="lg:w-1/2 flex flex-col lg:py-0 lg:mt-0 w-full mt-16 pt-12 pb-20 justify-center">
-          <h4 className="text-xs font-mono tracking-[0.2em] text-white/40 uppercase mb-8 flex items-center gap-2">
+        <div className="lg:w-[40%] flex flex-col lg:py-0 lg:mt-0 w-full mt-16 pt-12 pb-20 justify-center">
+          <h4 className="text-xs font-mono tracking-[0.2em] text-white/40 uppercase mb-6 flex items-center gap-2">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
@@ -136,26 +136,26 @@ export default function Page() {
             AI-Powered Design
           </h4>
 
-          <h1 className="lg:text-7xl leading-[1.1] text-primary landing-text-glow text-5xl italic tracking-tight font-serif mb-6">
+          <h1 className="lg:text-6xl leading-[1.1] text-primary landing-text-glow text-4xl italic tracking-tight font-serif mb-5">
             Design at the
             <br />
             <span className="text-white opacity-90">speed of thought.</span>
           </h1>
 
-          <p className="font-sans text-xl lg:text-2xl font-light text-white/70 leading-relaxed tracking-tight max-w-xl mb-12">
+          <p className="font-sans text-lg lg:text-xl font-light text-white/70 leading-relaxed tracking-tight max-w-md mb-10">
             The familiarity of Figma meets the generative power of AI. Create
             stunning interfaces just by{" "}
             <span className="text-white font-medium">describing the vibe</span>.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
+          <div className="flex flex-col sm:flex-row gap-5 items-start sm:items-center">
             {/* Animated Shiny CTA Button */}
             <button className="landing-shiny-cta focus:outline-hidden">
               <span>Start Designing Free</span>
             </button>
 
             {/* Secondary Button */}
-            <button className="hover:bg-white/10 hover:text-white transition-all flex text-sm font-medium text-slate-300 bg-white/5 rounded-full py-3 px-6 gap-2 items-center group landing-border-gradient">
+            <button className="hover:bg-white/10 hover:text-white transition-all flex text-sm font-medium text-slate-300 bg-white/5 rounded-full py-3 px-5 gap-2 items-center group landing-border-gradient">
               <span className="text-sm font-medium tracking-tight">
                 Watch Demo
               </span>
@@ -164,203 +164,26 @@ export default function Page() {
           </div>
         </div>
 
-        {/* Right Column: Abstract UI Visualization with Sonar */}
-        <div className="lg:w-1/2 lg:h-[800px] flex w-full h-[500px] relative items-center justify-center">
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible"
-            viewBox="0 0 600 600"
-          >
-            {/* Gradient Definitions */}
-            <defs>
-              <linearGradient
-                id="beam-gradient"
-                x1="0%"
-                y1="0%"
-                x2="100%"
-                y2="0%"
-              >
-                <stop offset="0%" stopColor="transparent" />
-                <stop offset="50%" stopColor="oklch(var(--primary))" />
-                <stop offset="100%" stopColor="transparent" />
-              </linearGradient>
-              <radialGradient id="center-glow" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="oklch(var(--primary) / 0.3)" />
-                <stop offset="100%" stopColor="transparent" />
-              </radialGradient>
-            </defs>
-
-            {/* Connecting Beams */}
-            <g>
-              <path
-                d="M -50 150 C 100 150, 100 300, 300 300"
-                fill="none"
-                stroke="white"
-                strokeWidth="1"
-                className="opacity-[0.08]"
-              />
-              <path
-                d="M -50 150 C 100 150, 100 300, 300 300"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                className="landing-beam-line landing-animate-beam opacity-60 text-primary"
-              />
-            </g>
-            <g>
-              <path
-                d="M -50 450 C 100 450, 100 300, 300 300"
-                fill="none"
-                stroke="white"
-                strokeWidth="1"
-                className="opacity-[0.08]"
-              />
-              <path
-                d="M -50 450 C 100 450, 100 300, 300 300"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                className="landing-beam-line landing-animate-beam opacity-60 text-primary"
-                style={{ animationDelay: "-1s" }}
-              />
-            </g>
-            <g>
-              <path
-                d="M 650 100 C 500 100, 500 300, 300 300"
-                fill="none"
-                stroke="white"
-                strokeWidth="1"
-                className="opacity-[0.08]"
-              />
-              <path
-                d="M 650 100 C 500 100, 500 300, 300 300"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                className="landing-beam-line landing-animate-beam opacity-60 text-primary"
-                style={{ animationDelay: "-2s" }}
-              />
-            </g>
-            <g>
-              <path
-                d="M 650 500 C 500 500, 500 300, 300 300"
-                fill="none"
-                stroke="white"
-                strokeWidth="1"
-                className="opacity-[0.08]"
-              />
-              <path
-                d="M 650 500 C 500 500, 500 300, 300 300"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                className="landing-beam-line landing-animate-beam opacity-60 text-primary"
-                style={{ animationDelay: "-1.5s" }}
-              />
-            </g>
-
-            {/* CENTRAL NODE DETAIL */}
-            <g transform="translate(300, 300)">
-              {/* Ambient Glow */}
-              <circle
-                r="120"
-                fill="url(#center-glow)"
-                className="animate-pulse"
-              />
-
-              {/* Sonar Waves */}
-              <circle
-                r="20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1"
-                opacity="0.5"
-                className="landing-animate-sonar text-primary"
-              />
-              <circle
-                r="20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1"
-                opacity="0.5"
-                className="landing-animate-sonar text-primary landing-delay-1000"
-              />
-              <circle
-                r="20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1"
-                opacity="0.5"
-                className="landing-animate-sonar text-primary landing-delay-2000"
-              />
-
-              {/* Technical Rings */}
-              <circle
-                r="65"
-                fill="none"
-                stroke="white"
-                strokeOpacity="0.1"
-                strokeWidth="1"
-                strokeDasharray="10 20"
-                className="landing-animate-spin-slow"
-              />
-              <circle
-                r="45"
-                fill="none"
-                stroke="currentColor"
-                strokeOpacity="0.2"
-                strokeWidth="1"
-                strokeDasharray="4 6"
-                className="landing-animate-spin-slow-reverse text-primary"
-              />
-
-              {/* Crosshair Markers */}
-              <g
-                className="landing-animate-spin-slow"
-                style={{ animationDuration: "20s" }}
-              >
-                <path d="M -80 0 L -70 0" stroke="white" strokeOpacity="0.2" />
-                <path d="M 80 0 L 70 0" stroke="white" strokeOpacity="0.2" />
-                <path d="M 0 -80 L 0 -70" stroke="white" strokeOpacity="0.2" />
-                <path d="M 0 80 L 0 70" stroke="white" strokeOpacity="0.2" />
-              </g>
-
-              {/* Core */}
-              <circle
-                r="8"
-                fill="#0A0A0A"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="text-primary"
-              />
-              <circle
-                r="4"
-                fill="currentColor"
-                className="landing-animate-pulse-fast text-primary"
-              />
-            </g>
-          </svg>
-
-          {/* Floating Labels */}
-          <div className="absolute top-[20%] lg:top-[25%] left-[10%] lg:left-[15%] flex flex-col items-end">
-            <span className="text-xs font-mono text-primary tracking-widest mb-1 opacity-80">
-              AI GENERATION
-            </span>
-            <div className="h-[1px] w-12 bg-gradient-to-l from-primary to-transparent" />
+        {/* Right Column: Canvas Preview */}
+        <div className="lg:w-[60%] lg:h-[800px] flex w-full h-[500px] relative items-center justify-center lg:pl-4">
+          {/* Background Glow */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-full h-[80%] bg-primary/30 blur-[120px] rounded-full opacity-50" />
           </div>
 
-          <div className="absolute bottom-[20%] lg:bottom-[25%] right-[10%] lg:right-[15%] flex flex-col items-start">
-            <span className="text-xs font-mono text-primary tracking-widest mb-1 opacity-80">
-              REAL-TIME
-            </span>
-            <div className="h-[1px] w-12 bg-gradient-to-r from-primary to-transparent" />
-          </div>
+          {/* Canvas Image with Primary Border */}
+          <div className="relative w-full max-w-[720px] group">
+            {/* Outer Glow Ring */}
+            <div className="absolute -inset-1 bg-primary/20 rounded-2xl blur-md opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
 
-          {/* Extra Data Decoration */}
-          <div className="absolute top-[50%] right-[15%] hidden lg:flex flex-col gap-1">
-            <div className="flex gap-1">
-              <div className="w-1 h-1 bg-white/20" />
-              <div className="w-1 h-1 bg-white/20" />
-              <div className="w-1 h-1 bg-primary animate-pulse" />
+            {/* Image Container */}
+            <div className="relative rounded-xl overflow-hidden border-2 border-primary/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_0_50px_-10px_rgba(var(--primary),0.3)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/canvas_resized.png"
+                alt="Unit Set Canvas - AI-powered design interface"
+                className="w-full h-auto object-contain transition-transform duration-700 group-hover:scale-[1.01]"
+              />
             </div>
           </div>
         </div>
