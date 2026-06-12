@@ -90,12 +90,12 @@ export function ProjectFilters({
             placeholder="Search projects..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="h-10 pl-9 transition-all duration-300 focus-visible:ring-primary/20 focus-visible:border-primary focus-visible:shadow-[0_0_15px_rgba(var(--primary),0.1)] hover:border-primary/50"
+            className="h-10 pl-9 border-0 transition-all duration-300 focus-visible:ring-primary/20 focus-visible:border-primary focus-visible:shadow-[0_0_15px_rgba(var(--primary),0.1)] hover:border-primary/50"
           />
         </div>
 
         {/* Filter Buttons */}
-        <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border border-border/50">
+        <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg ">
           <TooltipProvider delayDuration={0}>
             {sortOptions.map((option) => (
               <Tooltip key={option.value}>

@@ -1,19 +1,30 @@
+// Gradient color palette for project cards
+const gradients = [
+  { start: "#5a6eea", end: "#6b5dba" },
+  { start: "#e083fb", end: "#e5576c" },
+  { start: "#3facfe", end: "#00e2fe" },
+  { start: "#3ce97b", end: "#2ff9d7" },
+  { start: "#fa609a", end: "#fee040" },
+  { start: "#98edea", end: "#fed6e3" },
+  { start: "#ff8a9e", end: "#fecfef" },
+  { start: "#ffecd2", end: "#fcb69f" },
+];
+
+/**
+ * Gets gradient colors for a project based on index
+ * Returns start and end colors for gradient effects
+ */
+export const getGradientColors = (
+  index: number
+): { start: string; end: string } => {
+  return gradients[index % gradients.length];
+};
+
 /**
  * Generates a gradient thumbnail for project cards based on index
  * Returns a base64-encoded SVG data URL
  */
 export const generateGradientThumbnail = (index: number): string => {
-  const gradients = [
-    { start: "#5a6eea", end: "#6b5dba" },
-    { start: "#e083fb", end: "#e5576c" },
-    { start: "#3facfe", end: "#00e2fe" },
-    { start: "#3ce97b", end: "#2ff9d7" },
-    { start: "#fa609a", end: "#fee040" },
-    { start: "#98edea", end: "#fed6e3" },
-    { start: "#ff8a9e", end: "#fecfef" },
-    { start: "#ffecd2", end: "#fcb69f" },
-  ];
-
   const gradient = gradients[index % gradients.length];
 
   const svgContent = `

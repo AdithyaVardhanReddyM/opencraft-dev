@@ -27,13 +27,13 @@ export function RemixFromWebModal({
         </DialogHeader>
 
         <div className="flex flex-col items-center text-center gap-3 py-4">
-          <div className="w-full max-w-[320px] rounded-[12px] overflow-hidden  shadow-md">
+          <div className="w-full max-w-[320px] rounded-[15px] overflow-hidden shadow-md">
             <Image
-              src="/extension_card.svg"
+              src="/extension_card.png"
               alt="UnitSet Chrome Extension"
               width={320}
               height={200}
-              className="w-full h-auto"
+              className="w-full h-auto -mb-px"
               priority
             />
           </div>
@@ -48,7 +48,15 @@ export function RemixFromWebModal({
             </p>
           </div>
 
-          <Button className="gap-2">
+          <Button
+            className="gap-2"
+            onClick={() =>
+              window.open(
+                "https://chromewebstore.google.com/detail/mkialdnmpchidkoemocgcfcgpejmacfn?utm_source=item-share-cb",
+                "_blank"
+              )
+            }
+          >
             <Download className="size-4" />
             Download Extension
           </Button>

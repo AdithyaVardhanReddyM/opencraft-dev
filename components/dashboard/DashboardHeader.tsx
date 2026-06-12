@@ -52,7 +52,7 @@ export function DashboardHeader({
           </Link>
 
           {/* Center Tabs */}
-          <div className="absolute left-1/2 -translate-x-1/2">
+          <div className="-translate-x-[40%]">
             <div className="flex h-10 items-center bg-muted/30 backdrop-blur-2xl saturate-150 border border-border/20 shadow-sm rounded-full p-1 gap-1">
               {TABS.map((tab) => (
                 <button
@@ -63,7 +63,7 @@ export function DashboardHeader({
                   {activeTab === tab.id && (
                     <motion.div
                       layoutId="dashboard-active-tab"
-                      className="absolute inset-0 bg-background/60 dark:bg-white/8 backdrop-blur-sm rounded-full -z-10 shadow-xs ring-1 ring-white/10 dark:ring-white/10"
+                      className="absolute inset-0 bg-background backdrop-blur-sm rounded-full -z-10 shadow-xs"
                       transition={{
                         type: "spring",
                         stiffness: 300,

@@ -34,13 +34,40 @@ type DottedGlowBackgroundProps = {
   speedMax?: number;
   /** global speed multiplier for all dots */
   speedScale?: number;
+  /** gradient colors for glowing dots - each dot picks a color based on position */
+  gradientColors?: { start: string; end: string };
+  /** use gradient mode - dots will glow with interpolated gradient colors */
+  useGradient?: boolean;
 };
+
+/**
+ * Interpolate between two hex colors
+ */
+function interpolateColor(color1: string, color2: string, t: number): string {
+  const hex1 = color1.replace("#", "");
+  const hex2 = color2.replace("#", "");
+
+  const r1 = parseInt(hex1.substring(0, 2), 16);
+  const g1 = parseInt(hex1.substring(2, 4), 16);
+  const b1 = parseInt(hex1.substring(4, 6), 16);
+
+  const r2 = parseInt(hex2.substring(0, 2), 16);
+  const g2 = parseInt(hex2.substring(2, 4), 16);
+  const b2 = parseInt(hex2.substring(4, 6), 16);
+
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const b = Math.round(b1 + (b2 - b1) * t);
+
+  return `rgb(${r}, ${g}, ${b})`;
+}
 
 /**
  * Canvas-based dotted background that randomly glows and dims.
  * - Uses a stable grid of dots.
  * - Each dot gets its own phase + speed producing organic shimmering.
  * - Handles high-DPI and resizes via ResizeObserver.
+ * - Supports gradient glow colors based on dot position.
  */
 export const DottedGlowBackground = ({
   className,
@@ -59,6 +86,8 @@ export const DottedGlowBackground = ({
   speedMin = 0.4,
   speedMax = 1.3,
   speedScale = 1,
+  gradientColors,
+  useGradient = false,
 }: DottedGlowBackgroundProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -175,7 +204,13 @@ export const DottedGlowBackground = ({
     resize();
 
     // Precompute dot metadata for a medium-sized grid and regenerate on resize
-    let dots: { x: number; y: number; phase: number; speed: number }[] = [];
+    let dots: {
+      x: number;
+      y: number;
+      phase: number;
+      speed: number;
+      gradientT: number;
+    }[] = [];
 
     const regenDots = () => {
       dots = [];
@@ -184,6 +219,8 @@ export const DottedGlowBackground = ({
       const rows = Math.ceil(height / gap) + 2;
       const min = Math.min(speedMin, speedMax);
       const max = Math.max(speedMin, speedMax);
+      const diagonal = Math.sqrt(width * width + height * height);
+
       for (let i = -1; i < cols; i++) {
         for (let j = -1; j < rows; j++) {
           const x = i * gap + (j % 2 === 0 ? 0 : gap * 0.5); // offset every other row
@@ -192,7 +229,10 @@ export const DottedGlowBackground = ({
           const phase = Math.random() * Math.PI * 2;
           const span = Math.max(max - min, 0);
           const speed = min + Math.random() * span; // configurable rad/s
-          dots.push({ x, y, phase, speed });
+          // Calculate gradient position based on diagonal distance from top-left
+          const dist = Math.sqrt(x * x + y * y);
+          const gradientT = diagonal > 0 ? dist / diagonal : 0;
+          dots.push({ x, y, phase, speed, gradientT });
         }
       }
     };
@@ -235,7 +275,6 @@ export const DottedGlowBackground = ({
 
       // animate dots
       ctx.save();
-      ctx.fillStyle = resolvedColor;
 
       const time = (now / 1000) * Math.max(speedScale, 0);
       for (let i = 0; i < dots.length; i++) {
@@ -245,16 +284,34 @@ export const DottedGlowBackground = ({
         const lin = mod < 1 ? mod : 2 - mod; // 0..1..0
         const a = 0.25 + 0.55 * lin; // 0.25..0.8 linearly
 
+        // Determine glow color - use gradient if enabled
+        let dotGlowColor = resolvedGlowColor;
+        let dotFillColor = resolvedColor;
+
+        if (useGradient && gradientColors) {
+          const gradientColor = interpolateColor(
+            gradientColors.start,
+            gradientColors.end,
+            d.gradientT
+          );
+          dotGlowColor = gradientColor;
+          // When glowing, also tint the dot with the gradient color
+          if (a > 0.5) {
+            dotFillColor = gradientColor;
+          }
+        }
+
         // draw glow when bright
         if (a > 0.6) {
           const glow = (a - 0.6) / 0.4; // 0..1
-          ctx.shadowColor = resolvedGlowColor;
-          ctx.shadowBlur = 6 * glow;
+          ctx.shadowColor = dotGlowColor;
+          ctx.shadowBlur = 8 * glow;
         } else {
           ctx.shadowColor = "transparent";
           ctx.shadowBlur = 0;
         }
 
+        ctx.fillStyle = dotFillColor;
         ctx.globalAlpha = a * opacity;
         ctx.beginPath();
         ctx.arc(d.x, d.y, radius, 0, Math.PI * 2);
@@ -289,6 +346,8 @@ export const DottedGlowBackground = ({
     speedMin,
     speedMax,
     speedScale,
+    useGradient,
+    gradientColors,
   ]);
 
   return (
