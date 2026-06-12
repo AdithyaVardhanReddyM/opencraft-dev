@@ -17,15 +17,19 @@ export {
   fontWeightToTailwind,
   opacityToTailwind,
   updateElementClassName,
+  updateElementClassNameWithResult,
   isValidTailwindClass,
   parseNumericValue,
   rgbToHex,
   normalizeColor,
+  kebabToCamelCase,
+  camelToKebabCase,
   FONT_SIZE_MAP,
   SPACING_MAP,
   BORDER_RADIUS_MAP,
   FONT_WEIGHT_MAP,
   COLOR_MAP,
+  type UpdateClassNameResult,
 } from "./style-mapper";
 
 // Overlay Script
@@ -65,3 +69,16 @@ export {
   type SelectorConfidence,
   type SelectorMethod,
 } from "./selector-generator";
+
+// Element Finder
+export {
+  findElementInSource,
+  verifyElementMatch,
+  updateClassNameAtLocation,
+  getConflictGroup,
+  getConflictingClasses,
+  validateElementLocation,
+  type FindElementOptions,
+  type ElementLocation,
+  type ElementValidationResult,
+} from "./element-finder-temp";

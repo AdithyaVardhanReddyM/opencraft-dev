@@ -150,6 +150,15 @@ export interface HoveredElementInfo {
 }
 
 /**
+ * Information about the nearest ancestor with an ID
+ */
+export interface NearestIdAncestor {
+  id: string; // The ID of the ancestor element
+  pathFromAncestor: string; // CSS selector path from ancestor to element
+  depth: number; // Number of levels up to the ancestor
+}
+
+/**
  * Detailed information about a selected element.
  * Includes computed styles and identification data.
  */
@@ -170,6 +179,12 @@ export interface SelectedElementInfo {
   uniqueIdentifier: string; // Unique ID for targeting (id, data-attr, or generated)
   siblingIndex: number; // Position among same-tag siblings
   dataAttributes: Record<string, string>; // All data-* attributes
+  // Enhanced identification fields
+  parentTagName?: string; // Tag name of the parent element
+  parentId?: string; // ID of the parent element if available
+  childIndex: number; // Index among all children (not just same-tag siblings)
+  nearestIdAncestor?: NearestIdAncestor; // Nearest ancestor with an ID
+  textContentHash?: string; // Hash of text content for text elements
 }
 
 // ============================================================================
@@ -313,6 +328,7 @@ export type ParentToIframeMessage =
   | { type: "enable-edit-mode" }
   | { type: "disable-edit-mode" }
   | { type: "apply-style"; property: string; value: string }
+  | { type: "revert-styles"; properties: string[] }
   | { type: "deselect" };
 
 /**

@@ -11,12 +11,13 @@ import type {
 import { isEditModeMessage } from "@/lib/edit-mode/types";
 import {
   cssToTailwind,
-  updateElementClassName,
+  updateElementClassNameWithResult,
 } from "@/lib/edit-mode/style-mapper";
 import {
   writeSourceFile,
   readSourceFile,
   generateUniqueSelector,
+  validateElementLocation,
 } from "@/lib/edit-mode";
 
 // ======================
@@ -36,12 +37,14 @@ export interface UseEditModeReturn {
   pendingChanges: StyleChanges | null;
   isSaving: boolean;
   saveError: string | null;
+  saveWarning: string | null;
   hasUnsavedChanges: boolean;
   enableEditMode: () => Promise<void>;
   disableEditMode: () => Promise<void>;
   updateStyle: (property: string, value: string) => void;
   saveChanges: () => Promise<void>;
   discardChanges: () => void;
+  retrySave: () => Promise<void>;
 }
 
 // ======================
@@ -62,11 +65,14 @@ export function useEditMode({
   );
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveWarning, setSaveWarning] = useState<string | null>(null);
 
   // Refs
   const isEnablingRef = useRef(false);
   const isDisablingRef = useRef(false);
   const previousSandboxIdRef = useRef<string | undefined>(undefined);
+  const retryCountRef = useRef(0);
+  const maxRetries = 3;
 
   // Reset state when sandboxId changes
   useEffect(() => {
@@ -75,11 +81,13 @@ export function useEditMode({
       // Reset refs and state for new sandbox
       isEnablingRef.current = false;
       isDisablingRef.current = false;
+      retryCountRef.current = 0;
       setIsEditMode(false);
       setSelectedElement(null);
       setHoveredElement(null);
       setPendingChanges(null);
       setSaveError(null);
+      setSaveWarning(null);
     }
   }, [sandboxId]);
 
@@ -169,11 +177,15 @@ export function useEditMode({
           setSelectedElement(message.data);
           setPendingChanges(null);
           setSaveError(null);
+          setSaveWarning(null);
+          retryCountRef.current = 0;
           break;
         case "element-deselected":
           setSelectedElement(null);
           setPendingChanges(null);
           setSaveError(null);
+          setSaveWarning(null);
+          retryCountRef.current = 0;
           break;
         case "edit-mode-script-loaded":
           // Script is loaded, send enable command
@@ -317,6 +329,8 @@ export function useEditMode({
       setHoveredElement(null);
       setPendingChanges(null);
       setSaveError(null);
+      setSaveWarning(null);
+      retryCountRef.current = 0;
     } catch (error) {
       console.error("[useEditMode] Failed to disable edit mode:", error);
       // Reset state anyway
@@ -324,6 +338,7 @@ export function useEditMode({
       setSelectedElement(null);
       setHoveredElement(null);
       setPendingChanges(null);
+      setSaveWarning(null);
     } finally {
       isDisablingRef.current = false;
     }
@@ -361,6 +376,7 @@ export function useEditMode({
 
     setIsSaving(true);
     setSaveError(null);
+    setSaveWarning(null);
 
     try {
       // Convert pending changes to Tailwind classes
@@ -387,20 +403,100 @@ export function useEditMode({
       const sourceFilePath = selectedElement.sourceFile || "app/page.tsx";
 
       // Read the source file
-      const sourceContent = await readSourceFile(sandboxId, sourceFilePath);
+      let sourceContent: string;
+      try {
+        sourceContent = await readSourceFile(sandboxId, sourceFilePath);
+      } catch (readError) {
+        const errorMessage =
+          readError instanceof Error ? readError.message : "Unknown error";
+        if (
+          errorMessage.includes("not found") ||
+          errorMessage.includes("ENOENT")
+        ) {
+          throw new Error(
+            `Source file not found: ${sourceFilePath}. The file may have been moved or deleted.`
+          );
+        }
+        throw new Error(`Failed to read source file: ${errorMessage}`);
+      }
 
-      // Update the className in the source using the unique selector
-      // For high-confidence selectors (ID or data-attr), we can target more precisely
-      const updatedContent = updateElementClassName(
+      // Validate element location (for informational purposes)
+      // We don't throw on validation failure - let updateElementClassNameWithResult
+      // try its fallback strategies
+      const validation = validateElementLocation(
+        sourceContent,
+        selectedElement
+      );
+
+      if (validation.warning) {
+        console.warn("[useEditMode] Validation warning:", validation.warning);
+      }
+
+      if (!validation.isValid) {
+        console.warn(
+          "[useEditMode] Validation failed, will try fallback strategies:",
+          validation.error
+        );
+      }
+
+      // Use the new updateElementClassNameWithResult for precise element finding
+      // with integrated conflict resolution and fallback behavior
+      const updateResult = updateElementClassNameWithResult(
         sourceContent,
         uniqueSelector.method === "id" || uniqueSelector.method === "data-attr"
           ? uniqueSelector.selector
           : selectedElement.elementPath,
-        tailwindClasses
+        tailwindClasses,
+        selectedElement // Pass elementInfo for precise finding
       );
 
+      console.log(
+        "[useEditMode] Update result - method:",
+        updateResult.method,
+        "success:",
+        updateResult.success
+      );
+
+      // Handle update failure - only throw if all strategies failed
+      if (!updateResult.success) {
+        throw new Error(
+          updateResult.error || "Failed to update element className."
+        );
+      }
+
+      // Set warning from update result or validation
+      const warningToShow = updateResult.warning || validation.warning;
+      if (warningToShow) {
+        setSaveWarning(warningToShow);
+        console.warn("[useEditMode] Warning:", warningToShow);
+      }
+
+      const updatedContent = updateResult.sourceCode;
+
       // Write back to sandbox
-      await writeSourceFile(sandboxId, sourceFilePath, updatedContent);
+      try {
+        await writeSourceFile(sandboxId, sourceFilePath, updatedContent);
+      } catch (writeError) {
+        const errorMessage =
+          writeError instanceof Error ? writeError.message : "Unknown error";
+        if (
+          errorMessage.includes("permission") ||
+          errorMessage.includes("EACCES")
+        ) {
+          throw new Error(
+            `Permission denied writing to ${sourceFilePath}. Check file permissions.`
+          );
+        }
+        if (
+          errorMessage.includes("network") ||
+          errorMessage.includes("timeout")
+        ) {
+          throw new Error(
+            `Network error saving changes. Please check your connection and try again.`
+          );
+        }
+        throw new Error(`Failed to save changes: ${errorMessage}`);
+      }
 
       // Verify the changes were written correctly
       try {
@@ -412,6 +508,9 @@ export function useEditMode({
           console.warn(
             "[useEditMode] Verification warning: Changes may not have been persisted correctly"
           );
+          setSaveWarning(
+            "Changes may not have been saved correctly. Please verify and try again if needed."
+          );
         } else {
           console.log("[useEditMode] Changes verified successfully");
         }
@@ -419,19 +518,45 @@ export function useEditMode({
         console.warn("[useEditMode] Could not verify changes:", verifyError);
       }
 
-      // Clear pending changes on success
+      // Clear pending changes and reset retry count on success
       setPendingChanges(null);
+      retryCountRef.current = 0;
 
       console.log("[useEditMode] Changes saved successfully");
     } catch (error) {
       console.error("[useEditMode] Failed to save changes:", error);
-      setSaveError(
-        error instanceof Error ? error.message : "Failed to save changes"
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to save changes";
+      setSaveError(errorMessage);
+
+      // Increment retry count for transient failures
+      if (
+        errorMessage.includes("network") ||
+        errorMessage.includes("timeout")
+      ) {
+        retryCountRef.current++;
+      }
     } finally {
       setIsSaving(false);
     }
   }, [sandboxId, selectedElement, pendingChanges, isSaving]);
+
+  // ======================
+  // Retry Save (for transient failures)
+  // ======================
+
+  const retrySave = useCallback(async () => {
+    if (retryCountRef.current >= maxRetries) {
+      setSaveError(
+        `Maximum retry attempts (${maxRetries}) reached. Please try again later.`
+      );
+      return;
+    }
+
+    // Clear error and retry
+    setSaveError(null);
+    await saveChanges();
+  }, [saveChanges]);
 
   // ======================
   // Discard Changes
@@ -440,12 +565,26 @@ export function useEditMode({
   const discardChanges = useCallback(() => {
     if (!selectedElement || !pendingChanges) return;
 
-    // Revert DOM changes by deselecting
-    sendToIframe({ type: "deselect" });
+    // Get the list of properties that were changed
+    const changedProperties = Object.keys(pendingChanges);
 
-    // Clear pending changes
+    // Send message to iframe to revert inline styles for changed properties
+    // This removes the inline styles, allowing the original computed styles to show
+    if (changedProperties.length > 0) {
+      sendToIframe({ type: "revert-styles", properties: changedProperties });
+      console.log(
+        "[useEditMode] Sent revert-styles for properties:",
+        changedProperties
+      );
+    }
+
+    // Clear pending changes state
     setPendingChanges(null);
     setSaveError(null);
+    setSaveWarning(null);
+    retryCountRef.current = 0;
+
+    console.log("[useEditMode] Changes discarded");
   }, [selectedElement, pendingChanges, sendToIframe]);
 
   // ======================
@@ -511,11 +650,13 @@ export function useEditMode({
     pendingChanges,
     isSaving,
     saveError,
+    saveWarning,
     hasUnsavedChanges,
     enableEditMode,
     disableEditMode,
     updateStyle,
     saveChanges,
     discardChanges,
+    retrySave,
   };
 }

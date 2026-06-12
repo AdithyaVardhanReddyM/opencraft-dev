@@ -103,11 +103,13 @@ export function EditModePanel({ screenId, sandboxId }: EditModePanelProps) {
     pendingChanges,
     isSaving,
     saveError,
+    saveWarning,
     hasUnsavedChanges,
     enableEditMode,
     updateStyle,
     saveChanges,
     discardChanges,
+    retrySave,
   } = useEditModeContext();
 
   // Track if we've already tried to enable for this sandbox
@@ -156,10 +158,28 @@ export function EditModePanel({ screenId, sandboxId }: EditModePanelProps) {
         )}
       </div>
 
+      {/* Save Warning Toast */}
+      {saveWarning && selectedElement && !saveError && (
+        <div className="px-3 py-2 bg-yellow-500/10 border-t border-yellow-500/20">
+          <p className="text-xs text-yellow-600 dark:text-yellow-400">
+            {saveWarning}
+          </p>
+        </div>
+      )}
+
       {/* Save Error Toast */}
       {saveError && selectedElement && (
-        <div className="px-3 py-2 bg-destructive/10 border-t border-destructive/20">
-          <p className="text-xs text-destructive">{saveError}</p>
+        <div className="px-3 py-2 bg-destructive/10 border-t border-destructive/20 flex items-center justify-between gap-2">
+          <p className="text-xs text-destructive flex-1">{saveError}</p>
+          {hasUnsavedChanges && (
+            <button
+              onClick={retrySave}
+              disabled={isSaving}
+              className="text-xs text-destructive hover:text-destructive/80 underline underline-offset-2 disabled:opacity-50"
+            >
+              Retry
+            </button>
+          )}
         </div>
       )}
     </div>

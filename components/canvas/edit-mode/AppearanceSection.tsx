@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ComputedStylesInfo, StyleChanges } from "@/lib/edit-mode/types";
+import { rgbToHex } from "@/lib/edit-mode/style-mapper";
 
 // ============================================================================
 // Types
@@ -62,17 +63,6 @@ interface ShadowConfig {
 function parseNumeric(value: string): number {
   const match = value.match(/^(-?\d+(?:\.\d+)?)/);
   return match ? parseFloat(match[1]) : 0;
-}
-
-function rgbToHex(rgb: string): string {
-  if (rgb.startsWith("#")) return rgb;
-  if (rgb === "transparent" || rgb === "rgba(0, 0, 0, 0)") return "transparent";
-  const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (!match) return "#000000";
-  const r = parseInt(match[1], 10);
-  const g = parseInt(match[2], 10);
-  const b = parseInt(match[3], 10);
-  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
 
 function parseOpacityFromRgba(rgba: string): number {

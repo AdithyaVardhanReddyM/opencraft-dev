@@ -5,7 +5,12 @@
  * Handles font sizes, colors, spacing, border radius, and arbitrary values.
  */
 
-import type { StyleChanges } from "./types";
+import type { StyleChanges, SelectedElementInfo } from "./types";
+import {
+  findElementInSource,
+  updateClassNameAtLocation,
+  getConflictingClasses,
+} from "./element-finder-temp";
 
 // ============================================================================
 // Mapping Tables
@@ -142,7 +147,6 @@ export const COLOR_MAP: Record<string, string> = {
   "#374151": "gray-700",
   "#1f2937": "gray-800",
   "#111827": "gray-900",
-  // Add more colors as needed
 };
 
 // ============================================================================
@@ -176,33 +180,117 @@ function findNearestValue(target: number, values: number[]): number {
 }
 
 /**
- * Convert RGB color to hex
+ * Convert RGB/RGBA color to hex format.
  */
 export function rgbToHex(rgb: string): string {
-  const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (!match) return rgb;
+  const trimmed = rgb.trim().toLowerCase();
 
-  const r = parseInt(match[1], 10);
-  const g = parseInt(match[2], 10);
-  const b = parseInt(match[3], 10);
+  const preservedKeywords = [
+    "transparent",
+    "inherit",
+    "initial",
+    "unset",
+    "currentcolor",
+    "revert",
+    "revert-layer",
+  ];
+
+  if (preservedKeywords.includes(trimmed)) {
+    return trimmed;
+  }
+
+  if (trimmed === "rgba(0, 0, 0, 0)" || trimmed === "rgba(0,0,0,0)") {
+    return "transparent";
+  }
+
+  if (trimmed.startsWith("#")) {
+    if (trimmed.length === 4) {
+      return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`;
+    }
+    if (trimmed.length === 9) {
+      return trimmed.slice(0, 7);
+    }
+    return trimmed;
+  }
+
+  const rgbMatch = trimmed.match(
+    /rgba?\(\s*(\d+(?:\.\d+)?)\s*[,\s]\s*(\d+(?:\.\d+)?)\s*[,\s]\s*(\d+(?:\.\d+)?)/
+  );
+
+  if (!rgbMatch) {
+    return rgb;
+  }
+
+  const r = Math.min(255, Math.max(0, Math.round(parseFloat(rgbMatch[1]))));
+  const g = Math.min(255, Math.max(0, Math.round(parseFloat(rgbMatch[2]))));
+  const b = Math.min(255, Math.max(0, Math.round(parseFloat(rgbMatch[3]))));
 
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
 
-/**
- * Normalize a color value to lowercase hex
- */
+// ============================================================================
+// CSS Property Name Conversion
+// ============================================================================
+
+const VENDOR_PREFIXES = ["-webkit-", "-moz-", "-ms-", "-o-"];
+
+export function kebabToCamelCase(property: string): string {
+  const trimmed = property.trim();
+  if (!trimmed) return trimmed;
+
+  let prefix = "";
+  let rest = trimmed;
+
+  for (const vendorPrefix of VENDOR_PREFIXES) {
+    if (trimmed.startsWith(vendorPrefix)) {
+      prefix = vendorPrefix.slice(1, -1);
+      rest = trimmed.slice(vendorPrefix.length);
+      break;
+    }
+  }
+
+  const camelCaseRest = rest.replace(/-([a-z])/g, (_, letter) =>
+    letter.toUpperCase()
+  );
+
+  if (prefix) {
+    if (prefix === "moz") {
+      return (
+        "Moz" + camelCaseRest.charAt(0).toUpperCase() + camelCaseRest.slice(1)
+      );
+    }
+    return (
+      prefix + camelCaseRest.charAt(0).toUpperCase() + camelCaseRest.slice(1)
+    );
+  }
+
+  return camelCaseRest;
+}
+
+export function camelToKebabCase(property: string): string {
+  const trimmed = property.trim();
+  if (!trimmed) return trimmed;
+
+  const vendorPrefixMatch = trimmed.match(/^(webkit|Moz|ms|o)([A-Z])/);
+
+  if (vendorPrefixMatch) {
+    const [, prefix] = vendorPrefixMatch;
+    const rest = trimmed.slice(prefix.length);
+    const kebabRest = rest.replace(/([A-Z])/g, "-$1").toLowerCase();
+    return `-${prefix.toLowerCase()}${kebabRest}`;
+  }
+
+  return trimmed.replace(/([A-Z])/g, "-$1").toLowerCase();
+}
+
 export function normalizeColor(value: string): string {
   const trimmed = value.trim().toLowerCase();
 
-  // Handle rgb/rgba
   if (trimmed.startsWith("rgb")) {
     return rgbToHex(trimmed);
   }
 
-  // Handle hex
   if (trimmed.startsWith("#")) {
-    // Expand shorthand hex (#fff -> #ffffff)
     if (trimmed.length === 4) {
       return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`;
     }
@@ -213,135 +301,153 @@ export function normalizeColor(value: string): string {
 }
 
 // ============================================================================
+// Arbitrary Value Handling
+// ============================================================================
+
+export function escapeArbitraryValue(value: string): string {
+  let escaped = value.replace(/\s+/g, "_");
+  escaped = escaped.replace(/([(),])/g, "\\$1");
+  return escaped;
+}
+
+export function formatRgbaForTailwind(rgba: string): string {
+  const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (!match) return escapeArbitraryValue(rgba);
+
+  const [, r, g, b, a] = match;
+
+  if (!a || parseFloat(a) === 1) {
+    const rNum = parseInt(r, 10);
+    const gNum = parseInt(g, 10);
+    const bNum = parseInt(b, 10);
+    return `#${((1 << 24) + (rNum << 16) + (gNum << 8) + bNum)
+      .toString(16)
+      .slice(1)}`;
+  }
+
+  const alphaPercent = Math.round(parseFloat(a) * 100);
+  return `rgb\\(${r}_${g}_${b}_\\/_${alphaPercent}%\\)`;
+}
+
+export function createArbitraryValueClass(
+  prefix: string,
+  value: string
+): string {
+  if (value.startsWith("rgba(") || value.startsWith("rgb(")) {
+    const formatted = formatRgbaForTailwind(value);
+    return `${prefix}-[${formatted}]`;
+  }
+  const escaped = escapeArbitraryValue(value);
+  return `${prefix}-[${escaped}]`;
+}
+
+// ============================================================================
 // Conversion Functions
 // ============================================================================
 
-/**
- * Convert font size CSS value to Tailwind class
- */
 export function fontSizeToTailwind(value: string): string {
   const numValue = parseNumericValue(value);
   if (numValue === null) {
-    // Return arbitrary value for non-numeric
-    return `text-[${value}]`;
+    return createArbitraryValueClass("text", value);
   }
 
-  // Find nearest standard font size
   const nearest = findNearestValue(numValue, FONT_SIZE_VALUES);
   const tailwindClass = FONT_SIZE_MAP[String(nearest)];
 
-  // If exact match or close enough (within 2px), use standard class
   if (tailwindClass && Math.abs(numValue - nearest) <= 2) {
     return tailwindClass;
   }
 
-  // Use arbitrary value for non-standard sizes
   return `text-[${Math.round(numValue)}px]`;
 }
 
-/**
- * Convert color CSS value to Tailwind class
- */
 export function colorToTailwind(
   value: string,
   property: "text" | "bg" | "border"
 ): string {
-  const normalized = normalizeColor(value);
+  const trimmed = value.trim();
 
-  // Check for exact match in color map
+  if (trimmed === "transparent" || trimmed === "rgba(0, 0, 0, 0)") {
+    return `${property}-transparent`;
+  }
+
+  const rgbaMatch = trimmed.match(
+    /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/
+  );
+  if (rgbaMatch) {
+    const [, , , , a] = rgbaMatch;
+    if (a && parseFloat(a) < 1) {
+      return createArbitraryValueClass(property, trimmed);
+    }
+  }
+
+  const normalized = normalizeColor(value);
   const colorClass = COLOR_MAP[normalized];
   if (colorClass) {
     return `${property}-${colorClass}`;
   }
 
-  // Handle transparent
-  if (normalized === "transparent" || normalized === "rgba(0, 0, 0, 0)") {
-    return `${property}-transparent`;
-  }
-
-  // Use arbitrary value for custom colors
   return `${property}-[${normalized}]`;
 }
 
-/**
- * Convert spacing CSS value to Tailwind class
- */
 export function spacingToTailwind(value: string, property: string): string {
   const numValue = parseNumericValue(value);
 
-  // Handle auto
   if (value.trim().toLowerCase() === "auto") {
     return `${property}-auto`;
   }
 
   if (numValue === null) {
-    return `${property}-[${value}]`;
+    return createArbitraryValueClass(property, value);
   }
 
-  // Handle 0
   if (numValue === 0) {
     return `${property}-0`;
   }
 
-  // Find nearest standard spacing
   const nearest = findNearestValue(numValue, SPACING_VALUES);
   const tailwindScale = SPACING_MAP[String(nearest)];
 
-  // If exact match or close enough (within 2px), use standard class
   if (tailwindScale && Math.abs(numValue - nearest) <= 2) {
     return `${property}-${tailwindScale}`;
   }
 
-  // Use arbitrary value for non-standard spacing
   return `${property}-[${Math.round(numValue)}px]`;
 }
 
-/**
- * Convert border radius CSS value to Tailwind class
- */
 export function borderRadiusToTailwind(value: string): string {
   const numValue = parseNumericValue(value);
 
   if (numValue === null) {
-    return `rounded-[${value}]`;
+    return createArbitraryValueClass("rounded", value);
   }
 
-  // Handle 0
   if (numValue === 0) {
     return "rounded-none";
   }
 
-  // Handle very large values (full/pill)
   if (numValue >= 9999 || value.includes("9999")) {
     return "rounded-full";
   }
 
-  // Find nearest standard border radius
   const nearest = findNearestValue(numValue, BORDER_RADIUS_VALUES);
   const tailwindClass = BORDER_RADIUS_MAP[String(nearest)];
 
-  // If exact match or close enough (within 2px), use standard class
   if (tailwindClass && Math.abs(numValue - nearest) <= 2) {
     return tailwindClass;
   }
 
-  // Use arbitrary value for non-standard radius
   return `rounded-[${Math.round(numValue)}px]`;
 }
 
-/**
- * Convert font weight CSS value to Tailwind class
- */
 export function fontWeightToTailwind(value: string): string {
   const normalized = value.trim();
 
-  // Check for exact match
   const tailwindClass = FONT_WEIGHT_MAP[normalized];
   if (tailwindClass) {
     return tailwindClass;
   }
 
-  // Handle named weights
   const namedWeights: Record<string, string> = {
     normal: "font-normal",
     bold: "font-bold",
@@ -353,30 +459,22 @@ export function fontWeightToTailwind(value: string): string {
     return namedWeights[normalized.toLowerCase()];
   }
 
-  // Use arbitrary value
-  return `font-[${normalized}]`;
+  return createArbitraryValueClass("font", normalized);
 }
 
-/**
- * Convert opacity CSS value to Tailwind class
- */
 export function opacityToTailwind(value: string): string {
   const numValue = parseNumericValue(value);
 
   if (numValue === null) {
-    return `opacity-[${value}]`;
+    return createArbitraryValueClass("opacity", value);
   }
 
-  // Convert to percentage (0-100)
   const percentage = Math.round(numValue * 100);
-
-  // Standard opacity values
   const standardOpacities = [
     0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90,
     95, 100,
   ];
 
-  // Find nearest
   const nearest = findNearestValue(percentage, standardOpacities);
 
   if (Math.abs(percentage - nearest) <= 2) {
@@ -390,9 +488,6 @@ export function opacityToTailwind(value: string): string {
 // Main Conversion Function
 // ============================================================================
 
-/**
- * CSS property to Tailwind prefix mapping
- */
 const PROPERTY_PREFIX_MAP: Record<string, string> = {
   width: "w",
   height: "h",
@@ -407,11 +502,10 @@ const PROPERTY_PREFIX_MAP: Record<string, string> = {
   marginBottom: "mb",
   marginLeft: "ml",
   gap: "gap",
+  columnGap: "gap-x",
+  rowGap: "gap-y",
 };
 
-/**
- * Convert a StyleChanges object to an array of Tailwind classes
- */
 export function cssToTailwind(styles: StyleChanges): string[] {
   const classes: string[] = [];
 
@@ -424,31 +518,24 @@ export function cssToTailwind(styles: StyleChanges): string[] {
       case "fontSize":
         tailwindClass = fontSizeToTailwind(value);
         break;
-
       case "fontWeight":
         tailwindClass = fontWeightToTailwind(value);
         break;
-
       case "color":
         tailwindClass = colorToTailwind(value, "text");
         break;
-
       case "backgroundColor":
         tailwindClass = colorToTailwind(value, "bg");
         break;
-
       case "borderColor":
         tailwindClass = colorToTailwind(value, "border");
         break;
-
       case "borderRadius":
         tailwindClass = borderRadiusToTailwind(value);
         break;
-
       case "opacity":
         tailwindClass = opacityToTailwind(value);
         break;
-
       case "width":
       case "height":
       case "padding":
@@ -462,14 +549,15 @@ export function cssToTailwind(styles: StyleChanges): string[] {
       case "marginBottom":
       case "marginLeft":
       case "gap":
+      case "columnGap":
+      case "rowGap": {
         const prefix = PROPERTY_PREFIX_MAP[property];
         if (prefix) {
           tailwindClass = spacingToTailwind(value, prefix);
         }
         break;
-
-      case "display":
-        // Handle common display values
+      }
+      case "display": {
         const displayMap: Record<string, string> = {
           block: "block",
           inline: "inline",
@@ -483,8 +571,8 @@ export function cssToTailwind(styles: StyleChanges): string[] {
         };
         tailwindClass = displayMap[value.toLowerCase()] || null;
         break;
-
-      case "flexDirection":
+      }
+      case "flexDirection": {
         const flexDirMap: Record<string, string> = {
           row: "flex-row",
           "row-reverse": "flex-row-reverse",
@@ -493,8 +581,8 @@ export function cssToTailwind(styles: StyleChanges): string[] {
         };
         tailwindClass = flexDirMap[value.toLowerCase()] || null;
         break;
-
-      case "justifyContent":
+      }
+      case "justifyContent": {
         const justifyMap: Record<string, string> = {
           "flex-start": "justify-start",
           "flex-end": "justify-end",
@@ -505,8 +593,8 @@ export function cssToTailwind(styles: StyleChanges): string[] {
         };
         tailwindClass = justifyMap[value.toLowerCase()] || null;
         break;
-
-      case "alignItems":
+      }
+      case "alignItems": {
         const alignMap: Record<string, string> = {
           "flex-start": "items-start",
           "flex-end": "items-end",
@@ -516,8 +604,17 @@ export function cssToTailwind(styles: StyleChanges): string[] {
         };
         tailwindClass = alignMap[value.toLowerCase()] || null;
         break;
-
-      case "textAlign":
+      }
+      case "flexWrap": {
+        const flexWrapMap: Record<string, string> = {
+          wrap: "flex-wrap",
+          nowrap: "flex-nowrap",
+          "wrap-reverse": "flex-wrap-reverse",
+        };
+        tailwindClass = flexWrapMap[value.toLowerCase()] || null;
+        break;
+      }
+      case "textAlign": {
         const textAlignMap: Record<string, string> = {
           left: "text-left",
           center: "text-center",
@@ -526,9 +623,8 @@ export function cssToTailwind(styles: StyleChanges): string[] {
         };
         tailwindClass = textAlignMap[value.toLowerCase()] || null;
         break;
-
+      }
       default:
-        // Skip unknown properties
         break;
     }
 
@@ -545,12 +641,28 @@ export function cssToTailwind(styles: StyleChanges): string[] {
 // ============================================================================
 
 /**
+ * Result of updating element className
+ */
+export interface UpdateClassNameResult {
+  /** The updated source code */
+  sourceCode: string;
+  /** Whether the update was successful */
+  success: boolean;
+  /** Method used to find the element */
+  method: "element-info" | "selector" | "fallback" | "none";
+  /** Warning message if applicable */
+  warning?: string;
+  /** Error message if update failed */
+  error?: string;
+}
+
+/**
  * Extract class prefixes from Tailwind classes for conflict detection
+ * @deprecated Use getConflictingClasses from element-finder-temp instead
  */
 function extractClassPrefixes(classes: string[]): Set<string> {
   return new Set(
     classes.map((cls) => {
-      // Extract prefix (e.g., "text" from "text-lg", "p" from "p-4")
       const match = cls.match(/^([a-z]+)-/);
       return match ? match[1] : cls;
     })
@@ -559,16 +671,13 @@ function extractClassPrefixes(classes: string[]): Set<string> {
 
 /**
  * Find the element in source code by selector and return its position
- * Returns the position of the element's opening tag
  */
 function findElementBySelector(
   sourceCode: string,
   selector: string
 ): { start: number; end: number } | null {
-  // Handle ID selector: #myId
   if (selector.startsWith("#")) {
     const id = selector.slice(1);
-    // Match id="value" or id={'value'} or id={`value`}
     const idRegex = new RegExp(
       `id\\s*=\\s*(?:"${escapeRegexChars(id)}"|'${escapeRegexChars(
         id
@@ -577,12 +686,10 @@ function findElementBySelector(
     );
     const match = idRegex.exec(sourceCode);
     if (match) {
-      // Find the start of the element (look backwards for <)
       let start = match.index;
       while (start > 0 && sourceCode[start] !== "<") {
         start--;
       }
-      // Find the end of the opening tag
       let end = match.index + match[0].length;
       while (end < sourceCode.length && sourceCode[end] !== ">") {
         end++;
@@ -591,7 +698,6 @@ function findElementBySelector(
     }
   }
 
-  // Handle data attribute selector: [data-testid="value"]
   const dataAttrMatch = selector.match(/\[data-(\w+)="([^"]+)"\]/);
   if (dataAttrMatch) {
     const [, attrName, attrValue] = dataAttrMatch;
@@ -628,28 +734,102 @@ function escapeRegexChars(str: string): string {
 }
 
 /**
+ * Remove conflicting classes from existing classes using the new conflict resolution system.
+ * Uses getConflictingClasses for comprehensive Tailwind class conflict detection.
+ */
+function removeConflictingClasses(
+  existingClasses: string[],
+  newClasses: string[]
+): string[] {
+  const conflictingSet = new Set<string>();
+
+  for (const newClass of newClasses) {
+    const conflicts = getConflictingClasses(existingClasses, newClass);
+    conflicts.forEach((cls) => conflictingSet.add(cls));
+  }
+
+  return existingClasses.filter((cls) => !conflictingSet.has(cls));
+}
+
+/**
  * Update className in JSX/TSX source code with new Tailwind classes.
+ * Uses precise element finding when elementInfo is provided.
  * Preserves existing classes that don't conflict with new ones.
  *
  * @param sourceCode - The source code to modify
  * @param elementSelector - CSS selector or element path to identify the element
  * @param newClasses - Array of new Tailwind classes to add
+ * @param elementInfo - Optional SelectedElementInfo for precise element finding
+ * @returns Updated source code string (for backward compatibility)
  */
 export function updateElementClassName(
   sourceCode: string,
   elementSelector: string,
-  newClasses: string[]
+  newClasses: string[],
+  elementInfo?: SelectedElementInfo
 ): string {
-  const newPrefixes = extractClassPrefixes(newClasses);
+  const result = updateElementClassNameWithResult(
+    sourceCode,
+    elementSelector,
+    newClasses,
+    elementInfo
+  );
+  return result.sourceCode;
+}
 
-  // Try to find element by unique selector first
+/**
+ * Update className in JSX/TSX source code with new Tailwind classes.
+ * Returns detailed result including success status and warnings.
+ *
+ * @param sourceCode - The source code to modify
+ * @param elementSelector - CSS selector or element path to identify the element
+ * @param newClasses - Array of new Tailwind classes to add
+ * @param elementInfo - Optional SelectedElementInfo for precise element finding
+ * @returns UpdateClassNameResult with updated source code and metadata
+ */
+export function updateElementClassNameWithResult(
+  sourceCode: string,
+  elementSelector: string,
+  newClasses: string[],
+  elementInfo?: SelectedElementInfo
+): UpdateClassNameResult {
+  // Strategy 1: Use findElementInSource with elementInfo for precise element finding
+  if (elementInfo) {
+    const elementLocation = findElementInSource(sourceCode, elementInfo);
+
+    if (elementLocation) {
+      // Use updateClassNameAtLocation for precise updates with conflict resolution
+      const updatedSource = updateClassNameAtLocation(
+        sourceCode,
+        elementLocation,
+        newClasses
+      );
+
+      const warning =
+        elementLocation.confidence === "low"
+          ? "Element found with low confidence. Consider adding an id or data-testid attribute for more reliable updates."
+          : elementLocation.confidence === "medium"
+          ? "Element found with medium confidence. For best results, consider adding an id or data-testid attribute."
+          : undefined;
+
+      return {
+        sourceCode: updatedSource,
+        success: true,
+        method: "element-info",
+        warning,
+      };
+    }
+
+    console.warn(
+      "[style-mapper] Could not find element using elementInfo, trying selector fallback"
+    );
+  }
+
+  // Strategy 2: Try to find element by unique selector (id or data-attr)
   const elementPos = findElementBySelector(sourceCode, elementSelector);
 
   if (elementPos) {
-    // Found element by unique selector - update only this element
     const elementTag = sourceCode.slice(elementPos.start, elementPos.end);
-
-    // Find className in this specific element
     const classNameRegex =
       /className\s*=\s*(?:"([^"]*)"|'([^']*)'|{`([^`]*)`})/;
     const match = classNameRegex.exec(elementTag);
@@ -659,16 +839,13 @@ export function updateElementClassName(
         .split(/\s+/)
         .filter(Boolean);
 
-      // Filter out conflicting classes
-      const filteredClasses = existingClasses.filter((cls) => {
-        const prefix = cls.match(/^([a-z]+)-/)?.[1] || cls;
-        return !newPrefixes.has(prefix);
-      });
-
-      // Combine filtered existing classes with new classes
+      // Use comprehensive conflict resolution
+      const filteredClasses = removeConflictingClasses(
+        existingClasses,
+        newClasses
+      );
       const combinedClasses = [...filteredClasses, ...newClasses].join(" ");
 
-      // Determine quote style
       const fullMatch = match[0];
       const quote = fullMatch.includes('"')
         ? '"'
@@ -680,27 +857,34 @@ export function updateElementClassName(
           ? `className={\`${combinedClasses}\`}`
           : `className=${quote}${combinedClasses}${quote}`;
 
-      // Replace only in this element
       const updatedTag = elementTag.replace(fullMatch, newClassName);
-      return (
+      const updatedSource =
         sourceCode.slice(0, elementPos.start) +
         updatedTag +
-        sourceCode.slice(elementPos.end)
-      );
+        sourceCode.slice(elementPos.end);
+
+      return {
+        sourceCode: updatedSource,
+        success: true,
+        method: "selector",
+      };
     } else {
-      // No className found, add one before the closing >
       const insertPos = elementPos.end - 1;
       const newClassName = `className="${newClasses.join(" ")}"`;
-      return (
+      const updatedSource =
         sourceCode.slice(0, insertPos) +
         ` ${newClassName}` +
-        sourceCode.slice(insertPos)
-      );
+        sourceCode.slice(insertPos);
+
+      return {
+        sourceCode: updatedSource,
+        success: true,
+        method: "selector",
+      };
     }
   }
 
-  // Fallback: Update first matching className (legacy behavior)
-  // This is less precise but maintains backward compatibility
+  // Strategy 3: Fallback - Update first matching className (legacy behavior)
   console.warn(
     "[style-mapper] Could not find element by selector, using fallback"
   );
@@ -713,11 +897,11 @@ export function updateElementClassName(
       .split(/\s+/)
       .filter(Boolean);
 
-    const filteredClasses = existingClasses.filter((cls) => {
-      const prefix = cls.match(/^([a-z]+)-/)?.[1] || cls;
-      return !newPrefixes.has(prefix);
-    });
-
+    // Use comprehensive conflict resolution
+    const filteredClasses = removeConflictingClasses(
+      existingClasses,
+      newClasses
+    );
     const combinedClasses = [...filteredClasses, ...newClasses].join(" ");
 
     const fullMatch = match[0];
@@ -731,25 +915,39 @@ export function updateElementClassName(
         ? `className={\`${combinedClasses}\`}`
         : `className=${quote}${combinedClasses}${quote}`;
 
-    return sourceCode.replace(fullMatch, newClassName);
+    const updatedSource = sourceCode.replace(fullMatch, newClassName);
+
+    return {
+      sourceCode: updatedSource,
+      success: true,
+      method: "fallback",
+      warning:
+        "Element located using fallback method (first className match). " +
+        "This may affect the wrong element if multiple elements exist. " +
+        "Consider adding an id or data-testid attribute for reliable updates.",
+    };
   }
 
-  return sourceCode;
+  return {
+    sourceCode,
+    success: false,
+    method: "none",
+    error: "Could not find any className attribute in the source code.",
+  };
 }
 
 /**
  * Check if a Tailwind class is valid (basic validation)
  */
 export function isValidTailwindClass(className: string): boolean {
-  // Check for arbitrary value syntax
   if (/^[a-z]+-\[.+\]$/.test(className)) {
     return true;
   }
-
-  // Check for standard class patterns
   if (/^[a-z]+(-[a-z0-9]+)*$/.test(className)) {
     return true;
   }
-
   return false;
 }
+
+// Keep extractClassPrefixes for backward compatibility but mark as deprecated
+export { extractClassPrefixes };

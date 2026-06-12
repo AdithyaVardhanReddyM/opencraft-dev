@@ -33,6 +33,7 @@ export const OVERLAY_SCRIPT = `
 
   let isEditMode = false;
   let selectedElement = null;
+  let selectedElementVerification = null; // Stores verification data for selected element
   let hoveredElement = null;
   let highlightOverlay = null;
   let selectionOverlay = null;
@@ -314,11 +315,135 @@ export const OVERLAY_SCRIPT = `
   }
 
   // ============================================================================
+  // Enhanced Element Identification
+  // ============================================================================
+
+  /**
+   * Simple hash function for text content
+   * Used to help identify text elements uniquely
+   */
+  function hashTextContent(text) {
+    if (!text) return undefined;
+    // Simple djb2 hash
+    let hash = 5381;
+    for (let i = 0; i < text.length; i++) {
+      hash = ((hash << 5) + hash) + text.charCodeAt(i);
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(16);
+  }
+
+  /**
+   * Get the index of an element among all its siblings (not just same-tag)
+   */
+  function getChildIndex(element) {
+    if (!element.parentElement) return 0;
+    const children = Array.from(element.parentElement.children);
+    return children.indexOf(element);
+  }
+
+  /**
+   * Find the nearest ancestor with an ID and build the path from it
+   */
+  function getNearestIdAncestor(element) {
+    if (!element || element === document.body) return undefined;
+
+    const pathParts = [];
+    let current = element;
+    let depth = 0;
+
+    while (current && current !== document.body && current !== document.documentElement) {
+      const parent = current.parentElement;
+      if (!parent) break;
+
+      depth++;
+
+      // Build path segment for current element
+      let segment = current.tagName.toLowerCase();
+      const siblingIndex = getChildIndex(current);
+      segment += ':nth-child(' + (siblingIndex + 1) + ')';
+      pathParts.unshift(segment);
+
+      // Check if parent has an ID
+      if (parent.id && parent !== document.body) {
+        return {
+          id: parent.id,
+          pathFromAncestor: pathParts.join(' > '),
+          depth: depth,
+        };
+      }
+
+      current = parent;
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Get parent element information
+   */
+  function getParentInfo(element) {
+    const parent = element.parentElement;
+    if (!parent || parent === document.body) {
+      return { parentTagName: undefined, parentId: undefined };
+    }
+    return {
+      parentTagName: parent.tagName.toLowerCase(),
+      parentId: parent.id || undefined,
+    };
+  }
+
+  /**
+   * Create verification data for an element
+   * Used to verify the element hasn't been replaced by React re-rendering
+   */
+  function createElementVerification(element) {
+    return {
+      tagName: element.tagName,
+      id: element.id || null,
+      className: typeof element.className === 'string' ? element.className : '',
+      childIndex: getChildIndex(element),
+      textContentHash: hashTextContent(getTextContent(element)),
+      parentTagName: element.parentElement?.tagName || null,
+    };
+  }
+
+  /**
+   * Verify that the current selected element matches the stored verification data
+   * Returns true if the element appears to be the same, false otherwise
+   */
+  function verifySelectedElement() {
+    if (!selectedElement || !selectedElementVerification) return false;
+    
+    // Check if element is still in DOM
+    if (!document.body.contains(selectedElement)) return false;
+    
+    // Verify basic properties match
+    const current = createElementVerification(selectedElement);
+    
+    // Tag name must match
+    if (current.tagName !== selectedElementVerification.tagName) return false;
+    
+    // ID must match (if present)
+    if (selectedElementVerification.id && current.id !== selectedElementVerification.id) return false;
+    
+    // Child index should match (element position in parent)
+    if (current.childIndex !== selectedElementVerification.childIndex) return false;
+    
+    // Parent tag should match
+    if (current.parentTagName !== selectedElementVerification.parentTagName) return false;
+    
+    return true;
+  }
+
+  // ============================================================================
   // Element Selection Info
   // ============================================================================
 
   function getSelectedElementInfo(element) {
     const rect = element.getBoundingClientRect();
+    const textContent = getTextContent(element);
+    const parentInfo = getParentInfo(element);
 
     return {
       tagName: element.tagName.toLowerCase(),
@@ -333,10 +458,16 @@ export const OVERLAY_SCRIPT = `
       },
       elementPath: getElementPath(element),
       sourceFile: element.dataset?.sourceFile || undefined,
-      textContent: getTextContent(element),
+      textContent: textContent,
       uniqueIdentifier: generateUniqueIdentifier(element),
       siblingIndex: getSiblingIndex(element),
       dataAttributes: getDataAttributes(element),
+      // Enhanced identification fields
+      parentTagName: parentInfo.parentTagName,
+      parentId: parentInfo.parentId,
+      childIndex: getChildIndex(element),
+      nearestIdAncestor: getNearestIdAncestor(element),
+      textContentHash: hashTextContent(textContent),
     };
   }
 
@@ -417,14 +548,16 @@ export const OVERLAY_SCRIPT = `
     if (!isSelectableElement(target)) {
       if (selectedElement) {
         selectedElement = null;
+        selectedElementVerification = null;
         hideSelection();
         window.parent.postMessage({ type: 'element-deselected' }, '*');
       }
       return;
     }
 
-    // Select the element
+    // Select the element and store verification data
     selectedElement = target;
+    selectedElementVerification = createElementVerification(target);
     updateSelection(target);
 
     // Notify parent with element info
@@ -454,6 +587,7 @@ export const OVERLAY_SCRIPT = `
         isEditMode = false;
         document.body.style.cursor = '';
         selectedElement = null;
+        selectedElementVerification = null;
         hoveredElement = null;
         hideHighlight();
         hideSelection();
@@ -462,17 +596,58 @@ export const OVERLAY_SCRIPT = `
       case 'apply-style':
         if (selectedElement && data.property && data.value !== undefined) {
           try {
+            // Verify element still exists and hasn't been replaced
+            if (!verifySelectedElement()) {
+              console.warn('[EditMode] Selected element verification failed - element may have been replaced');
+              window.parent.postMessage({
+                type: 'edit-mode-error',
+                error: 'Selected element has changed or no longer exists. Please re-select the element.',
+              }, '*');
+              selectedElement = null;
+              selectedElementVerification = null;
+              hideSelection();
+              break;
+            }
+            
             selectedElement.style[data.property] = data.value;
             // Update selection overlay position in case size changed
             updateSelection(selectedElement);
           } catch (err) {
             console.error('[EditMode] Failed to apply style:', err);
+            window.parent.postMessage({
+              type: 'edit-mode-error',
+              error: 'Failed to apply style: ' + (err.message || 'Unknown error'),
+            }, '*');
+          }
+        }
+        break;
+
+      case 'revert-styles':
+        if (selectedElement && data.properties && Array.isArray(data.properties)) {
+          try {
+            // Verify element still exists
+            if (!verifySelectedElement()) {
+              console.warn('[EditMode] Cannot revert styles - element verification failed');
+              break;
+            }
+            
+            // Remove inline styles for the specified properties
+            for (const property of data.properties) {
+              selectedElement.style[property] = '';
+            }
+            
+            // Update selection overlay position in case size changed
+            updateSelection(selectedElement);
+            console.log('[EditMode] Reverted styles for properties:', data.properties);
+          } catch (err) {
+            console.error('[EditMode] Failed to revert styles:', err);
           }
         }
         break;
 
       case 'deselect':
         selectedElement = null;
+        selectedElementVerification = null;
         hideSelection();
         window.parent.postMessage({ type: 'element-deselected' }, '*');
         break;

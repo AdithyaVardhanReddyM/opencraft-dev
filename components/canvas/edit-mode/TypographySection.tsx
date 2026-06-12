@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ComputedStylesInfo, StyleChanges } from "@/lib/edit-mode/types";
+import { rgbToHex } from "@/lib/edit-mode/style-mapper";
 
 // ============================================================================
 // Types
@@ -98,16 +99,6 @@ function parseLetterSpacing(value: string): number {
     return Math.round(numValue * 100);
   }
   return Math.round(numValue);
-}
-
-function rgbToHex(rgb: string): string {
-  if (rgb.startsWith("#")) return rgb;
-  const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (!match) return "#000000";
-  const r = parseInt(match[1], 10);
-  const g = parseInt(match[2], 10);
-  const b = parseInt(match[3], 10);
-  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
 
 function getFontFamilyLabel(value: string): string {
