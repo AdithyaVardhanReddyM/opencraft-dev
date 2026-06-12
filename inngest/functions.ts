@@ -95,6 +95,7 @@ export const runChatAgent = inngest.createFunction(
       userId,
       modelId: eventModelId,
       imageUrls: eventImageUrls,
+      clerkId,
     } = event.data;
 
     // Extract message content - prefer userMessage.content, fall back to legacy message
@@ -107,6 +108,54 @@ export const runChatAgent = inngest.createFunction(
       | undefined;
     const modelId = stateModelId || eventModelId || DEFAULT_MODEL_ID;
     const imageUrls = stateImageUrls || eventImageUrls || [];
+
+    // Step 0: Check generation limit before proceeding
+    if (clerkId) {
+      const canGenerateResult = await step.run(
+        "check-generation-limit",
+        async () => {
+          const convexHttpUrl = getConvexHttpUrl();
+          const response = await fetch(`${convexHttpUrl}/inngest/canGenerate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clerkId }),
+          });
+          if (!response.ok) {
+            return { canGenerate: true }; // Allow on error to not block users
+          }
+          return (await response.json()) as {
+            canGenerate: boolean;
+            reason?: string;
+            remaining?: number;
+          };
+        }
+      );
+
+      if (!canGenerateResult.canGenerate) {
+        // Create error message and return early
+        if (screenId) {
+          await step.run("create-limit-reached-message", async () => {
+            const convexHttpUrl = getConvexHttpUrl();
+            await fetch(`${convexHttpUrl}/inngest/createMessage`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                screenId,
+                role: "assistant",
+                content:
+                  "You've reached your generation limit of 10. Thank you for trying Unit {set}! Stay tuned for more updates.",
+              }),
+            });
+          });
+        }
+        return {
+          screenId,
+          projectId,
+          isError: true,
+          errorType: "GENERATION_LIMIT_REACHED",
+        };
+      }
+    }
 
     // Step 1: Get screen to check for existing sandbox
     const screen = await step.run("get-screen", async () => {
@@ -654,6 +703,18 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
 
         return { success: true };
       });
+
+      // Increment generation count on successful generation
+      if (clerkId) {
+        await step.run("increment-generation-count", async () => {
+          const convexHttpUrl = getConvexHttpUrl();
+          await fetch(`${convexHttpUrl}/inngest/incrementGeneration`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clerkId }),
+          });
+        });
+      }
     }
 
     // Handle error case - create error message

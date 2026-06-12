@@ -75,7 +75,7 @@ import {
 } from "@/lib/ai-models";
 import { CreditBar } from "@/components/canvas/CreditBar";
 import { nanoid } from "nanoid";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 
@@ -144,6 +144,21 @@ export function AISidebar({
 }) {
   const [activeTab, setActiveTab] = useState("chat");
 
+  // Get generation stats for the user
+  const generationStats = useQuery(api.users.getGenerationStats);
+  const getOrCreateUser = useMutation(api.users.getOrCreateUser);
+
+  // Ensure user record exists on mount
+  useEffect(() => {
+    if (generationStats === null) {
+      getOrCreateUser();
+    }
+  }, [generationStats, getOrCreateUser]);
+
+  const generationsRemaining = generationStats?.generationsRemaining ?? 10;
+  const generationsLimit = generationStats?.generationsLimit ?? 10;
+  const canGenerate = generationsRemaining > 0;
+
   // Use the streaming hook for chat functionality
   const {
     messages,
@@ -161,6 +176,7 @@ export function AISidebar({
   });
 
   const handleSuggestionClick = (suggestion: string) => {
+    if (!canGenerate) return;
     sendMessage(suggestion);
   };
 
@@ -266,6 +282,7 @@ export function AISidebar({
               <EmptyChat
                 hasScreen={!!selectedScreenId}
                 onSuggestionClick={handleSuggestionClick}
+                canGenerate={canGenerate}
               />
             ) : (
               <Conversation className="flex-1">
@@ -295,6 +312,9 @@ export function AISidebar({
               initialPrompt={initialPrompt}
               initialModelId={initialModelId}
               onInitialDataConsumed={onInitialDataConsumed}
+              generationsRemaining={generationsRemaining}
+              generationsLimit={generationsLimit}
+              canGenerate={canGenerate}
             />
           </TabsContent>
 
@@ -356,9 +376,11 @@ function LoadingHistory() {
 function EmptyChat({
   hasScreen,
   onSuggestionClick,
+  canGenerate,
 }: {
   hasScreen: boolean;
   onSuggestionClick: (suggestion: string) => void;
+  canGenerate: boolean;
 }) {
   if (!hasScreen) {
     return (
@@ -391,14 +413,20 @@ function EmptyChat({
       {/* Suggestions */}
       <div className="w-full space-y-2">
         <p className="text-xs text-muted-foreground/70 text-center mb-3">
-          Try one of these
+          {canGenerate ? "Try one of these" : "Generation limit reached"}
         </p>
         <div className="flex flex-wrap justify-center gap-2">
           {SUGGESTIONS.map((suggestion) => (
             <button
               key={suggestion}
               onClick={() => onSuggestionClick(suggestion)}
-              className="px-3 py-1.5 text-xs rounded-full bg-muted/40 hover:bg-muted/70 text-muted-foreground hover:text-foreground border border-border/30 hover:border-border/50 transition-all duration-200"
+              disabled={!canGenerate}
+              className={cn(
+                "px-3 py-1.5 text-xs rounded-full border transition-all duration-200",
+                canGenerate
+                  ? "bg-muted/40 hover:bg-muted/70 text-muted-foreground hover:text-foreground border-border/30 hover:border-border/50"
+                  : "bg-muted/20 text-muted-foreground/50 border-border/20 cursor-not-allowed"
+              )}
             >
               {suggestion}
             </button>
@@ -563,6 +591,9 @@ function ChatInput({
   initialPrompt,
   initialModelId,
   onInitialDataConsumed,
+  generationsRemaining,
+  generationsLimit,
+  canGenerate,
 }: {
   onSubmit: (
     message: PromptInputMessage,
@@ -577,6 +608,9 @@ function ChatInput({
   initialPrompt?: string;
   initialModelId?: string;
   onInitialDataConsumed?: () => void;
+  generationsRemaining: number;
+  generationsLimit: number;
+  canGenerate: boolean;
 }) {
   const [inputValue, setInputValue] = useState("");
   const [extensionContent, setExtensionContent] =
@@ -771,8 +805,11 @@ function ChatInput({
 
       {/* Credit bar and input container */}
       <div className="rounded-xl overflow-hidden border border-border/40 bg-muted/30 hover:bg-muted/40 transition-colors focus-within:bg-muted/50 focus-within:border-border/60 focus-within:ring-[3px] focus-within:ring-primary/70 focus-within:ring-offset-0 focus-within:shadow-[0_0_24px_rgba(249,115,22,0.35)]">
-        {/* Credit Bar */}
-        <CreditBar credits={30} selectedModelId={selectedModel} />
+        {/* Generation Limit Bar */}
+        <CreditBar
+          generationsRemaining={generationsRemaining}
+          generationsLimit={generationsLimit}
+        />
 
         <PromptInput
           onSubmit={handleSubmit}
@@ -815,16 +852,19 @@ function ChatInput({
 
             <PromptInputTextarea
               placeholder={
-                extensionContent
+                !canGenerate
+                  ? "Generation limit reached"
+                  : extensionContent
                   ? "Add instructions for replication..."
                   : pendingImages.length > 0
                   ? "Describe what you want to do with these images..."
                   : "Ask AI anything..."
               }
-              className="min-h-[36px] max-h-[120px] text-sm placeholder:text-muted-foreground/50 bg-transparent border-none shadow-none focus-visible:ring-0"
+              className="min-h-[36px] max-h-[120px] text-sm placeholder:text-muted-foreground/50 bg-transparent border-none shadow-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
               value={inputValue}
               onChange={handleInputChange}
               onPaste={handlePaste}
+              disabled={!canGenerate}
             />
           </PromptInputBody>
           <PromptInputFooter className="justify-between px-2 pb-2">
@@ -903,6 +943,7 @@ function ChatInput({
               status={status}
               size="icon-sm"
               className="h-8 w-8 rounded-lg"
+              disabled={!canGenerate}
             />
           </PromptInputFooter>
         </PromptInput>

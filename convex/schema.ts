@@ -2,6 +2,15 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  // User generation tracking
+  users: defineTable({
+    clerkId: v.string(), // Clerk user ID (subject)
+    generationsUsed: v.number(), // Number of successful generations
+    generationsLimit: v.number(), // Max generations allowed (default: 10)
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_clerkId", ["clerkId"]),
+
   projects: defineTable({
     userId: v.string(), // Clerk user ID
     name: v.string(),

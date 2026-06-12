@@ -76,6 +76,8 @@ export async function POST(req: NextRequest) {
           projectId,
           userId,
           channelKey: channelKey || `screen:${screenId}`,
+          // Pass clerkId for generation limit tracking
+          clerkId: userId,
         },
       });
 
@@ -150,6 +152,8 @@ async function handleUseAgentFormat(
       projectId,
       modelId,
       imageUrls,
+      // Pass clerkId for generation limit tracking
+      clerkId: authUserId,
     },
   });
 

@@ -187,4 +187,86 @@ http.route({
   }),
 });
 
+/**
+ * HTTP endpoint for Inngest workflow to check if user can generate
+ */
+http.route({
+  path: "/inngest/canGenerate",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const { clerkId } = await request.json();
+
+      if (!clerkId) {
+        return new Response(JSON.stringify({ error: "clerkId is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const result = await ctx.runQuery(internal.users.internalCanGenerate, {
+        clerkId,
+      });
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error checking generation limit:", error);
+      return new Response(
+        JSON.stringify({
+          error: error instanceof Error ? error.message : "Internal error",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+  }),
+});
+
+/**
+ * HTTP endpoint for Inngest workflow to increment generation count
+ * Called only on successful generation (no error)
+ */
+http.route({
+  path: "/inngest/incrementGeneration",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const { clerkId } = await request.json();
+
+      if (!clerkId) {
+        return new Response(JSON.stringify({ error: "clerkId is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const result = await ctx.runMutation(
+        internal.users.internalIncrementGeneration,
+        { clerkId }
+      );
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error incrementing generation:", error);
+      return new Response(
+        JSON.stringify({
+          error: error instanceof Error ? error.message : "Internal error",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+  }),
+});
+
 export default http;
