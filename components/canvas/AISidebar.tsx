@@ -829,8 +829,8 @@ function ChatInput({
           </PromptInputBody>
           <PromptInputFooter className="justify-between px-2 pb-2">
             <PromptInputTools>
-              {/* Add Image Button - hide for xAI Grok (free tier doesn't support vision) */}
-              {selectedModel !== DEFAULT_MODEL_ID && (
+              {/* Add Image Button - only show for models that support vision */}
+              {modelSupportsVision(selectedModel) && (
                 <PromptInputActionMenu>
                   <PromptInputActionMenuTrigger />
                   <PromptInputActionMenuContent>

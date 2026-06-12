@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
@@ -10,11 +9,15 @@ import { ProjectSortOption } from "@/types/project";
 import { Separator } from "@/components/ui/separator";
 import { ModeToggle } from "../mode-toggle";
 
+type TabId = (typeof TABS)[number]["id"];
+
 interface DashboardHeaderProps {
   sortBy: ProjectSortOption;
   onSortChange: (sort: ProjectSortOption) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  activeTab: TabId;
+  onTabChange: (tab: TabId) => void;
 }
 
 const TABS = [
@@ -22,16 +25,16 @@ const TABS = [
   { id: "shared-with-you", label: "Shared with You" },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+export type { TabId };
 
 export function DashboardHeader({
   sortBy,
   onSortChange,
   searchQuery,
   onSearchChange,
+  activeTab,
+  onTabChange,
 }: DashboardHeaderProps) {
-  const [activeTab, setActiveTab] = useState<TabId>("your-projects");
-
   return (
     <header className="bg-accent">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -54,7 +57,7 @@ export function DashboardHeader({
               {TABS.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => onTabChange(tab.id)}
                   className="relative z-10 rounded-full px-4 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   {activeTab === tab.id && (

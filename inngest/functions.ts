@@ -78,7 +78,7 @@ const extractTitle = (content: string): string => {
 const SANDBOX_AUTO_PAUSE_TIMEOUT_MS = 15 * 60 * 1000;
 
 // Default model ID
-const DEFAULT_MODEL_ID = "x-ai/grok-4.1-fast:free";
+const DEFAULT_MODEL_ID = "openai/gpt-5.1";
 
 // Chat function - directly invoke agent without network
 export const runChatAgent = inngest.createFunction(

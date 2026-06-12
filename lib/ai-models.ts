@@ -16,10 +16,10 @@ export interface AIModel {
  * Models are grouped by provider for the selector UI
  */
 export const AI_MODELS: AIModel[] = [
-  // xAI (default) - free tier doesn't support vision
+  // xAI (default)
   {
-    id: "x-ai/grok-4.1-fast:free",
-    name: "Grok 4.1 Fast",
+    id: "x-ai/grok-code-fast-1",
+    name: "Grok Code Fast",
     provider: "xAI",
     providerSlug: "xai",
     supportsVision: false,
@@ -36,25 +36,16 @@ export const AI_MODELS: AIModel[] = [
 
   // Anthropic
   {
-    id: "anthropic/claude-opus-4.5",
-    name: "Claude Opus 4.5",
+    id: "anthropic/claude-sonnet-4.5",
+    name: "Claude Sonnet 4.5",
     provider: "Anthropic",
     providerSlug: "anthropic",
     supportsVision: true,
   },
-
-  // Google
-  {
-    id: "google/gemini-3-pro-preview",
-    name: "Gemini 3 Pro",
-    provider: "Google",
-    providerSlug: "google",
-    supportsVision: true,
-  },
 ];
 
-/** Default model ID - xAI Grok */
-export const DEFAULT_MODEL_ID = "x-ai/grok-4.1-fast:free";
+/** Default model ID - OpenAI GPT-5.1 */
+export const DEFAULT_MODEL_ID = "openai/gpt-5.1";
 
 /**
  * Get a model by its ID

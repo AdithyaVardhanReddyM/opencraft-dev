@@ -1,16 +1,14 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
  * Credit cost per generation by model provider
  */
 export const MODEL_CREDITS: Record<string, number> = {
-  "x-ai/grok-4.1-fast:free": 1,
+  "x-ai/grok-code-fast-1": 1,
   "openai/gpt-5.1": 2,
-  "anthropic/claude-opus-4.5": 5,
-  "google/gemini-3-pro-preview": 3,
+  "anthropic/claude-sonnet-4.5": 3,
 };
 
 /**
