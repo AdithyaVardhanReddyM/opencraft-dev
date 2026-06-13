@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   ArrowRight,
@@ -9,12 +10,20 @@ import {
   Headphones,
   Wallet,
   MessageCircle,
+  Loader2,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
 
 export default function Page() {
   const spotlightRefs = useRef<HTMLDivElement[]>([]);
+  const router = useRouter();
+  const [isNavigating, setIsNavigating] = useState<string | null>(null);
+
+  const handleNavigate = (buttonId: string) => {
+    setIsNavigating(buttonId);
+    router.push("/dashboard");
+  };
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -104,14 +113,17 @@ export default function Page() {
 
         {/* Action Button */}
         <Button
-          asChild
           size="sm"
-          className="flex gap-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors group text-xs font-semibold rounded-full py-2 px-4 items-center"
+          onClick={() => handleNavigate("nav")}
+          disabled={isNavigating === "nav"}
+          className="flex gap-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors group text-xs font-semibold rounded-full py-2 px-4 items-center disabled:opacity-70"
         >
-          <Link href="/dashboard">
-            Get Started
+          Get Started
+          {isNavigating === "nav" ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
             <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-          </Link>
+          )}
         </Button>
       </nav>
 
@@ -142,12 +154,17 @@ export default function Page() {
 
           <div className="flex flex-col sm:flex-row gap-5 items-center justify-center">
             {/* Animated Shiny CTA Button */}
-            <Link
-              href="/dashboard"
-              className="landing-shiny-cta focus:outline-hidden"
+            <button
+              onClick={() => handleNavigate("hero")}
+              disabled={isNavigating === "hero"}
+              className="landing-shiny-cta focus:outline-hidden disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              <span>Start Designing</span>
-            </Link>
+              {isNavigating === "hero" ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <span>Start Designing</span>
+              )}
+            </button>
 
             {/* Secondary Button */}
             <button className="hover:bg-white/10 hover:text-white transition-all flex text-sm font-medium text-slate-300 bg-white/5 rounded-full py-5 px-10 gap-2 items-center group landing-border-gradient">
@@ -514,12 +531,17 @@ export default function Page() {
                 </div>
 
                 {/* CTA Button */}
-                <Link
-                  href="/dashboard"
-                  className="landing-shiny-cta group !px-7 !py-3"
+                <button
+                  onClick={() => handleNavigate("philosophy")}
+                  disabled={isNavigating === "philosophy"}
+                  className="landing-shiny-cta group !px-7 !py-3 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  <span className="text-sm font-medium">Start Designing</span>
-                </Link>
+                  {isNavigating === "philosophy" ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <span className="text-sm font-medium">Start Designing</span>
+                  )}
+                </button>
               </div>
             </div>
           </div>

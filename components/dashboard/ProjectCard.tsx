@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Trash2, Sparkles, Calendar, Pencil } from "lucide-react";
+import { Trash2, Sparkles, Calendar, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/lib/date-utils";
 import { getGradientColors } from "@/lib/gradient-utils";
@@ -26,6 +26,7 @@ export function ProjectCard({
   const router = useRouter();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   // Get gradient colors based on project number
   const gradientColors = useMemo(() => {
@@ -33,6 +34,7 @@ export function ProjectCard({
   }, [project.projectNumber]);
 
   const handleCardClick = () => {
+    setIsNavigating(true);
     router.push(`/dashboard/${project._id}/canvas`);
   };
 
@@ -125,10 +127,18 @@ export function ProjectCard({
 
         {/* Project Details - Compact Footer */}
         <div className="relative z-10 px-4 py-3">
-          {/* Title */}
-          <h2 className="font-semibold text-base leading-tight line-clamp-1 text-primary mb-2">
-            {project.name}
-          </h2>
+          {/* Title Row */}
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold text-base leading-tight line-clamp-1 text-primary">
+              {project.name}
+            </h2>
+            {isNavigating && (
+              <span className="flex items-center gap-1.5 text-xs text-primary shrink-0">
+                <Loader2 className="size-3.5 animate-spin" />
+                Redirecting
+              </span>
+            )}
+          </div>
 
           {/* Timestamps Row - Spread to corners */}
           <div className="flex items-center justify-between text-xs text-muted-foreground">

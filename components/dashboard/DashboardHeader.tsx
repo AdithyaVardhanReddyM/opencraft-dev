@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
+import { dark } from "@clerk/themes";
 import { motion } from "framer-motion";
 import { ProjectFilters } from "@/components/dashboard/ProjectFilters";
 import { ProjectSortOption } from "@/types/project";
@@ -90,6 +91,7 @@ export function DashboardHeader({
 
             <UserButton
               appearance={{
+                baseTheme: dark,
                 elements: {
                   avatarBox: "ring-2 ring-primary",
                 },
