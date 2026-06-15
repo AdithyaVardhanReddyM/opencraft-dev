@@ -109,6 +109,35 @@ function requiresReasoningTokens(modelId: string): boolean {
   return REASONING_MODELS.some((m) => modelId.includes(m));
 }
 
+/**
+ * Send a server-side track event to Pendo
+ */
+async function trackPendoEvent(
+  event: string,
+  visitorId: string,
+  properties: Record<string, unknown> = {}
+) {
+  try {
+    await fetch("https://data.pendo.io/data/track", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-pendo-integration-key": "650460f8-9d7d-48e5-bb97-7ee1e1ed158b",
+      },
+      body: JSON.stringify({
+        type: "track",
+        event,
+        visitorId,
+        accountId: "system",
+        timestamp: Date.now(),
+        properties,
+      }),
+    });
+  } catch (e) {
+    console.error("[Pendo] Failed to track event:", event, e);
+  }
+}
+
 // Chat function - directly invoke agent without network
 export const runChatAgent = inngest.createFunction(
   { id: "run-chat-agent" },
@@ -177,6 +206,13 @@ export const runChatAgent = inngest.createFunction(
             });
           });
         }
+        await step.run("track-pendo-limit-reached", async () => {
+          await trackPendoEvent("generation_limit_reached", clerkId, {
+            screen_id: screenId,
+            project_id: projectId,
+          });
+        });
+
         return {
           screenId,
           projectId,
@@ -801,6 +837,22 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
           });
         });
       }
+
+      // Track successful AI generation in Pendo
+      await step.run("track-pendo-generation-completed", async () => {
+        await trackPendoEvent(
+          "ai_generation_completed",
+          clerkId || "system",
+          {
+            screen_id: screenId,
+            project_id: projectId,
+            model_id: modelId,
+            files_count: Object.keys(result.state.data.files || {}).length,
+            has_title: !!result.state.data.title,
+            sandbox_id: sandboxId,
+          }
+        );
+      });
     }
 
     // Handle error case - create error message
@@ -825,6 +877,19 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
         }
 
         return { success: true };
+      });
+
+      // Track failed AI generation in Pendo
+      await step.run("track-pendo-generation-failed", async () => {
+        await trackPendoEvent(
+          "ai_generation_failed",
+          clerkId || "system",
+          {
+            screen_id: screenId,
+            project_id: projectId,
+            model_id: modelId,
+          }
+        );
       });
     }
 

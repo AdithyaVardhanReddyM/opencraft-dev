@@ -32,6 +32,10 @@ export function ShareCanvasModal({
     // Fake delay for UX
     await new Promise((resolve) => setTimeout(resolve, 800));
 
+    pendo.track("share_invite_sent", {
+      total_invites_in_session: invitedEmails.length + 1,
+    });
+
     setInvitedEmails((prev) => [...prev, email.trim()]);
     setEmail("");
     setIsInviting(false);

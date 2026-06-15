@@ -522,6 +522,13 @@ export function useEditMode({
       setPendingChanges(null);
       retryCountRef.current = 0;
 
+      pendo.track("visual_edit_saved", {
+        sandbox_id: sandboxId,
+        source_file_path: sourceFilePath,
+        changed_properties_count: tailwindClasses.length,
+        update_method: updateResult.method || "unknown",
+      });
+
       console.log("[useEditMode] Changes saved successfully");
     } catch (error) {
       console.error("[useEditMode] Failed to save changes:", error);

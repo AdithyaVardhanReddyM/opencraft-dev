@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   Search,
   RotateCcw,
@@ -32,6 +33,22 @@ export function ProjectFilters({
   searchQuery,
   onSearchChange,
 }: ProjectFiltersProps) {
+  // Debounced search tracking
+  const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (!searchQuery.trim()) return;
+    searchTimerRef.current = setTimeout(() => {
+      pendo.track("project_searched", {
+        search_query: searchQuery.trim(),
+        query_length: searchQuery.trim().length,
+      });
+    }, 500);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [searchQuery]);
+
   const hasFilters = searchQuery || sortBy !== "newest";
 
   const handleReset = () => {

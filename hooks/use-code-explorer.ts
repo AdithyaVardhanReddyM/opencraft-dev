@@ -163,6 +163,12 @@ export function useCodeExplorer({
       const cachedContent = getContentFromCache(path, cachedFiles);
       if (cachedContent !== null) {
         setFileContent(cachedContent);
+        pendo.track("code_file_viewed", {
+          file_path: path,
+          file_extension: path.includes(".") ? path.split(".").pop() || "" : "",
+          from_cache: true,
+          sandbox_id: sandboxId || "",
+        });
         return;
       }
 
@@ -173,6 +179,12 @@ export function useCodeExplorer({
       try {
         const content = await fetchFileContent(path);
         setFileContent(content);
+        pendo.track("code_file_viewed", {
+          file_path: path,
+          file_extension: path.includes(".") ? path.split(".").pop() || "" : "",
+          from_cache: false,
+          sandbox_id: sandboxId || "",
+        });
       } catch (error) {
         setContentError(
           error instanceof Error ? error.message : "Failed to load file"
@@ -181,7 +193,7 @@ export function useCodeExplorer({
         setIsLoadingContent(false);
       }
     },
-    [cachedFiles, fetchFileContent]
+    [cachedFiles, fetchFileContent, sandboxId]
   );
 
   /**

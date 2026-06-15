@@ -50,6 +50,11 @@ export function DeleteProjectDialog({
         // Perform actual deletion
         await deleteProject({ projectId: project._id });
 
+        pendo.track("project_deleted", {
+          project_name: project.name,
+          project_id: String(project._id),
+        });
+
         // Show success toast
         toast.success("Project deleted", {
           description: `"${project.name}" has been deleted successfully.`,
