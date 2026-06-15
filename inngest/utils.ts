@@ -9,7 +9,7 @@ export interface ConvexMessage {
   screenId: string;
   role: "user" | "assistant";
   content: string;
-  reasoningDetails?: unknown; // Reasoning details for models like Gemini 3 Pro
+  reasoningDetails?: unknown; // Reasoning details for reasoning models
   createdAt: number;
 }
 
@@ -56,7 +56,7 @@ export function lastAssistantTextMessageContent(result: AgentResult) {
 }
 
 /**
- * Extended message type that includes reasoning_details for models like Gemini 3 Pro
+ * Extended message type that includes reasoning_details for reasoning models
  * We use intersection type to ensure compatibility with Message while adding reasoning_details
  */
 export type ExtendedMessage = Message & {
@@ -78,7 +78,7 @@ export function formatMessagesForAgent(messages: ConvexMessage[]): Message[] {
       content: msg.content,
     };
 
-    // Include reasoning_details if present (required for Gemini 3 Pro multi-turn)
+    // Include reasoning_details if present (required for reasoning model multi-turn)
     // This is passed through to the API even though it's not in the Message type
     // We cast to unknown first then to Message to allow the extra property
     if (msg.reasoningDetails) {

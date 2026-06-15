@@ -24,12 +24,12 @@ export function ScreenPreview({ x, y, w, h }: ScreenPreviewProps) {
       }}
     >
       <div
-        className="w-full h-full rounded-lg border-2 border-dashed border-orange-500/60 bg-orange-500/5 flex items-center justify-center"
+        className="w-full h-full rounded-lg border-2 border-dashed border-primary/60 bg-primary/5 flex items-center justify-center"
         style={{
           backdropFilter: "blur(4px)",
         }}
       >
-        <div className="flex flex-col items-center gap-2 text-orange-500/80">
+        <div className="flex flex-col items-center gap-2 text-primary/80">
           <Monitor className="w-8 h-8" />
           <span className="text-sm font-medium">Screen</span>
           <span className="text-xs opacity-60">

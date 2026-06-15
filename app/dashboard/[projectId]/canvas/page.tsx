@@ -23,6 +23,7 @@ import {
   LayersSidebarToggle,
 } from "@/components/canvas/LayersSidebar";
 import { AISidebar } from "@/components/canvas/AISidebar";
+import { DEFAULT_MODEL_ID } from "@/lib/ai-models";
 import { getShapeCenter } from "@/lib/canvas/layers-sidebar-utils";
 import { getFramesWithContainedShapes } from "@/lib/canvas/containment-utils";
 import { captureFrameAsImage } from "@/lib/canvas/canvas-capture";
@@ -113,7 +114,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
         const shape = shapes.find((s) => s.id === id);
         if (!shape) return;
 
-        let patch: Record<string, unknown> = {};
+        const patch: Record<string, unknown> = {};
 
         switch (property) {
           case "strokeType":
@@ -144,6 +145,11 @@ function CanvasContent({ projectId }: { projectId: string }) {
           case "cornerType":
             if (shape.type === "rect") {
               patch.borderRadius = cornerTypeToRadius(value as CornerType);
+            }
+            break;
+          case "arrowType":
+            if (shape.type === "arrow") {
+              patch.arrowType = value;
             }
             break;
           case "fontFamily":
@@ -509,7 +515,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
   // Show loading state while initial data is being fetched
   if (isLoading) {
     return (
-      <div className="relative h-screen w-full overflow-hidden bg-accent flex items-center justify-center">
+      <div className="relative h-screen w-full overflow-hidden bg-canvas flex items-center justify-center">
         <Shimmer className="text-sm" duration={1.5} spread={3}>
           Loading canvas...
         </Shimmer>
@@ -519,7 +525,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
 
   return (
     <div
-      className="relative h-screen w-full overflow-hidden bg-accent"
+      className="relative h-screen w-full overflow-hidden bg-canvas"
       style={{ overscrollBehavior: "none" }}
     >
       {/* Delete Screen Confirmation Modal */}
@@ -564,9 +570,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
             ? "Generate a full blown professional/modern web page/component based on this user's sketch/wireframe"
             : undefined
         }
-        initialModelId={
-          generationContext ? "google/gemini-3-pro-preview" : undefined
-        }
+        initialModelId={generationContext ? DEFAULT_MODEL_ID : undefined}
         onInitialDataConsumed={() => setGenerationContext(null)}
       />
 
@@ -749,6 +753,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
                 <ArrowPreview
                   startWorld={draftShape.startWorld}
                   currentWorld={draftShape.currentWorld}
+                  arrowType={defaultProperties.arrowType}
                 />
               )}
             </>

@@ -9,12 +9,16 @@ export type StrokeWidthPreset = "thin" | "normal" | "thick";
 // Corner type options
 export type CornerType = "sharp" | "rounded";
 
+// Arrow routing options
+export type ArrowType = "straight" | "elbow";
+
 // Control types that can be displayed in the properties bar
 export type ControlType =
   | "strokeType"
   | "strokeWidth"
   | "color"
   | "cornerType"
+  | "arrowType"
   | "fontFamily"
   | "textAlign"
   | "textColor"
@@ -50,7 +54,7 @@ export const CORNER_RADIUS_MAP: Record<CornerType, number> = {
 
 // Curated color palette for dark mode canvas
 export const COLOR_PALETTE = [
-  "#ffffff", // White
+  "#000000", // Black
   "#a1a1aa", // Zinc 400
   "#f87171", // Red 400
   "#fb923c", // Orange 400
@@ -64,7 +68,7 @@ export const COLOR_PALETTE = [
 
 // Frame fill color palette - subtle tints that work well on dark canvas
 export const FRAME_FILL_PALETTE = [
-  "rgba(255, 255, 255, 0.05)", // Default - subtle white
+  "rgba(226, 226, 226, 0.9)", // Default - light gray
   "rgba(251, 146, 60, 0.08)", // Pale orange
   "rgba(96, 165, 250, 0.08)", // Pale blue
   "rgba(74, 222, 128, 0.08)", // Pale green
@@ -82,13 +86,15 @@ export interface ShapeDefaultProperties {
   strokeWidth: StrokeWidthPreset;
   strokeColor: string;
   cornerType: CornerType;
+  arrowType: ArrowType;
 }
 
 export const DEFAULT_SHAPE_PROPERTIES: ShapeDefaultProperties = {
   strokeType: "solid",
-  strokeWidth: "normal",
-  strokeColor: "#ffffff",
-  cornerType: "rounded",
+  strokeWidth: "thin",
+  strokeColor: "#000000",
+  cornerType: "sharp",
+  arrowType: "elbow",
 };
 
 // Tools that support shape properties
@@ -108,6 +114,7 @@ const TOOLS_WITH_COLOR: Tool[] = [
   "freedraw",
 ];
 const TOOLS_WITH_CORNER_TYPE: Tool[] = ["rect"];
+const TOOLS_WITH_ARROW_TYPE: Tool[] = ["arrow"];
 const TOOLS_WITH_FONT_FAMILY: Tool[] = ["text"];
 const TOOLS_WITH_TEXT_ALIGN: Tool[] = ["text"];
 const TOOLS_WITH_TEXT_COLOR: Tool[] = ["text"];
@@ -125,6 +132,7 @@ const SHAPES_WITH_STROKE_TYPE = [
 const SHAPES_WITH_STROKE_WIDTH = ["rect", "ellipse"];
 const SHAPES_WITH_COLOR = ["rect", "ellipse", "line", "arrow", "freedraw"];
 const SHAPES_WITH_CORNER_TYPE = ["rect"];
+const SHAPES_WITH_ARROW_TYPE = ["arrow"];
 const SHAPES_WITH_FONT_FAMILY = ["text"];
 const SHAPES_WITH_TEXT_ALIGN = ["text"];
 const SHAPES_WITH_TEXT_COLOR = ["text"];
@@ -210,6 +218,9 @@ export function getControlsForTool(tool: Tool): ControlType[] {
   if (TOOLS_WITH_CORNER_TYPE.includes(tool)) {
     controls.push("cornerType");
   }
+  if (TOOLS_WITH_ARROW_TYPE.includes(tool)) {
+    controls.push("arrowType");
+  }
   if (TOOLS_WITH_FONT_FAMILY.includes(tool)) {
     controls.push("fontFamily");
   }
@@ -251,6 +262,9 @@ export function getControlsForShapes(shapes: Shape[]): ControlType[] {
   const allSupportCornerType = shapes.every((s) =>
     SHAPES_WITH_CORNER_TYPE.includes(s.type)
   );
+  const allSupportArrowType = shapes.every((s) =>
+    SHAPES_WITH_ARROW_TYPE.includes(s.type)
+  );
   const allSupportFontFamily = shapes.every((s) =>
     SHAPES_WITH_FONT_FAMILY.includes(s.type)
   );
@@ -274,6 +288,7 @@ export function getControlsForShapes(shapes: Shape[]): ControlType[] {
   if (allSupportStrokeWidth) controls.push("strokeWidth");
   if (allSupportColor) controls.push("color");
   if (allSupportCornerType) controls.push("cornerType");
+  if (allSupportArrowType) controls.push("arrowType");
   if (allSupportFontFamily) controls.push("fontFamily");
   if (allSupportTextAlign) controls.push("textAlign");
   if (allSupportTextColor) controls.push("textColor");
@@ -300,6 +315,8 @@ export function shapeSupportsProperty(
       return SHAPES_WITH_COLOR.includes(shape.type);
     case "cornerType":
       return SHAPES_WITH_CORNER_TYPE.includes(shape.type);
+    case "arrowType":
+      return SHAPES_WITH_ARROW_TYPE.includes(shape.type);
     case "fontFamily":
       return SHAPES_WITH_FONT_FAMILY.includes(shape.type);
     case "textAlign":
@@ -326,3 +343,4 @@ export function frameRadiusToCornerType(
   if (radius === undefined || radius === null) return "sharp"; // Default for frames is sharp
   return radius === 0 ? "sharp" : "rounded";
 }
+

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { Code2, Sparkles, MonitorPlay, Wand2 } from "lucide-react";
+import { Code2, MonitorPlay } from "lucide-react";
 import type { CodeExplorerProps } from "@/lib/canvas/code-explorer-types";
 import { useCodeExplorer } from "@/hooks/use-code-explorer";
 import { FileTree } from "./FileTree";
@@ -56,10 +56,10 @@ export function CodeExplorer({
   if (!sandboxId) {
     return (
       <EmptyState
-        icon={Wand2}
+        icon={Code2}
         title="No code yet"
-        description="Start a conversation with AI to generate code for this screen"
-        hint="Try the Chat tab"
+        description="Generate this screen from the Chat tab to explore its code here"
+        hint="Open the Chat tab"
         accentColor="primary"
       />
     );
@@ -122,61 +122,24 @@ function EmptyState({
   const isPrimary = accentColor === "primary";
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
-      {/* Decorative background */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div
-          className={`absolute top-1/3 left-1/3 w-40 h-40 rounded-full blur-3xl ${
-            isPrimary ? "bg-primary/8" : "bg-muted/30"
-          }`}
-        />
-        <div className="absolute bottom-1/4 right-1/3 w-32 h-32 bg-muted/20 rounded-full blur-2xl" />
-      </div>
+    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+      <Icon
+        className={`mb-4 h-9 w-9 ${
+          isPrimary ? "text-primary" : "text-muted-foreground/40"
+        }`}
+        strokeWidth={1.5}
+      />
 
-      {/* Icon container */}
-      <div className="relative mb-5">
-        <div
-          className={`absolute inset-0 rounded-2xl blur-xl scale-150 opacity-40 ${
-            isPrimary ? "bg-primary/20" : "bg-muted/40"
-          }`}
-        />
-        <div
-          className={`relative h-16 w-16 rounded-2xl flex items-center justify-center border shadow-lg ${
-            isPrimary
-              ? "bg-linear-to-br from-primary/20 to-primary/5 border-primary/20"
-              : "bg-linear-to-br from-muted/80 to-muted/40 border-border/50"
-          }`}
-        >
-          <Icon
-            className={`h-8 w-8 ${
-              isPrimary ? "text-primary/70" : "text-muted-foreground/60"
-            }`}
-          />
-        </div>
-      </div>
-
-      {/* Text content */}
-      <h3 className="text-sm font-medium text-foreground/90 mb-1.5">{title}</h3>
-      <p className="text-xs text-muted-foreground/70 max-w-[220px] leading-relaxed">
+      <h3 className="text-sm font-semibold tracking-tight text-foreground">
+        {title}
+      </h3>
+      <p className="mt-1.5 max-w-[240px] text-xs leading-relaxed text-muted-foreground">
         {description}
       </p>
 
-      {/* Hint badge */}
       {hint && (
-        <div
-          className={`mt-5 px-3 py-1.5 rounded-full border ${
-            isPrimary
-              ? "bg-primary/10 border-primary/20"
-              : "bg-muted/30 border-border/30"
-          }`}
-        >
-          <span
-            className={`text-[10px] font-medium ${
-              isPrimary ? "text-primary/80" : "text-muted-foreground/60"
-            }`}
-          >
-            {hint}
-          </span>
+        <div className="mt-5 inline-flex items-center rounded-md border border-border/60 bg-muted/30 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+          {hint}
         </div>
       )}
     </div>

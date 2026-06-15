@@ -28,9 +28,9 @@ export interface DevicePreset {
  * Predefined device size presets
  */
 export const DEVICE_PRESETS: DevicePreset[] = [
-  { id: "desktop", label: "Desktop", icon: Monitor, width: 1440, height: 1024 },
-  { id: "tablet", label: "Tablet", icon: Tablet, width: 1133, height: 744 },
-  { id: "mobile", label: "Mobile", icon: Smartphone, width: 402, height: 874 },
+  { id: "desktop", label: "Desktop", icon: Monitor, width: 720, height: 512 },
+  { id: "tablet", label: "Tablet", icon: Tablet, width: 566, height: 372 },
+  { id: "mobile", label: "Mobile", icon: Smartphone, width: 201, height: 437 },
 ];
 
 /**

@@ -12,12 +12,13 @@ export const FramePreview = ({
 
   return (
     <div
-      className="absolute pointer-events-none backdrop-blur-xl bg-white/5 saturate-150"
+      className="absolute pointer-events-none backdrop-blur-xl saturate-150"
       style={{
         left: x,
         top: y,
         width: w,
         height: h,
+        backgroundColor: "rgba(226, 226, 226, 0.9)",
       }}
     />
   );

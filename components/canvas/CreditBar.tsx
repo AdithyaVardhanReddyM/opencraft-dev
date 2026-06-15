@@ -34,7 +34,7 @@ export function CreditBar({
       )}
     >
       <div className="flex items-center gap-2 text-[12px]">
-        <Sparkle fill="#f08000" className={cn("h-3 w-3 text-primary")} />
+        <Sparkle fill="#0072E5" className={cn("h-3 w-3 text-primary")} />
         <span
           className={cn(
             "font-medium",

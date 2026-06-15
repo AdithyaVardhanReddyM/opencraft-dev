@@ -37,7 +37,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="h-screen overflow-y-auto bg-accent scrollbar-thin">
+    <div className="h-screen overflow-y-auto bg-white scrollbar-thin">
       <DashboardHeader
         sortBy={sortBy}
         onSortChange={setSortBy}
@@ -46,7 +46,7 @@ export default function DashboardPage() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
-      <main className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      <main className="container mx-auto px-4 pb-20 pt-6 sm:px-6 lg:px-8">
         {activeTab === "your-projects" ? (
           <ProjectsGrid
             sortOption={sortBy}

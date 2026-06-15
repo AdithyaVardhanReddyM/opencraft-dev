@@ -2,6 +2,7 @@ export { StrokeTypeControl } from "./StrokeTypeControl";
 export { StrokeWidthControl } from "./StrokeWidthControl";
 export { ColorPicker } from "./ColorPicker";
 export { CornerTypeControl } from "./CornerTypeControl";
+export { ArrowTypeControl } from "./ArrowTypeControl";
 export { FontFamilyControl } from "./FontFamilyControl";
 export { TextAlignControl } from "./TextAlignControl";
 export { FrameFillPicker } from "./FrameFillPicker";

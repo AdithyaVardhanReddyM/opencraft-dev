@@ -80,7 +80,7 @@ http.route({
           screenId,
           role,
           content,
-          reasoningDetails, // Pass reasoning details for models like Gemini 3 Pro
+          reasoningDetails, // Pass reasoning details for reasoning models
         }
       );
 

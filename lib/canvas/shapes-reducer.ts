@@ -90,6 +90,7 @@ type ShapesActionCore =
         stroke?: string;
         strokeWidth?: number;
         strokeType?: "solid" | "dashed";
+        arrowType?: "straight" | "elbow";
       };
     }
   | {

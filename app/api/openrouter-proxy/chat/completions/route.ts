@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Models that require reasoning token storage (Gemini 3 Pro)
-const REASONING_MODELS = ["google/gemini-3-pro-preview"];
+// Models that require reasoning token storage. Per OpenRouter docs,
+// reasoning_details must be preserved and re-submitted across tool calls for
+// these reasoning models (Gemini, Moonshot/Kimi, MiniMax all require this).
+const REASONING_MODELS = [
+  "google/gemini-3.5-flash",
+  "moonshotai/kimi-k2.7-code",
+  "minimax/minimax-m3",
+];
 
 /**
  * Check if a model requires reasoning tokens
@@ -87,7 +93,7 @@ function storeReasoningDetails(
 
 /**
  * Proxy endpoint for OpenRouter API calls
- * Adds reasoning parameter for models that require it (Gemini 3 Pro)
+ * Adds reasoning parameter for reasoning models that require it
  * Also handles reasoning_details preservation for tool calls
  */
 export async function POST(req: NextRequest) {
@@ -132,11 +138,33 @@ export async function POST(req: NextRequest) {
           "Content-Type": "application/json",
           "HTTP-Referer":
             process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-          "X-Title": "Unit Set",
+          "X-Title": "OpenCraft",
         },
         body: JSON.stringify(openrouterBody),
       }
     );
+
+    // Surface upstream errors with full detail. Without this, AgentKit only
+    // sees a generic "Provider returned error / 500" and the real cause
+    // (provider outage, content policy, token limit, bad reasoning_details
+    // sequence, etc.) is lost. Read the body once as text and forward it
+    // verbatim with the original status so retry behavior is unchanged.
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(
+        `[OpenRouter Proxy] Upstream ${response.status} for model "${modelId}": ${errorBody.slice(
+          0,
+          2000
+        )}`
+      );
+      return new NextResponse(errorBody, {
+        status: response.status,
+        headers: {
+          "Content-Type":
+            response.headers.get("content-type") || "application/json",
+        },
+      });
+    }
 
     // Check if it's a streaming response
     const contentType = response.headers.get("content-type");

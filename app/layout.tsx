@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "UnitSet",
+  title: "OpenCraft",
   description: "A tool for vibe designing.",
 };
 
@@ -31,7 +31,7 @@ export default function RootLayout({
     <ClerkProvider
       appearance={{
         variables: {
-          colorPrimary: "#F08000",
+          colorPrimary: "#0072E5",
         },
       }}
     >
@@ -41,7 +41,8 @@ export default function RootLayout({
         >
           <ThemeProvider
             attribute="class"
-            defaultTheme="dark"
+            defaultTheme="light"
+            forcedTheme="light"
             enableSystem
             disableTransitionOnChange
           >

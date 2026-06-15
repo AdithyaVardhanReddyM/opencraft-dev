@@ -72,77 +72,66 @@ export function ProjectFilters({
   ];
 
   return (
-    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-      {/* Title */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Projects</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage your ongoing work, track progress, and collaborate.
-        </p>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* Search Input */}
+      <div className="group relative w-full sm:max-w-sm">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-colors duration-200 group-focus-within:text-primary" />
+        <Input
+          placeholder="Search projects..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="h-10 rounded-lg border border-border/60 bg-white pl-9 shadow-sm transition-all duration-200 hover:border-primary/40 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
+        />
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 lg:min-w-[400px]">
-        {/* Search Input */}
-        <div className="relative flex-1 group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground group-hover:text-primary transition-colors duration-300" />
-          <Input
-            placeholder="Search projects..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="h-10 pl-9 border-0 transition-all duration-300 focus-visible:ring-primary/20 focus-visible:border-primary focus-visible:shadow-[0_0_15px_rgba(var(--primary),0.1)] hover:border-primary/50"
-          />
-        </div>
+      {/* Sort Controls */}
+      <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-white/70 p-1 shadow-sm backdrop-blur-sm">
+        <TooltipProvider delayDuration={0}>
+          {sortOptions.map((option) => (
+            <Tooltip key={option.value}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={sortBy === option.value ? "secondary" : "ghost"}
+                  size="icon"
+                  className={`size-8 transition-all duration-200 ${
+                    sortBy === option.value
+                      ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground"
+                      : "text-muted-foreground hover:bg-white hover:text-foreground"
+                  }`}
+                  onClick={() => onSortChange(option.value)}
+                >
+                  {option.icon}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{option.label}</p>
+              </TooltipContent>
+            </Tooltip>
+          ))}
+        </TooltipProvider>
 
-        {/* Filter Buttons */}
-        <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg ">
-          <TooltipProvider delayDuration={0}>
-            {sortOptions.map((option) => (
-              <Tooltip key={option.value}>
+        {hasFilters && (
+          <>
+            <div className="mx-1 h-4 w-px bg-border" />
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant={sortBy === option.value ? "secondary" : "ghost"}
+                    variant="ghost"
                     size="icon"
-                    className={`size-8 ${
-                      sortBy === option.value
-                        ? "bg-background shadow-sm text-primary hover:bg-background hover:text-primary"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                    onClick={() => onSortChange(option.value)}
+                    className="size-8 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    onClick={handleReset}
                   >
-                    {option.icon}
+                    <RotateCcw className="size-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{option.label}</p>
+                  <p>Reset filters</p>
                 </TooltipContent>
               </Tooltip>
-            ))}
-          </TooltipProvider>
-
-          {hasFilters && (
-            <>
-              <div className="w-px h-4 bg-border mx-1" />
-              <TooltipProvider delayDuration={0}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      onClick={handleReset}
-                    >
-                      <RotateCcw className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Reset filters</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </>
-          )}
-        </div>
+            </TooltipProvider>
+          </>
+        )}
       </div>
     </div>
   );

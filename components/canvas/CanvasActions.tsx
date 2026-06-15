@@ -37,7 +37,7 @@ export function CanvasActions() {
         className="gap-2 px-4 h-9 bg-primary hover:bg-primary/90 text-primary-foreground border-0 transition-all duration-200"
         style={{
           boxShadow:
-            "0 4px 16px -4px oklch(0.7114 0.1728 56.6323 / 0.5), 0 2px 8px -2px oklch(0 0 0 / 0.3)",
+            "0 4px 16px -4px oklch(0.5665 0.1947 256.1696 / 0.5), 0 2px 8px -2px oklch(0 0 0 / 0.3)",
         }}
       >
         <Share2 className="size-4" />

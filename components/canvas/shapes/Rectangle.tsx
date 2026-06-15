@@ -12,7 +12,7 @@ export const Rectangle = ({ shape }: { shape: RectShape }) => (
       borderWidth: shape.strokeWidth,
       borderStyle: shape.strokeType === "dashed" ? "dashed" : "solid",
       backgroundColor: shape.fill ?? "transparent",
-      borderRadius: shape.borderRadius ?? 8,
+      borderRadius: shape.borderRadius ?? 0,
     }}
   />
 );

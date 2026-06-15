@@ -16,59 +16,36 @@ export interface AIModel {
  * Models are grouped by provider for the selector UI
  */
 export const AI_MODELS: AIModel[] = [
-  // OpenAI (default: GPT-5.1)
+  // Google (default: Gemini 3.5 Flash)
   {
-    id: "openai/gpt-5.1",
-    name: "GPT-5.1",
-    provider: "OpenAI",
-    providerSlug: "openai",
-    supportsVision: true,
-  },
-  {
-    id: "openai/gpt-5.2",
-    name: "GPT-5.2",
-    provider: "OpenAI",
-    providerSlug: "openai",
-    supportsVision: true,
-  },
-
-  // Anthropic
-  {
-    id: "anthropic/claude-sonnet-4.5",
-    name: "Claude Sonnet 4.5",
-    provider: "Anthropic",
-    providerSlug: "anthropic",
-    supportsVision: true,
-  },
-  {
-    id: "anthropic/claude-haiku-4.5",
-    name: "Claude Haiku 4.5",
-    provider: "Anthropic",
-    providerSlug: "anthropic",
-    supportsVision: true,
-  },
-
-  // Google
-  {
-    id: "google/gemini-3-pro-preview",
-    name: "Gemini 3 Pro",
+    id: "google/gemini-3.5-flash",
+    name: "Gemini 3.5 Flash",
     provider: "Google",
     providerSlug: "google",
     supportsVision: true,
   },
 
-  // xAI
+  // Moonshot AI
   {
-    id: "x-ai/grok-code-fast-1",
-    name: "Grok Code Fast",
-    provider: "xAI",
-    providerSlug: "xai",
-    supportsVision: false,
+    id: "moonshotai/kimi-k2.7-code",
+    name: "Kimi K2.7 Code",
+    provider: "Moonshot AI",
+    providerSlug: "moonshotai",
+    supportsVision: true,
+  },
+
+  // MiniMax
+  {
+    id: "minimax/minimax-m3",
+    name: "MiniMax M3",
+    provider: "MiniMax",
+    providerSlug: "minimax",
+    supportsVision: true,
   },
 ];
 
-/** Default model ID - Google Gemini 3 Pro */
-export const DEFAULT_MODEL_ID = "google/gemini-3-pro-preview";
+/** Default model ID - Google Gemini 3.5 Flash */
+export const DEFAULT_MODEL_ID = "google/gemini-3.5-flash";
 
 /**
  * Get a model by its ID

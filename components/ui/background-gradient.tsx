@@ -41,7 +41,7 @@ export const BackgroundGradient = ({
         }}
         className={cn(
           "absolute inset-0 rounded-xl z-[1] opacity-60 group-hover:opacity-100 blur-xl  transition duration-500 will-change-transform",
-          " bg-[radial-gradient(circle_farthest-side_at_0_100%,#F08000,transparent),radial-gradient(circle_farthest-side_at_100%_0,#F08000,transparent),radial-gradient(circle_farthest-side_at_100%_100%,#F08000,transparent),radial-gradient(circle_farthest-side_at_0_0,#F08000,#F08000)]"
+          " bg-[radial-gradient(circle_farthest-side_at_0_100%,#0072E5,transparent),radial-gradient(circle_farthest-side_at_100%_0,#0072E5,transparent),radial-gradient(circle_farthest-side_at_100%_100%,#0072E5,transparent),radial-gradient(circle_farthest-side_at_0_0,#0072E5,#0072E5)]"
         )}
       />
       <motion.div
@@ -62,7 +62,7 @@ export const BackgroundGradient = ({
         }}
         className={cn(
           "absolute inset-0 rounded-xl z-[1] will-change-transform",
-          "bg-[radial-gradient(circle_farthest-side_at_0_100%,#F08000,transparent),radial-gradient(circle_farthest-side_at_100%_0,#F08000,transparent),radial-gradient(circle_farthest-side_at_100%_100%,#F08000,transparent),radial-gradient(circle_farthest-side_at_0_0,#F08000,#F08000)]"
+          "bg-[radial-gradient(circle_farthest-side_at_0_100%,#0072E5,transparent),radial-gradient(circle_farthest-side_at_100%_0,#0072E5,transparent),radial-gradient(circle_farthest-side_at_100%_100%,#0072E5,transparent),radial-gradient(circle_farthest-side_at_0_0,#0072E5,#0072E5)]"
         )}
       />
 

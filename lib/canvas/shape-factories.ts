@@ -15,7 +15,7 @@ import { measureTextDimensions, TEXT_PLACEHOLDER } from "./text-utils";
 
 // Default shape styling
 export const SHAPE_DEFAULTS = {
-  stroke: "#ffff",
+  stroke: "#000000",
   strokeWidth: 1,
 } as const;
 
@@ -43,7 +43,7 @@ export function createFrame(params: {
     frameNumber: params.frameNumber,
     stroke: "transparent",
     strokeWidth: 0,
-    fill: params.fill ?? "rgba(255, 255, 255, 0.05)",
+    fill: params.fill ?? "rgba(226, 226, 226, 0.9)",
     borderRadius: params.borderRadius ?? 0, // Default to sharp corners for frames
   };
 }
@@ -73,7 +73,7 @@ export function createRect(params: {
     strokeWidth: params.strokeWidth ?? SHAPE_DEFAULTS.strokeWidth,
     fill: params.fill ?? null,
     strokeType: params.strokeType ?? "solid",
-    borderRadius: params.borderRadius ?? 8,
+    borderRadius: params.borderRadius ?? 0,
   };
 }
 
@@ -137,6 +137,7 @@ export function createArrow(params: {
   strokeWidth?: number;
   fill?: string | null;
   strokeType?: "solid" | "dashed";
+  arrowType?: "straight" | "elbow";
 }): ArrowShape {
   return {
     id: nanoid(),
@@ -149,6 +150,7 @@ export function createArrow(params: {
     strokeWidth: params.strokeWidth ?? SHAPE_DEFAULTS.strokeWidth,
     fill: params.fill ?? null,
     strokeType: params.strokeType ?? "solid",
+    arrowType: params.arrowType ?? "elbow",
   };
 }
 
@@ -272,8 +274,8 @@ export function createGeneratedUI(params: {
 
 // Screen shape default dimensions
 export const SCREEN_DEFAULTS = {
-  width: 1440,
-  height: 1024,
+  width: 720,
+  height: 512,
   minWidth: 320,
   minHeight: 240,
 } as const;

@@ -179,7 +179,7 @@ export const internalCreateMessage = internalMutation({
     content: v.string(),
     modelId: v.optional(v.string()),
     imageIds: v.optional(v.array(v.id("_storage"))),
-    reasoningDetails: v.optional(v.any()), // For models like Gemini 3 Pro that require reasoning token storage
+    reasoningDetails: v.optional(v.any()), // For reasoning models that require reasoning token storage
   },
   handler: async (ctx, args) => {
     // Verify screen exists

@@ -17,8 +17,8 @@ export default function PricingPage() {
         <div className="text-center space-y-6 mb-12">
           <Link href="/" className="flex justify-center">
             <Image
-              src="/unitset_logo.svg"
-              alt="UnitSet"
+              src="/opencraft_logo.svg"
+              alt="OpenCraft"
               width={80}
               height={80}
             />

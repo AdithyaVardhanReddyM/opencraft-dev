@@ -8,7 +8,7 @@ import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { ProjectCard } from "@/components/dashboard/ProjectCard";
 import { Button } from "@/components/ui/button";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, SearchX } from "lucide-react";
 import { Project } from "@/types/project";
 import { Id } from "@/convex/_generated/dataModel";
 import { NewProjectCard } from "./NewProjectCard";
@@ -128,13 +128,20 @@ export function ProjectsGrid({
   // Handle no search results
   if (filteredAndSortedProjects.length === 0 && searchQuery) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 px-4">
-        <div className="flex flex-col items-center text-center max-w-md space-y-4">
-          <h2 className="text-2xl font-semibold">No projects found</h2>
-          <p className="text-muted-foreground">
-            No projects match your search query "{searchQuery}"
-          </p>
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-border/60 bg-white px-6 py-20 text-center">
+        <div className="mb-5 flex size-14 items-center justify-center rounded-2xl bg-white shadow-lg shadow-primary/10 ring-1 ring-border/60">
+          <SearchX className="size-6 text-muted-foreground" />
         </div>
+        <h2 className="text-xl font-semibold tracking-tight text-foreground">
+          No matching projects
+        </h2>
+        <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+          Nothing matched{" "}
+          <span className="font-medium text-foreground">
+            &ldquo;{searchQuery}&rdquo;
+          </span>
+          . Try a different search.
+        </p>
       </div>
     );
   }

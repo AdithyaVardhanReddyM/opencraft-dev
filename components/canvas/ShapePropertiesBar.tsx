@@ -7,12 +7,14 @@ import type {
   TextShape,
   FrameShape,
   ScreenShape,
+  ArrowShape,
 } from "@/types/canvas";
 import {
   type ShapeDefaultProperties,
   type StrokeType,
   type StrokeWidthPreset,
   type CornerType,
+  type ArrowType,
   type ControlType,
   type FontFamilyPreset,
   type TextAlignOption,
@@ -28,6 +30,7 @@ import {
   StrokeWidthControl,
   ColorPicker,
   CornerTypeControl,
+  ArrowTypeControl,
   FontFamilyControl,
   TextAlignControl,
   FrameFillPicker,
@@ -77,6 +80,10 @@ export function ShapePropertiesBar({
     ? getCornerTypeFromShapes(selectedShapes)
     : defaultProperties.cornerType;
 
+  const arrowTypeValue = hasSelection
+    ? getArrowTypeFromShapes(selectedShapes)
+    : defaultProperties.arrowType;
+
   const fontFamilyValue = hasSelection
     ? getFontFamilyFromShapes(selectedShapes)
     : "sans";
@@ -87,11 +94,11 @@ export function ShapePropertiesBar({
 
   const textColorValue = hasSelection
     ? getTextColorFromShapes(selectedShapes)
-    : "#ffffff";
+    : "#000000";
 
   const frameFillValue = hasSelection
     ? getFrameFillFromShapes(selectedShapes)
-    : "rgba(255, 255, 255, 0.05)";
+    : "rgba(226, 226, 226, 0.9)";
 
   const frameCornerTypeValue = hasSelection
     ? getFrameCornerTypeFromShapes(selectedShapes)
@@ -131,6 +138,14 @@ export function ShapePropertiesBar({
       onPropertyChange("cornerType", value);
     } else {
       onDefaultChange("cornerType", value);
+    }
+  };
+
+  const handleArrowTypeChange = (value: ArrowType) => {
+    if (hasSelection) {
+      onPropertyChange("arrowType", value);
+    } else {
+      onDefaultChange("arrowType", value);
     }
   };
 
@@ -213,6 +228,16 @@ export function ShapePropertiesBar({
           <CornerTypeControl
             value={cornerTypeValue}
             onChange={handleCornerTypeChange}
+          />
+        </>
+      )}
+
+      {controls.includes("arrowType") && (
+        <>
+          <Separator />
+          <ArrowTypeControl
+            value={arrowTypeValue}
+            onChange={handleArrowTypeChange}
           />
         </>
       )}
@@ -313,7 +338,7 @@ function getColorFromShapes(shapes: Shape[]): string | "mixed" {
     )
     .map((s) => s.stroke);
 
-  if (colors.length === 0) return "#ffffff";
+  if (colors.length === 0) return "#000000";
   const first = colors[0];
   return colors.every((c) => c === first) ? first : "mixed";
 }
@@ -326,6 +351,16 @@ function getCornerTypeFromShapes(shapes: Shape[]): CornerType | "mixed" {
   if (radii.length === 0) return "rounded";
   const first = radii[0];
   return radii.every((r) => r === first) ? first : "mixed";
+}
+
+function getArrowTypeFromShapes(shapes: Shape[]): ArrowType | "mixed" {
+  const types = shapes
+    .filter((s): s is ArrowShape => s.type === "arrow")
+    .map((s) => s.arrowType ?? "straight");
+
+  if (types.length === 0) return "straight";
+  const first = types[0];
+  return types.every((t) => t === first) ? first : "mixed";
 }
 
 function getFontFamilyFromShapes(shapes: Shape[]): FontFamilyPreset | "mixed" {
@@ -353,7 +388,7 @@ function getTextColorFromShapes(shapes: Shape[]): string | "mixed" {
     .filter((s): s is TextShape => s.type === "text")
     .map((s) => s.stroke);
 
-  if (colors.length === 0) return "#ffffff";
+  if (colors.length === 0) return "#000000";
   const first = colors[0];
   return colors.every((c) => c === first) ? first : "mixed";
 }
@@ -361,9 +396,9 @@ function getTextColorFromShapes(shapes: Shape[]): string | "mixed" {
 function getFrameFillFromShapes(shapes: Shape[]): string | "mixed" {
   const fills = shapes
     .filter((s): s is FrameShape => s.type === "frame")
-    .map((s) => s.fill ?? "rgba(255, 255, 255, 0.05)");
+    .map((s) => s.fill ?? "rgba(226, 226, 226, 0.9)");
 
-  if (fills.length === 0) return "rgba(255, 255, 255, 0.05)";
+  if (fills.length === 0) return "rgba(226, 226, 226, 0.9)";
   const first = fills[0];
   return fills.every((f) => f === first) ? first : "mixed";
 }

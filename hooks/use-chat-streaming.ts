@@ -58,11 +58,20 @@ export interface UseChatStreamingReturn {
   retryLastMessage: () => void;
 }
 
-// Strip files_summary tags from message content for display
+// Strip the agent's structured tags from message content for display.
+// Mirrors the server-side cleanup in inngest/functions.ts so streamed text and
+// persisted messages render identically. <task_summary> wraps the visible
+// content, so only its tags are removed; <title> and <files_summary> are hidden
+// sections, so their full blocks are removed. The trailing open-ended replaces
+// handle partially-streamed tags (closing tag not yet received) so a hidden
+// section's content never flashes mid-stream.
 function stripFilesSummary(content: string): string {
   return content
-    .replace(/<files_summary>[\s\S]*?<\/files_summary>/g, "")
-    .replace(/<task_summary>[\s\S]*?<\/task_summary>/g, "")
+    .replace(/<\/?task_summary>/gi, "")
+    .replace(/<title>[\s\S]*?<\/title>/gi, "")
+    .replace(/<files_summary>[\s\S]*?<\/files_summary>/gi, "")
+    .replace(/<title>[\s\S]*$/i, "")
+    .replace(/<files_summary>[\s\S]*$/i, "")
     .trim();
 }
 

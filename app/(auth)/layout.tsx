@@ -13,7 +13,7 @@ export default function Layout({ children }: LayoutProps) {
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse at top right, rgba(255, 100, 50, 0.15) 0%, transparent 50%), radial-gradient(ellipse at bottom left, rgba(255, 60, 30, 0.1) 0%, transparent 50%), linear-gradient(to bottom, #030303, #0a0505)",
+            "radial-gradient(ellipse at top right, rgba(0, 114, 229, 0.15) 0%, transparent 50%), radial-gradient(ellipse at bottom left, rgba(0, 114, 229, 0.1) 0%, transparent 50%), linear-gradient(to bottom, #030303, #0a0505)",
         }}
       />
 

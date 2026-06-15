@@ -249,7 +249,7 @@ TRACKPAD_SENSITIVITY = 0.25;
 MOUSE_WHEEL_SENSITIVITY = 0.05;
 
 // Shape defaults (shape-factories.ts)
-SHAPE_DEFAULTS = { stroke: "#ffff", strokeWidth: 1 };
+SHAPE_DEFAULTS = { stroke: "#000000", strokeWidth: 1 };
 
 // Text defaults (text-utils.ts)
 TEXT_PLACEHOLDER = "Type something...";
@@ -269,7 +269,7 @@ MAX_RETRIES = 3;
 STROKE_WIDTH_MAP = { thin: 1, normal: 2, thick: 4 };
 CORNER_RADIUS_MAP = { sharp: 0, rounded: 8 };
 COLOR_PALETTE = [
-  "#ffffff",
+  "#000000",
   "#a1a1aa",
   "#f87171",
   "#fb923c",

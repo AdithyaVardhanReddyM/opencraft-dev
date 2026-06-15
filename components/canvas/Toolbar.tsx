@@ -62,7 +62,7 @@ export function Toolbar({ currentTool, onToolSelect }: ToolbarProps) {
         style={{
           borderRadius: "0 0 16px 16px",
           boxShadow:
-            "0 8px 32px -4px oklch(0.7114 0.1728 56.6323 / 0.25), 0 12px 24px -8px oklch(0 0 0 / 0.4)",
+            "0 8px 32px -4px oklch(0.5665 0.1947 256.1696 / 0.25), 0 12px 24px -8px oklch(0 0 0 / 0.4)",
         }}
       >
         {/* Regular tools */}
@@ -106,13 +106,13 @@ export function Toolbar({ currentTool, onToolSelect }: ToolbarProps) {
           title={`${SCREEN_TOOL.label} (${SCREEN_TOOL.shortcut})`}
           className={`group relative flex h-9 items-center gap-1.5 rounded-lg px-2.5 transition-all duration-300 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0 ${
             isScreenActive
-              ? "bg-linear-to-r from-primary to-orange-400 text-white shadow-lg shadow-primary/30"
-              : "bg-linear-to-r from-primary/15 to-orange-400/15 text-primary hover:from-primary/25 hover:to-orange-400/25 hover:shadow-md hover:shadow-primary/20"
+              ? "bg-linear-to-r from-primary to-[#75D8FC] text-white shadow-lg shadow-primary/30"
+              : "bg-linear-to-r from-primary/15 to-[#75D8FC]/15 text-primary hover:from-primary/25 hover:to-[#75D8FC]/25 hover:shadow-md hover:shadow-primary/20"
           }`}
         >
           {/* Animated glow ring when not active */}
           {!isScreenActive && (
-            <span className="absolute inset-0 rounded-lg bg-linear-to-r from-primary/40 to-orange-400/40 opacity-0 blur-sm transition-opacity duration-300 group-hover:opacity-100" />
+            <span className="absolute inset-0 rounded-lg bg-linear-to-r from-primary/40 to-[#75D8FC]/40 opacity-0 blur-sm transition-opacity duration-300 group-hover:opacity-100" />
           )}
 
           {/* Monitor icon with animation */}

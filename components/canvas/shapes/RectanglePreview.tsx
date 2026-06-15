@@ -18,7 +18,7 @@ export const RectanglePreview = ({
         top: y,
         width: w,
         height: h,
-        borderRadius: "8px",
+        borderRadius: "0px",
       }}
     />
   );

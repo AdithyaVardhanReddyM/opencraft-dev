@@ -373,7 +373,7 @@ function LoadingHistory() {
     <div className="flex flex-col items-center justify-center flex-1 py-12 px-4">
       <div className="flex flex-col items-center gap-3">
         <Image
-          src="/unitset_logo.svg"
+          src="/opencraft_logo.svg"
           alt="AI"
           width={32}
           height={32}
@@ -541,7 +541,7 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
             <AlertCircle className="h-5 w-5 text-destructive" />
           ) : (
             <Image
-              src="/unitset_logo.svg"
+              src="/opencraft_logo.svg"
               alt="AI"
               width={20}
               height={20}
@@ -841,7 +841,7 @@ function ChatInput({
       />
 
       {/* Credit bar and input container */}
-      <div className="rounded-xl overflow-hidden border border-border/40 bg-muted/30 hover:bg-muted/40 transition-colors focus-within:bg-muted/50 focus-within:border-border/60 focus-within:ring-[3px] focus-within:ring-primary/70 focus-within:ring-offset-0 focus-within:shadow-[0_0_24px_rgba(249,115,22,0.35)]">
+      <div className="rounded-xl overflow-hidden border border-border/40 bg-muted/30 hover:bg-muted/40 transition-colors focus-within:bg-muted/50 focus-within:border-border/60 focus-within:ring-[3px] focus-within:ring-primary/70 focus-within:ring-offset-0 focus-within:shadow-[0_0_24px_rgba(0,114,229,0.35)]">
         {/* Generation Limit Bar */}
         <CreditBar
           generationsRemaining={generationsRemaining}

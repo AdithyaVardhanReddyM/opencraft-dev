@@ -36,17 +36,14 @@ export function ScreenCursorPreview({
       }}
     >
       <div
-        className="w-full h-full rounded-lg border-2 border-dashed border-orange-500/50 bg-orange-500/5 flex items-center justify-center"
+        className="w-full h-full border-2 border-dashed border-primary/50 bg-primary/5 flex items-center justify-center"
         style={{
           backdropFilter: "blur(2px)",
         }}
       >
-        <div className="flex flex-col items-center gap-2 text-orange-500/70">
-          <Monitor className="w-10 h-10" />
-          <span className="text-base font-medium">Screen</span>
-          <span className="text-sm opacity-70">
-            {w} × {h}
-          </span>
+        <div className="flex flex-col items-center gap-1.5 text-primary/70">
+          <Monitor className="w-5 h-5" />
+          <span className="text-xs font-medium">Screen</span>
         </div>
       </div>
     </div>

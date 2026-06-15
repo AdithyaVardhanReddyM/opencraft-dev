@@ -1118,6 +1118,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
               endY: draft.currentWorld.y,
               stroke: defaultProperties.strokeColor,
               strokeType: defaultProperties.strokeType,
+              arrowType: defaultProperties.arrowType,
             },
           });
         } else if (draft.type === "line") {

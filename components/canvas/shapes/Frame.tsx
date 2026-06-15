@@ -2,7 +2,7 @@ import { FrameShape } from "@/types/canvas";
 
 export const Frame = ({ shape }: { shape: FrameShape }) => {
   const borderRadius = shape.borderRadius ?? 0;
-  const fillColor = shape.fill ?? "rgba(255, 255, 255, 0.05)";
+  const fillColor = shape.fill ?? "rgba(226, 226, 226, 0.9)";
 
   return (
     <>
@@ -18,7 +18,7 @@ export const Frame = ({ shape }: { shape: FrameShape }) => {
         }}
       />
       <div
-        className="absolute pointer-events-none whitespace-nowrap text-xs font-medium text-white/80 select-none"
+        className="absolute pointer-events-none whitespace-nowrap text-xs font-medium text-foreground/70 select-none"
         style={{
           left: shape.x,
           top: shape.y - 24,

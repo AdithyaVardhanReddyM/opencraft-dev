@@ -30,7 +30,7 @@ export function RemixFromWebModal({
           <div className="w-full max-w-[320px] rounded-[15px] overflow-hidden shadow-md">
             <Image
               src="/extension_card.png"
-              alt="UnitSet Chrome Extension"
+              alt="OpenCraft Chrome Extension"
               width={320}
               height={200}
               className="w-full h-auto -mb-px"
@@ -44,7 +44,7 @@ export function RemixFromWebModal({
             </h3>
             <p className="text-sm text-muted-foreground max-w-[280px]">
               Download our Chrome extension to remix or replicate components
-              from websites directly into UnitSet.
+              from websites directly into OpenCraft.
             </p>
           </div>
 

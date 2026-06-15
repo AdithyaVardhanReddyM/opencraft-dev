@@ -69,7 +69,7 @@ function StreamingIndicatorComponent({
       <div className={cn("flex gap-2.5 items-start", className)}>
         <div className="flex h-6 w-6 shrink-0 items-center justify-center mt-0.5">
           <Image
-            src="/unitset_logo.svg"
+            src="/opencraft_logo.svg"
             alt="AI"
             width={20}
             height={20}
@@ -89,7 +89,7 @@ function StreamingIndicatorComponent({
     <div className={cn("flex gap-2.5 items-start", className)}>
       <div className="flex h-6 w-6 shrink-0 items-center justify-center mt-0.5">
         <Image
-          src="/unitset_logo.svg"
+          src="/opencraft_logo.svg"
           alt="AI"
           width={20}
           height={20}

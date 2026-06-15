@@ -102,6 +102,7 @@ export interface ArrowShape extends BaseShape {
   endX: number;
   endY: number;
   strokeType?: "solid" | "dashed";
+  arrowType?: "straight" | "elbow";
 }
 
 export interface LineShape extends BaseShape {

@@ -295,7 +295,7 @@ function renderFrame(
   const x = shape.x - offsetX;
   const y = shape.y - offsetY;
   const borderRadius = shape.borderRadius ?? 0;
-  const fillColor = shape.fill ?? "rgba(255, 255, 255, 0.05)";
+  const fillColor = shape.fill ?? "rgba(226, 226, 226, 0.9)";
 
   ctx.beginPath();
   if (borderRadius > 0) {

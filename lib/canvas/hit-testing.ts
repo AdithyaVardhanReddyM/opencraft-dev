@@ -1,5 +1,6 @@
 import type { Point, Shape } from "@/types/canvas";
 import { getTextShapeDimensions } from "./text-utils";
+import { getArrowPoints } from "./arrow-utils";
 
 // Hit testing thresholds
 const FREEDRAW_HIT_THRESHOLD = 5;
@@ -128,7 +129,23 @@ export function isPointInShape(point: Point, shape: Shape): boolean {
       }
       return false;
 
-    case "arrow":
+    case "arrow": {
+      // Test every segment of the (possibly elbow) route.
+      const pts = getArrowPoints(
+        shape.startX,
+        shape.startY,
+        shape.endX,
+        shape.endY,
+        shape.arrowType
+      );
+      for (let i = 0; i < pts.length - 1; i++) {
+        if (distanceToLineSegment(point, pts[i], pts[i + 1]) <= LINE_HIT_THRESHOLD) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     case "line":
       return (
         distanceToLineSegment(

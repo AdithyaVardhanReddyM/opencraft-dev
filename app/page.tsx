@@ -83,8 +83,8 @@ export default function Page() {
         <Link href="/" className="flex items-center mr-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/unitset_fulllogo.svg"
-            alt="Unit Set"
+            src="/opencraft_full_logo.svg"
+            alt="OpenCraft"
             className="h-5 w-auto"
           />
         </Link>
@@ -193,7 +193,7 @@ export default function Page() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/canvas_resized.png"
-                alt="Unit Set Canvas - AI-powered design interface"
+                alt="OpenCraft Canvas - AI-powered design interface"
                 className="w-full h-auto object-contain transition-transform duration-700 group-hover:scale-[1.01]"
               />
             </div>
@@ -507,7 +507,7 @@ export default function Page() {
                 </svg>
                 <p className="text-xl md:text-2xl lg:text-3xl text-white/80 font-light leading-relaxed tracking-tight">
                   All-in-one vibe coding tools try to do everything and end up
-                  generating AI slop. UnitSet focuses on{" "}
+                  generating AI slop. OpenCraft focuses on{" "}
                   <span className="text-primary font-medium">design</span> —
                   your IDE handles the rest. Each tool should do one thing
                   exceptionally well.
@@ -641,8 +641,8 @@ export default function Page() {
           <div className="lg:col-span-3 flex flex-col gap-8 items-start">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/unitset_fulllogo.svg"
-              alt="Unit Set"
+              src="/opencraft_full_logo.svg"
+              alt="OpenCraft"
               className="h-6 w-auto"
             />
             <p className="text-white/40 text-sm leading-relaxed max-w-[280px] font-light">
@@ -814,7 +814,7 @@ export default function Page() {
         {/* Bottom Bar */}
         <div className="w-full max-w-7xl mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
           <span className="text-white/20 text-xs font-mono tracking-wide">
-            © 2025 UnitSet Technologies. All rights reserved.
+            © 2025 OpenCraft Technologies. All rights reserved.
           </span>
           <div className="flex items-center gap-8">
             <span className="text-white/20 text-xs font-mono border-l border-white/10 pl-8"></span>

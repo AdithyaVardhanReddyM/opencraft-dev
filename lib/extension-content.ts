@@ -1,6 +1,6 @@
 /**
  * Extension Content Utilities
- * Functions for detecting and parsing content captured by the UnitSet Chrome extension
+ * Functions for detecting and parsing content captured by the OpenCraft Chrome extension
  */
 
 /** Prefix used to identify extension content in clipboard */

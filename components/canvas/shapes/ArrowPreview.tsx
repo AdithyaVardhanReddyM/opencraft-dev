@@ -1,18 +1,37 @@
+import { getArrowPoints, type ArrowRouting } from "@/lib/canvas/arrow-utils";
+
 export const ArrowPreview = ({
   startWorld,
   currentWorld,
+  arrowType,
 }: {
   startWorld: { x: number; y: number };
   currentWorld: { x: number; y: number };
+  arrowType?: ArrowRouting;
 }) => {
   const arrowHeadSize = 6;
+
+  const minX = Math.min(startWorld.x, currentWorld.x);
+  const minY = Math.min(startWorld.y, currentWorld.y);
+
+  const points = getArrowPoints(
+    startWorld.x,
+    startWorld.y,
+    currentWorld.x,
+    currentWorld.y,
+    arrowType
+  );
+
+  const localPoints = points
+    .map((p) => `${p.x - minX + arrowHeadSize},${p.y - minY + arrowHeadSize}`)
+    .join(" ");
 
   return (
     <svg
       className="absolute pointer-events-none"
       style={{
-        left: Math.min(startWorld.x, currentWorld.x) - arrowHeadSize,
-        top: Math.min(startWorld.y, currentWorld.y) - arrowHeadSize,
+        left: minX - arrowHeadSize,
+        top: minY - arrowHeadSize,
         width: Math.abs(currentWorld.x - startWorld.x) + arrowHeadSize * 2,
         height: Math.abs(currentWorld.y - startWorld.y) + arrowHeadSize * 2,
         overflow: "visible",
@@ -35,25 +54,13 @@ export const ArrowPreview = ({
           />
         </marker>
       </defs>
-      <line
-        x1={
-          startWorld.x - Math.min(startWorld.x, currentWorld.x) + arrowHeadSize
-        }
-        y1={
-          startWorld.y - Math.min(startWorld.y, currentWorld.y) + arrowHeadSize
-        }
-        x2={
-          currentWorld.x -
-          Math.min(startWorld.x, currentWorld.x) +
-          arrowHeadSize
-        }
-        y2={
-          currentWorld.y -
-          Math.min(startWorld.y, currentWorld.y) +
-          arrowHeadSize
-        }
+      <polyline
+        points={localPoints}
+        fill="none"
         stroke="#9ca3af"
         strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
         markerEnd="url(#arrowhead-preview)"
       />
     </svg>

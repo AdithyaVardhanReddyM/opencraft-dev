@@ -22,8 +22,8 @@ export function SelectionBox({ startWorld, currentWorld }: SelectionBoxProps) {
         width: w,
         height: h,
         borderWidth: "1.5px",
-        borderColor: "hsl(24 95% 53%)",
-        backgroundColor: "rgba(249, 115, 22, 0.1)",
+        borderColor: "hsl(210 100% 45%)",
+        backgroundColor: "rgba(0, 114, 229, 0.1)",
       }}
     />
   );

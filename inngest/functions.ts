@@ -25,11 +25,12 @@ interface AgentState {
   filesSummary: string;
   title: string;
   files: { [path: string]: string };
-  reasoningDetails?: unknown; // For models like Gemini 3 Pro that require reasoning token storage
+  reasoningDetails?: unknown; // For reasoning models that require reasoning token storage
 }
 
 // OpenRouter provider using OpenAI-compatible API
-// For models that require reasoning (like Gemini 3 Pro), we use a proxy that adds the reasoning parameter
+// For reasoning models, we use a proxy that adds the reasoning parameter and
+// preserves reasoning_details across tool calls (required by OpenRouter)
 const openrouter = (config: { model: string }) => {
   const needsReasoning = requiresReasoningTokens(config.model);
 
@@ -89,11 +90,17 @@ const extractTitle = (content: string): string => {
 // Auto-pause timeout for sandboxes (15 minutes)
 const SANDBOX_AUTO_PAUSE_TIMEOUT_MS = 15 * 60 * 1000;
 
-// Default model ID - Google Gemini 3 Pro
-const DEFAULT_MODEL_ID = "google/gemini-3-pro-preview";
+// Default model ID - Google Gemini 3.5 Flash
+const DEFAULT_MODEL_ID = "google/gemini-3.5-flash";
 
-// Models that require reasoning token storage (Gemini 3 Pro)
-const REASONING_MODELS = ["google/gemini-3-pro-preview"];
+// Models that require reasoning token storage (reasoning_details must be
+// preserved across tool calls per OpenRouter docs). All current models are
+// reasoning-capable, so all route through the reasoning proxy.
+const REASONING_MODELS = [
+  "google/gemini-3.5-flash",
+  "moonshotai/kimi-k2.7-code",
+  "minimax/minimax-m3",
+];
 
 /**
  * Check if a model requires reasoning token storage
@@ -165,7 +172,7 @@ export const runChatAgent = inngest.createFunction(
                 screenId,
                 role: "assistant",
                 content:
-                  "You've reached your generation limit of 10. Thank you for trying Unit {set}! Stay tuned for more updates.",
+                  "You've reached your generation limit of 10. Thank you for trying OpenCraft! Stay tuned for more updates.",
               }),
             });
           });
@@ -273,7 +280,7 @@ export const runChatAgent = inngest.createFunction(
         filesSummary: "",
         title: "",
         files: screen?.files || {},
-        reasoningDetails: undefined, // Will be populated for Gemini 3 Pro responses
+        reasoningDetails: undefined, // Will be populated for reasoning model responses
       },
       { messages: previousMessages }
     );
@@ -605,11 +612,11 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
             }
           }
 
-          // Extract reasoning_details from the last assistant message for Gemini 3 Pro
+          // Extract reasoning_details from the last assistant message for reasoning models
           // The reasoning_details are returned in the raw response and need to be stored
           if (network && result.output.length > 0) {
             const lastMessage = result.output[result.output.length - 1];
-            // Check if the message has reasoning_details (from Gemini 3 Pro)
+            // Check if the message has reasoning_details (from reasoning models)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const messageWithReasoning = lastMessage as any;
             if (messageWithReasoning?.reasoning_details) {
@@ -754,7 +761,7 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
             }\n\n${filesSummary}`
           : cleanSummary || "UI generation completed successfully.";
 
-        // Include reasoning_details for models like Gemini 3 Pro
+        // Include reasoning_details for reasoning models
         const reasoningDetails = result.state.data.reasoningDetails;
 
         // Build the message payload
@@ -764,7 +771,7 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
           content: messageContent,
         };
 
-        // Add reasoning details if present (for Gemini 3 Pro)
+        // Add reasoning details if present (for reasoning models)
         if (reasoningDetails !== undefined && reasoningDetails !== null) {
           messagePayload.reasoningDetails = reasoningDetails;
         }

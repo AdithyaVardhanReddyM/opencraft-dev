@@ -107,9 +107,6 @@ function ShapeItem({
         <span className="text-left" title={fullName}>
           {name}
         </span>
-        {isSelected && (
-          <div className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 shadow-[0_0_4px_rgba(0,0,0,0.2)]" />
-        )}
       </button>
     </div>
   );
@@ -117,8 +114,8 @@ function ShapeItem({
 
 function EmptyState({ hasSearch }: { hasSearch: boolean }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none">
-      <div className="w-full border-2 border-dashed border-primary/20 rounded-lg p-6 flex flex-col items-center justify-center">
+    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none min-h-0">
+      <div className="w-full flex-1 p-6 flex flex-col items-center justify-center">
         <div className="h-12 w-12 flex items-center justify-center ">
           <Layers
             className="h-6 w-6 text-primary"

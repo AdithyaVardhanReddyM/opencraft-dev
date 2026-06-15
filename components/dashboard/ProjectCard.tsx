@@ -1,16 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Trash2, Sparkles, Calendar, Pencil, Loader2 } from "lucide-react";
+import { Trash2, Calendar, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/lib/date-utils";
-import { getGradientColors } from "@/lib/gradient-utils";
 import { Project } from "@/types/project";
 import { DeleteProjectDialog } from "@/components/dashboard/DeleteProjectDialog";
 import { Id } from "@/convex/_generated/dataModel";
-import { DottedGlowBackground } from "@/components/ui/dotted-glow-background";
 
 interface ProjectCardProps {
   project: Project;
@@ -25,13 +23,7 @@ export function ProjectCard({
 }: ProjectCardProps) {
   const router = useRouter();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
-
-  // Get gradient colors based on project number
-  const gradientColors = useMemo(() => {
-    return getGradientColors(project.projectNumber);
-  }, [project.projectNumber]);
 
   const handleCardClick = () => {
     setIsNavigating(true);
@@ -48,99 +40,79 @@ export function ProjectCard({
   return (
     <>
       <div
-        className={`relative flex flex-col overflow-hidden rounded-xl border border-border/50 bg-accent cursor-pointer transition-all duration-300 group ${
+        className={`group relative flex flex-col rounded-2xl border border-border/60 bg-white p-2.5 shadow-sm cursor-pointer transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10 ${
           isDeleting ? "opacity-0 scale-95" : "opacity-100 scale-100"
-        } ${
-          isHovered ? "border-primary shadow-xl shadow-primary/10" : "shadow-sm"
         }`}
         onClick={handleCardClick}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Delete Button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className={`absolute top-3 right-3 z-20 size-8 bg-background/80 backdrop-blur-sm border border-border/50 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-all duration-200 ${
-            isHovered ? "opacity-100" : "opacity-0"
-          }`}
-          onClick={handleDeleteClick}
-          aria-label="Delete project"
-        >
-          <Trash2 className="size-3.5" />
-        </Button>
-
-        {/* New Badge */}
-        {isNewProject && (
-          <div className="absolute top-3 left-3 z-20">
-            <span className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-primary/90 text-primary-foreground rounded-full shadow-lg shadow-primary/20">
-              <Sparkles className="size-2.5" />
-              New
-            </span>
-          </div>
-        )}
-
-        {/* Thumbnail Area with Dotted Glow */}
-        <div className="relative aspect-16/10 overflow-hidden bg-muted/50">
+        {/* Inner thumbnail panel — no border */}
+        <div className="relative aspect-16/10 overflow-hidden rounded-xl bg-gradient-to-br from-[#0072E5]/[0.05] via-white to-[#75D8FC]/[0.10]">
           {project.thumbnail ? (
             <Image
               src={project.thumbnail}
               alt={project.name}
               fill
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
             />
           ) : (
             <>
-              {/* Dotted Glow Background with Gradient Colors */}
-              <DottedGlowBackground
-                className="pointer-events-none"
-                opacity={isHovered ? 0.95 : 0.65}
-                gap={12}
-                radius={1.5}
-                color="rgba(120, 120, 120, 0.4)"
-                darkColor="rgba(160, 160, 160, 0.3)"
-                backgroundOpacity={0}
-                speedMin={0.2}
-                speedMax={isHovered ? 2 : 0.9}
-                speedScale={isHovered ? 1.4 : 0.7}
-                useGradient
-                gradientColors={gradientColors}
+              {/* Blueprint grid */}
+              <div
+                className="absolute inset-0 opacity-70 transition-opacity duration-500 group-hover:opacity-100"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(to right, rgba(0,114,229,0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,114,229,0.07) 1px, transparent 1px)",
+                  backgroundSize: "22px 22px",
+                }}
               />
-
-              {/* Logo overlay */}
+              {/* Soft glow */}
+              <div className="absolute left-1/2 top-1/2 size-32 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-3xl transition-all duration-500 group-hover:scale-125 group-hover:bg-primary/15" />
+              {/* Logo */}
               <div className="absolute inset-0 z-10 flex items-center justify-center">
-                <div className="relative">
-                  <Image
-                    src="/unitset_logo.svg"
-                    alt="Unit Set"
-                    width={56}
-                    height={56}
-                    className={`object-contain transition-all duration-300 ${
-                      isHovered ? "scale-110 opacity-100" : "opacity-50"
-                    }`}
-                  />
-                </div>
+                <Image
+                  src="/opencraft_logo.svg"
+                  alt="OpenCraft"
+                  width={76}
+                  height={76}
+                  className="object-contain opacity-80 transition-all duration-500 group-hover:scale-105 group-hover:opacity-100"
+                />
               </div>
             </>
           )}
+
+          {/* Delete Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-2.5 top-2.5 z-20 size-8 bg-white/80 backdrop-blur-sm border border-border/60 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive"
+            onClick={handleDeleteClick}
+            aria-label="Delete project"
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
         </div>
 
-        {/* Project Details - Compact Footer */}
-        <div className="relative z-10 px-4 py-3">
-          {/* Title Row */}
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="font-semibold text-base leading-tight line-clamp-1 text-primary">
-              {project.name}
-            </h2>
+        {/* Footer — no separator */}
+        <div className="px-1.5 pb-1 pt-3">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <h2 className="truncate text-base font-semibold leading-tight text-foreground transition-colors duration-200 group-hover:text-primary">
+                {project.name}
+              </h2>
+              {isNewProject && (
+                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-primary">
+                  New
+                </span>
+              )}
+            </div>
             {isNavigating && (
-              <span className="flex items-center gap-1.5 text-xs text-primary shrink-0">
+              <span className="flex shrink-0 items-center gap-1.5 text-xs text-primary">
                 <Loader2 className="size-3.5 animate-spin" />
                 Redirecting
               </span>
             )}
           </div>
 
-          {/* Timestamps Row - Spread to corners */}
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Calendar className="size-3.5" />

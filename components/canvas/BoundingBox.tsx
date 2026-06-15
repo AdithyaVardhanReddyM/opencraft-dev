@@ -148,7 +148,7 @@ export function BoundingBox({
             width: handleSize,
             height: handleSize,
             backgroundColor: "white",
-            border: "2px solid hsl(24 95% 53%)",
+            border: "2px solid oklch(0.5665 0.1947 256.1696)",
             borderRadius: "50%",
           }}
           onPointerDown={(e) => handlePointerDown("line-start", e)}
@@ -163,7 +163,7 @@ export function BoundingBox({
             width: handleSize,
             height: handleSize,
             backgroundColor: "white",
-            border: "2px solid hsl(24 95% 53%)",
+            border: "2px solid oklch(0.5665 0.1947 256.1696)",
             borderRadius: "50%",
           }}
           onPointerDown={(e) => handlePointerDown("line-end", e)}
@@ -187,7 +187,7 @@ export function BoundingBox({
       <div
         className="absolute inset-0 border-2 pointer-events-none"
         style={{
-          borderColor: "hsl(24 95% 53%)",
+          borderColor: "oklch(0.5665 0.1947 256.1696)",
         }}
       />
 
@@ -201,7 +201,7 @@ export function BoundingBox({
           width: handleSize,
           height: handleSize,
           backgroundColor: "white",
-          border: "2px solid hsl(24 95% 53%)",
+          border: "2px solid oklch(0.5665 0.1947 256.1696)",
         }}
         onPointerDown={(e) => handlePointerDown("nw", e)}
       />
@@ -215,7 +215,7 @@ export function BoundingBox({
           width: handleSize,
           height: handleSize,
           backgroundColor: "white",
-          border: "2px solid hsl(24 95% 53%)",
+          border: "2px solid oklch(0.5665 0.1947 256.1696)",
         }}
         onPointerDown={(e) => handlePointerDown("ne", e)}
       />
@@ -229,7 +229,7 @@ export function BoundingBox({
           width: handleSize,
           height: handleSize,
           backgroundColor: "white",
-          border: "2px solid hsl(24 95% 53%)",
+          border: "2px solid oklch(0.5665 0.1947 256.1696)",
         }}
         onPointerDown={(e) => handlePointerDown("sw", e)}
       />
@@ -243,7 +243,7 @@ export function BoundingBox({
           width: handleSize,
           height: handleSize,
           backgroundColor: "white",
-          border: "2px solid hsl(24 95% 53%)",
+          border: "2px solid oklch(0.5665 0.1947 256.1696)",
         }}
         onPointerDown={(e) => handlePointerDown("se", e)}
       />
@@ -260,7 +260,7 @@ export function BoundingBox({
               width: handleSize,
               height: handleSize,
               backgroundColor: "white",
-              border: "2px solid hsl(24 95% 53%)",
+              border: "2px solid oklch(0.5665 0.1947 256.1696)",
             }}
             onPointerDown={(e) => handlePointerDown("n", e)}
           />
@@ -274,7 +274,7 @@ export function BoundingBox({
               width: handleSize,
               height: handleSize,
               backgroundColor: "white",
-              border: "2px solid hsl(24 95% 53%)",
+              border: "2px solid oklch(0.5665 0.1947 256.1696)",
             }}
             onPointerDown={(e) => handlePointerDown("s", e)}
           />
@@ -288,7 +288,7 @@ export function BoundingBox({
               width: handleSize,
               height: handleSize,
               backgroundColor: "white",
-              border: "2px solid hsl(24 95% 53%)",
+              border: "2px solid oklch(0.5665 0.1947 256.1696)",
             }}
             onPointerDown={(e) => handlePointerDown("e", e)}
           />
@@ -302,7 +302,7 @@ export function BoundingBox({
               width: handleSize,
               height: handleSize,
               backgroundColor: "white",
-              border: "2px solid hsl(24 95% 53%)",
+              border: "2px solid oklch(0.5665 0.1947 256.1696)",
             }}
             onPointerDown={(e) => handlePointerDown("w", e)}
           />
