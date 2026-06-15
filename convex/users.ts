@@ -181,3 +181,31 @@ export const internalIncrementGeneration = internalMutation({
     return { success: true, generationsUsed: newCount };
   },
 });
+
+/**
+ * Get user metadata for analytics (Pendo)
+ */
+export const getUserMetadata = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return null;
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (!user) {
+      return null;
+    }
+
+    return {
+      generationsUsed: user.generationsUsed,
+      generationsLimit: user.generationsLimit,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+  },
+});
