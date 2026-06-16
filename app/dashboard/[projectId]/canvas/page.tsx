@@ -297,6 +297,12 @@ function CanvasContent({ projectId }: { projectId: string }) {
 
         // Select the new screen shape - this will automatically open the AI sidebar
         dispatchShapes({ type: "SELECT_SHAPE", payload: shapeId });
+
+        pendo.track("screen_created", {
+          project_id: projectId,
+          screen_id: String(convexScreenId),
+          creation_method: "screen_tool",
+        });
       } catch (error) {
         console.error("Failed to create screen:", error);
       }
@@ -358,6 +364,12 @@ function CanvasContent({ projectId }: { projectId: string }) {
       if (screenToDelete.screenId) {
         await deleteScreenMutation({ screenId: screenToDelete.screenId });
       }
+
+      pendo.track("screen_deleted", {
+        screen_id: screenToDelete.screenId ? String(screenToDelete.screenId) : "",
+        project_id: projectId,
+        screen_title: screenToDelete.title || "",
+      });
     } catch (error) {
       console.error("Failed to delete screen:", error);
     } finally {
@@ -483,6 +495,14 @@ function CanvasContent({ projectId }: { projectId: string }) {
         setGenerationContext({
           image: captureResult.blob,
           sourceFrameId: frame.id,
+        });
+
+        pendo.track("frame_to_design_generated", {
+          project_id: projectId,
+          source_frame_id: frame.id,
+          contained_shapes_count: containedShapes.length,
+          frame_width: frame.w,
+          frame_height: frame.h,
         });
       } catch (error) {
         console.error("Failed to generate from frame:", error);

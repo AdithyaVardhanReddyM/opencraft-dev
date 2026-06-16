@@ -104,6 +104,13 @@ export function ScreenToolbar({
         theme: themeId,
       });
 
+      pendo.track("theme_changed", {
+        screen_id: String(screenData._id),
+        previous_theme: screenData.theme || "default",
+        new_theme: themeId,
+        sandbox_id: screenData.sandboxId || "",
+      });
+
       // Refresh the iframe to show new theme
       onRefresh();
     },
@@ -145,6 +152,12 @@ export function ScreenToolbar({
           screenId: screenData._id,
           title: trimmedName,
         });
+
+        pendo.track("screen_renamed", {
+          screen_id: String(screenData._id),
+          new_title: trimmedName,
+          previous_title: screenData.title || "Untitled",
+        });
       } catch (error) {
         console.error("Failed to save screen name:", error);
         setEditedName(screenData?.title || "Untitled");
@@ -175,8 +188,16 @@ export function ScreenToolbar({
     (preset: DevicePreset) => {
       onResize(preset.width, preset.height);
       setIsDeviceDropdownOpen(false);
+
+      pendo.track("screen_device_resized", {
+        screen_id: screenData?._id ? String(screenData._id) : "",
+        device_preset_id: preset.id,
+        device_preset_label: preset.label,
+        width: preset.width,
+        height: preset.height,
+      });
     },
-    [onResize]
+    [onResize, screenData]
   );
 
   // Handle preview click
@@ -184,6 +205,10 @@ export function ScreenToolbar({
     if (status === "expired" || status === "idle") return;
 
     if (status === "ready" && screenData?.sandboxUrl) {
+      pendo.track("screen_previewed", {
+        screen_id: screenData._id ? String(screenData._id) : "",
+        sandbox_url: screenData.sandboxUrl,
+      });
       window.open(screenData.sandboxUrl, "_blank");
       return;
     }

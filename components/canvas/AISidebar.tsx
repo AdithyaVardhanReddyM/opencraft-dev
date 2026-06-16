@@ -177,6 +177,10 @@ export function AISidebar({
 
   const handleSuggestionClick = (suggestion: string) => {
     if (!canGenerate) return;
+    pendo.track("suggestion_used", {
+      suggestion_text: suggestion,
+      screen_id: selectedScreenId || "",
+    });
     if (typeof window !== "undefined" && window.pendo?.trackAgent) {
       window.pendo.trackAgent("prompt", {
         agentId: "wYiI5wkyld0XBfcxyNqOovEQ0Rg",
@@ -740,6 +744,12 @@ function ChatInput({
         const parsed = parseExtensionContent(pastedText);
         if (parsed.isExtensionContent && parsed.data) {
           setExtensionContent(parsed.data);
+          pendo.track("extension_content_pasted", {
+            element_tag_name: parsed.data.data?.metadata?.tagName || "",
+            element_width: parsed.data.data?.metadata?.dimensions?.width || 0,
+            element_height: parsed.data.data?.metadata?.dimensions?.height || 0,
+            has_user_prompt: e.currentTarget.value.trim().length > 0,
+          });
         }
         return;
       }
@@ -972,6 +982,11 @@ function ChatInput({
                               key={model.id}
                               value={model.id}
                               onSelect={() => {
+                                pendo.track("ai_model_changed", {
+                                  previous_model_id: selectedModel,
+                                  new_model_id: model.id,
+                                  model_provider: model.provider,
+                                });
                                 setSelectedModel(model.id);
                                 setModelSelectorOpen(false);
                               }}

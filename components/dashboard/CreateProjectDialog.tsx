@@ -75,6 +75,11 @@ export function CreateProjectDialog({
           description: data.description || undefined,
         });
 
+        pendo.track("project_created", {
+          project_name: data.name,
+          has_description: !!data.description,
+        });
+
         // Show success toast
         toast.success("Project created", {
           description: `"${data.name}" has been created successfully.`,

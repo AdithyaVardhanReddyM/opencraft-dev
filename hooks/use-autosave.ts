@@ -136,6 +136,12 @@ export function useAutosave(
       setError(null);
       retryCountRef.current = 0;
       pendingCloudSyncRef.current = false;
+
+      pendo.track("canvas_state_saved", {
+        project_id: projectId,
+        shapes_count: shapes.length,
+        canvas_version: data.version,
+      });
     } catch (err) {
       console.error("Cloud sync failed:", err);
 

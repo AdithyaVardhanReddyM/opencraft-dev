@@ -452,6 +452,15 @@ export function useChatStreaming({
           imageBase64Urls.push(base64);
         }
 
+        if (imageBase64Urls.length > 0) {
+          pendo.track("image_uploaded", {
+            image_count: images.length,
+            file_types: images.map((img) => img.file.type).join(","),
+            total_size_bytes: images.reduce((sum, img) => sum + img.file.size, 0),
+            model_id: modelId || "default",
+          });
+        }
+
         setStatusText("Starting...");
 
         // Save user message to Convex with image IDs and model
@@ -474,6 +483,17 @@ export function useChatStreaming({
         // Send message via the useAgents hook with model and images in state
         // The state function will be called by useAgents to get current state
         await agentSendMessage(trimmedContent || "[Image attached]");
+
+        pendo.track("ai_prompt_submitted", {
+          model_id: modelId || "default",
+          prompt_length: trimmedContent.length,
+          has_images: images.length > 0,
+          image_count: images.length,
+          has_extension_data: trimmedContent.includes("[UNITSET_ELEMENT_CAPTURE]"),
+          screen_id: screenId,
+          project_id: projectId,
+          is_first_message: !convexMessages || convexMessages.length === 0,
+        });
 
         // Note: isWaitingForResponse will be cleared when Convex receives assistant message
         pendingUserMessageRef.current = null;
