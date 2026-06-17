@@ -628,20 +628,170 @@ html[data-scroll-behavior="smooth"] {
    landing-* class prefixes
    ======================================== */
 
-/* Landing Page Text Glow */
+/* Landing Page Text Glow (white headline over the brand gradient) */
 .landing-text-glow {
-  text-shadow: 0 0 25px oklch(var(--primary) / 0.4);
+  text-shadow: 0 2px 30px rgba(4, 18, 47, 0.35);
 }
 
-/* Landing Page Grid Background */
+/* Use the Fraunces display serif for serif headings on the landing page.
+   Scoped to .landing-page so the rest of the app keeps its own serif. */
+.landing-page .font-serif {
+  font-family: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", Times,
+    serif;
+  font-optical-sizing: auto;
+}
+
+/* Brand gradient hero backdrop — deep blue hour fading down into a warm
+   peach sunset and finally the light page background (mirrors reference). */
+.landing-hero-gradient {
+  background-image: radial-gradient(
+      120% 80% at 50% -8%,
+      rgba(255, 255, 255, 0.22),
+      transparent 55%
+    ),
+    radial-gradient(
+      70% 55% at 82% 6%,
+      rgba(117, 216, 252, 0.45),
+      transparent 60%
+    ),
+    radial-gradient(
+      60% 45% at 12% 22%,
+      rgba(0, 114, 229, 0.4),
+      transparent 65%
+    ),
+    linear-gradient(
+      180deg,
+      #04122f 0%,
+      #07235e 12%,
+      #0a4fb0 26%,
+      #0f7ae6 40%,
+      #4ba6ef 53%,
+      #93cdf5 66%,
+      #d9e9f6 77%,
+      #f7ddca 87%,
+      #faf9f6 100%
+    );
+}
+
+/* Subtle film grain over the hero gradient for depth */
+.landing-hero-gradient::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+/* ── Hero headline "canvas selection" decoration ─────────────────────
+   Wraps the headline in a blue selection box with white corner handles
+   and animates the brand select-cursor in to "click" it into existence. */
+.hero-select-frame {
+  opacity: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25),
+    0 8px 30px -10px rgba(0, 114, 229, 0.5);
+  animation: hero-select-pop 1.2s ease-out 0.55s forwards;
+}
+
+@keyframes hero-select-pop {
+  0%,
+  60% {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+  72% {
+    opacity: 1;
+    transform: scale(0.997);
+  }
+  82% {
+    transform: scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.hero-handle {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  background: #ffffff;
+  border: 1.5px solid #0072e5;
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(2, 12, 40, 0.3);
+}
+.hero-handle.tl {
+  top: -6px;
+  left: -6px;
+}
+.hero-handle.tr {
+  top: -6px;
+  right: -6px;
+}
+.hero-handle.bl {
+  bottom: -6px;
+  left: -6px;
+}
+.hero-handle.br {
+  bottom: -6px;
+  right: -6px;
+}
+
+.hero-select-cursor {
+  bottom: -20px;
+  right: -16px;
+  opacity: 0;
+  filter: drop-shadow(0 2px 5px rgba(2, 12, 40, 0.4));
+  animation: hero-cursor-move 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.45s forwards;
+}
+
+@keyframes hero-cursor-move {
+  0% {
+    opacity: 0;
+    transform: translate(44px, 44px) scale(1);
+  }
+  20% {
+    opacity: 1;
+  }
+  46% {
+    /* arrive at the corner */
+    transform: translate(0, 0) scale(1);
+  }
+  54% {
+    /* click down */
+    transform: translate(0, 0) scale(0.8);
+  }
+  62% {
+    /* release */
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    /* glide out and away so the corner + handle stay visible */
+    opacity: 1;
+    transform: translate(46px, 18px) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-select-frame,
+  .hero-select-cursor {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}
+
+/* Landing Page Grid Background (dark hairlines for the light theme) */
 .landing-grid-bg {
   background-size: 100px 200px;
   background-image: linear-gradient(
       to right,
-      rgba(255, 255, 255, 0.03) 1px,
+      rgba(15, 23, 42, 0.045) 1px,
       transparent 1px
     ),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.045) 1px, transparent 1px);
   mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
 }
 
@@ -953,7 +1103,7 @@ html[data-scroll-behavior="smooth"] {
 .landing-spotlight-bg {
   background: radial-gradient(
     600px circle at var(--mouse-x) var(--mouse-y),
-    rgba(255, 255, 255, 0.06),
+    rgba(0, 114, 229, 0.08),
     transparent 40%
   );
 }

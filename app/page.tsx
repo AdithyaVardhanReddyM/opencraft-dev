@@ -6,14 +6,12 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowRight,
   ArrowUpRight,
-  Layout,
   Headphones,
   Wallet,
-  MessageCircle,
   Loader2,
+  Play,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import Script from "next/script";
 
 export default function Page() {
   const spotlightRefs = useRef<HTMLDivElement[]>([]);
@@ -48,44 +46,19 @@ export default function Page() {
   };
 
   return (
-    <div className="landing-page min-h-screen overflow-x-hidden selection:bg-primary selection:text-primary-foreground relative bg-[#030303] text-white">
-      {/* Animated Background - UnicornStudio */}
-      <div
-        className="fixed inset-0 w-full h-screen z-0 pointer-events-none"
-        style={{
-          maskImage:
-            "linear-gradient(transparent, black 0%, black 80%, transparent)",
-          filter: "hue-rotate(190deg) saturate(1.2)",
-        }}
-      >
-        <div
-          data-us-project="FixNvEwvWwbu3QX9qC3F"
-          className="absolute inset-0 w-full h-full"
-          style={{ minHeight: "100vh" }}
-        />
-      </div>
-      <Script
-        id="unicorn-studio"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `
-            !function(){if(!window.UnicornStudio){window.UnicornStudio={isInitialized:!1};var i=document.createElement("script");i.src="https://cdn.jsdelivr.net/gh/hiunicornstudio/unicornstudio.js@v1.4.29/dist/unicornStudio.umd.js",i.onload=function(){window.UnicornStudio.isInitialized||(UnicornStudio.init(),window.UnicornStudio.isInitialized=!0)},(document.head || document.body).appendChild(i)}}();
-          `,
-        }}
-      />
+    <div className="landing-page min-h-screen overflow-x-hidden selection:bg-primary selection:text-primary-foreground relative bg-[#faf9f6] text-[#15151c]">
+      {/* Brand Gradient Hero Backdrop — blue hour fading into a warm sunset */}
+      <div className="landing-hero-gradient absolute top-0 left-0 right-0 h-[1100px] z-0 overflow-hidden pointer-events-none" />
 
-      {/* Background Effects */}
-      <div className="fixed inset-0 landing-grid-bg pointer-events-none z-[1]" />
-
-      {/* Navigation: Pill Shaped & Floating */}
-      <nav className="fixed -translate-x-1/2 flex shadow-black/50 transition-all duration-300 hover:border-white/20 hover:shadow-primary/5 bg-gradient-to-br from-white/10 to-white/0 w-full lg:w-fit max-w-[90vw] z-50 rounded-full ring-white/10 ring-1 pt-1.5 pr-1.5 pb-1.5 pl-4 top-6 left-1/2 shadow-[0_2.8px_2.2px_rgba(0,_0,_0,_0.034),_0_6.7px_5.3px_rgba(0,_0,_0,_0.048),_0_12.5px_10px_rgba(0,_0,_0,_0.06),_0_22.3px_17.9px_rgba(0,_0,_0,_0.072),_0_41.8px_33.4px_rgba(0,_0,_0,_0.086),_0_100px_80px_rgba(0,_0,_0,_0.12)] backdrop-blur-xl items-center justify-between">
+      {/* Navigation: Frosted Pill, Floating */}
+      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex w-full lg:w-fit max-w-[90vw] items-center justify-between rounded-full bg-white/45 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-white/50 border border-white/40 pt-1.5 pr-1.5 pb-1.5 pl-4 shadow-[0_8px_32px_rgba(2,12,40,0.14),inset_0_1px_0_rgba(255,255,255,0.65)] transition-all duration-300 hover:bg-white/60">
         {/* Logo Area */}
         <Link href="/" className="flex items-center mr-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/opencraft_full_logo.svg"
             alt="OpenCraft"
-            className="h-5 w-auto"
+            className="h-7 w-auto"
           />
         </Link>
 
@@ -93,19 +66,19 @@ export default function Page() {
         <div className="hidden md:flex items-center gap-6 mr-8">
           <Link
             href="#features"
-            className="text-xs font-medium text-white/50 hover:text-white transition-colors"
+            className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors"
           >
             Features
           </Link>
           <Link
             href="#philosophy"
-            className="text-xs font-medium text-white/50 hover:text-white transition-colors"
+            className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors"
           >
             Philosophy
           </Link>
           <Link
             href="/pricing"
-            className="text-xs font-medium text-white/50 hover:text-white transition-colors"
+            className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors"
           >
             Pricing
           </Link>
@@ -131,65 +104,95 @@ export default function Page() {
       <main className="container lg:px-12 flex flex-col z-10 mx-auto pt-32 px-6 relative items-center">
         {/* Hero Text - Centered */}
         <div className="flex flex-col items-center text-center w-full max-w-3xl pt-12 pb-16">
-          {/* <h4 className="text-xs font-mono tracking-[0.2em] text-white/40 uppercase mb-6 flex items-center gap-2 justify-center">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-            </span>
-            AI-Powered Design
-          </h4> */}
+          <div className="animate-slide-up relative inline-block mb-10">
+            <h1 className="landing-text-glow lg:text-7xl leading-[1.05] text-4xl tracking-tight font-serif text-white px-3 py-1">
+              Vibe design for
+              <br />
+              <span className="italic text-[#a9defc]">vibe coders.</span>
+            </h1>
 
-          <h1 className="lg:text-6xl leading-[1.1] text-primary landing-text-glow text-4xl italic tracking-tight font-serif mb-5">
-            Vibe design for
-            <br />
-            <span className="text-white opacity-90">vibe coders.</span>
-          </h1>
+            {/* Canvas-style selection frame with corner handles */}
+            <div
+              aria-hidden="true"
+              className="hero-select-frame pointer-events-none absolute -inset-2 rounded-[4px] border-2 border-[#0072e5]"
+            >
+              <span className="hero-handle tl" />
+              <span className="hero-handle tr" />
+              <span className="hero-handle bl" />
+              <span className="hero-handle br" />
+            </div>
 
-          <p className="font-sans text-lg lg:text-xl font-light text-white/70 leading-relaxed tracking-tight max-w-xl mb-10">
+            {/* Animated brand select-cursor that "clicks" the box into view */}
+            <div
+              aria-hidden="true"
+              className="hero-select-cursor pointer-events-none absolute"
+            >
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"
+                  fill="#ffffff"
+                  stroke="#0072e5"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+          </div>
+
+          <p className="animate-slide-up stagger-1 font-sans text-lg lg:text-xl font-light text-white/85 leading-relaxed tracking-tight max-w-xl mb-10">
             A simple yet powerful design tool for developers who want to level
             up their UI game. Intuitive canvas, AI-powered generation, sandboxes
             for live previews, and{" "}
             <span className="text-white font-medium">so much more</span>.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-5 items-center justify-center">
-            {/* Animated Shiny CTA Button */}
+          <div className="animate-slide-up stagger-2 flex flex-col sm:flex-row gap-3 items-center justify-center">
+            {/* Primary — solid white pill, reads crisp on the gradient */}
             <button
               onClick={() => handleNavigate("hero")}
               disabled={isNavigating === "hero"}
-              className="landing-shiny-cta focus:outline-hidden disabled:opacity-70 disabled:cursor-not-allowed"
+              className="group inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-[#0a4fb0] ring-1 ring-white/70 shadow-[0_10px_26px_-10px_rgba(2,12,40,0.5)] hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-12px_rgba(2,12,40,0.6)] transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isNavigating === "hero" ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <span>Start Designing</span>
+                <>
+                  Start Designing
+                  <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </>
               )}
             </button>
 
-            {/* Secondary Button */}
-            <button className="hover:bg-white/10 hover:text-white transition-all flex text-sm font-medium text-slate-300 bg-white/5 rounded-full py-5 px-10 gap-2 items-center group landing-border-gradient">
-              <span className="text-sm font-medium tracking-tight">
-                Watch Demo
+            {/* Secondary — frosted glass with a play badge */}
+            <button className="group inline-flex items-center gap-2.5 rounded-full border border-white/40 bg-white/10 px-5 py-2.5 text-sm font-medium text-white backdrop-blur-md hover:bg-white/20 hover:border-white/60 transition-all duration-300">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 group-hover:bg-white/30 transition-colors">
+                <Play className="h-2.5 w-2.5 fill-white text-white translate-x-px" />
               </span>
-              <ArrowRight className="h-4 w-4 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+              <span className="tracking-tight">Watch Demo</span>
             </button>
           </div>
         </div>
 
         {/* Canvas Preview - Below Hero */}
-        <div className="w-full flex relative items-center justify-center pb-32">
+        <div className="animate-scale-in stagger-3 w-full flex relative items-center justify-center pb-32">
           {/* Background Glow */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-[80%] h-[60%] bg-primary/30 blur-[120px] rounded-full opacity-50" />
+            <div className="w-[80%] h-[60%] bg-primary/25 blur-[120px] rounded-full opacity-60" />
           </div>
 
-          {/* Canvas Image with Primary Border */}
-          <div className="relative w-full max-w-4xl group">
+          {/* Canvas Image with Soft Frame */}
+          <div className="relative w-full max-w-6xl group">
             {/* Outer Glow Ring */}
             <div className="absolute -inset-1 bg-primary/20 rounded-2xl blur-md opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
 
             {/* Image Container */}
-            <div className="relative rounded-xl overflow-hidden border-2 border-primary/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_0_50px_-10px_rgba(var(--primary),0.3)]">
+            <div className="relative rounded-xl overflow-hidden border border-white/70 ring-1 ring-slate-900/10 shadow-[0_30px_80px_-20px_rgba(2,12,40,0.45)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/canvas_resized.png"
@@ -199,29 +202,27 @@ export default function Page() {
             </div>
           </div>
         </div>
-
-        {/* Logo Marquee Section */}
       </main>
 
       {/* Features Section */}
       <section
         id="features"
-        className="flex flex-col overflow-hidden lg:px-12 z-10 bg-black/50 w-full border-white/5 border-t pt-32 px-6 pb-32 relative backdrop-blur-3xl items-center"
+        className="flex flex-col overflow-hidden lg:px-12 z-10 bg-[#faf9f6] w-full border-slate-200/70 border-t pt-32 px-6 pb-32 relative items-center"
       >
         {/* Clean Background Line */}
-        <div className="absolute top-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+        <div className="absolute top-0 w-full h-px bg-gradient-to-r from-transparent via-slate-300/50 to-transparent" />
 
         {/* Section Header */}
         <div className="flex flex-col items-center text-center max-w-4xl mb-20 relative z-10">
           <span className="text-xs font-mono text-primary/80 uppercase tracking-[0.3em] mb-6">
             Everything you need
           </span>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-medium tracking-tight text-white mb-6 leading-[1.1]">
-            From <span className="italic text-white/70">sketch</span> to{" "}
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-medium tracking-tight text-[#15151c] mb-6 leading-[1.1]">
+            From <span className="italic text-slate-400">sketch</span> to{" "}
             <span className="text-primary">ship</span>,
             <br className="hidden sm:block" /> all in one place.
           </h2>
-          <p className="text-lg text-white/50 leading-relaxed max-w-xl font-light">
+          <p className="text-lg text-slate-500 leading-relaxed max-w-xl font-light">
             Your complete design-to-code workflow — draw, generate, edit, and
             export.
           </p>
@@ -232,7 +233,7 @@ export default function Page() {
           {/* Card 1: Infinite Canvas - Large Featured */}
           <div
             ref={addSpotlightRef}
-            className="landing-spotlight-card group relative flex flex-col lg:col-span-7 lg:row-span-2 rounded-[24px] border border-white/10 bg-white/[0.02] overflow-hidden transition-all duration-500"
+            className="landing-spotlight-card group relative flex flex-col md:col-span-2 lg:col-span-7 lg:row-span-2 rounded-[24px] border border-slate-200/80 bg-white overflow-hidden transition-all duration-500 shadow-[0_1px_2px_rgba(2,12,40,0.04),0_18px_44px_-26px_rgba(2,12,40,0.22)] hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(2,12,40,0.04),0_28px_60px_-24px_rgba(0,114,229,0.28)]"
           >
             <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[24px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -242,10 +243,10 @@ export default function Page() {
               <span className="inline-block text-[10px] font-mono text-primary/70 uppercase tracking-widest mb-3">
                 Core Feature
               </span>
-              <h3 className="text-2xl md:text-3xl font-serif font-medium tracking-tight text-white mb-2">
+              <h3 className="text-2xl md:text-3xl font-serif font-medium tracking-tight text-[#15151c] mb-2">
                 Infinite Canvas
               </h3>
-              <p className="text-sm text-white/40 leading-relaxed font-light max-w-md">
+              <p className="text-sm text-slate-500 leading-relaxed font-light max-w-md">
                 Sketch wireframes, brainstorm ideas, and draw shapes freely.
                 Pan, zoom, and organize your thoughts on a limitless workspace.
               </p>
@@ -259,14 +260,14 @@ export default function Page() {
                 alt="Infinite Canvas for wireframing"
                 className="w-full h-full object-cover object-top group-hover:scale-[1.02] transition-transform duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent" />
             </div>
           </div>
 
           {/* Card 2: AI Chat Generation - Tall Right */}
           <div
             ref={addSpotlightRef}
-            className="landing-spotlight-card group relative flex flex-col lg:col-span-5 rounded-[24px] border border-white/10 bg-white/[0.02] overflow-hidden transition-all duration-500"
+            className="landing-spotlight-card group relative flex flex-col lg:col-span-5 rounded-[24px] border border-slate-200/80 bg-white overflow-hidden transition-all duration-500 shadow-[0_1px_2px_rgba(2,12,40,0.04),0_18px_44px_-26px_rgba(2,12,40,0.22)] hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(2,12,40,0.04),0_28px_60px_-24px_rgba(0,114,229,0.28)]"
           >
             <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[24px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -279,15 +280,15 @@ export default function Page() {
                 alt="AI-powered component generation"
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-transparent opacity-80" />
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent opacity-80" />
             </div>
 
             {/* Content */}
             <div className="p-6 relative z-10">
-              <h3 className="text-lg font-semibold tracking-tight text-white mb-2">
+              <h3 className="text-lg font-semibold tracking-tight text-[#15151c] mb-2">
                 AI Chat Generation
               </h3>
-              <p className="text-xs text-white/40 leading-relaxed font-light">
+              <p className="text-xs text-slate-500 leading-relaxed font-light">
                 Describe your UI in plain English. Get production-ready
                 components with live preview.
               </p>
@@ -297,7 +298,7 @@ export default function Page() {
           {/* Card 3: Visual Editor - Small */}
           <div
             ref={addSpotlightRef}
-            className="landing-spotlight-card group relative flex flex-col lg:col-span-5 rounded-[24px] border border-white/10 bg-white/[0.02] overflow-hidden transition-all duration-500"
+            className="landing-spotlight-card group relative flex flex-col lg:col-span-5 rounded-[24px] border border-slate-200/80 bg-white overflow-hidden transition-all duration-500 shadow-[0_1px_2px_rgba(2,12,40,0.04),0_18px_44px_-26px_rgba(2,12,40,0.22)] hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(2,12,40,0.04),0_28px_60px_-24px_rgba(0,114,229,0.28)]"
           >
             <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[24px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -310,15 +311,15 @@ export default function Page() {
                 alt="Professional visual editor"
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-transparent opacity-80" />
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent opacity-80" />
             </div>
 
             {/* Content */}
             <div className="p-6 relative z-10">
-              <h3 className="text-lg font-semibold tracking-tight text-white mb-2">
+              <h3 className="text-lg font-semibold tracking-tight text-[#15151c] mb-2">
                 Visual Editor
               </h3>
-              <p className="text-xs text-white/40 leading-relaxed font-light">
+              <p className="text-xs text-slate-500 leading-relaxed font-light">
                 Edit components visually. Fine-tune styles without touching
                 code.
               </p>
@@ -328,20 +329,20 @@ export default function Page() {
           {/* Card 4: Code Export - Wide */}
           <div
             ref={addSpotlightRef}
-            className="landing-spotlight-card group relative flex flex-col md:flex-row lg:col-span-8 rounded-[24px] border border-white/10 bg-white/[0.02] overflow-hidden transition-all duration-500"
+            className="landing-spotlight-card group relative flex flex-col md:flex-row md:col-span-2 lg:col-span-8 rounded-[24px] border border-slate-200/80 bg-white overflow-hidden transition-all duration-500 shadow-[0_1px_2px_rgba(2,12,40,0.04),0_18px_44px_-26px_rgba(2,12,40,0.22)] hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(2,12,40,0.04),0_28px_60px_-24px_rgba(0,114,229,0.28)]"
           >
             <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[24px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
             {/* Content - Left */}
             <div className="p-8 relative z-10 flex flex-col justify-center md:w-2/5">
-              <span className="inline-block text-[10px] font-mono text-white/30 uppercase tracking-widest mb-2">
+              <span className="inline-block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2">
                 Export
               </span>
-              <h3 className="text-xl font-semibold tracking-tight text-white mb-3">
+              <h3 className="text-xl font-semibold tracking-tight text-[#15151c] mb-3">
                 Ship to your <span className="text-primary">IDE</span>
               </h3>
-              <p className="text-sm text-white/40 leading-relaxed font-light">
+              <p className="text-sm text-slate-500 leading-relaxed font-light">
                 Export clean, production-ready code. React, Next.js, and more —
                 ready to ship.
               </p>
@@ -355,18 +356,18 @@ export default function Page() {
                 alt="Export clean code to your IDE"
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#080808] via-transparent to-transparent opacity-60 hidden md:block" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-transparent opacity-60 md:hidden" />
+              <div className="absolute inset-0 bg-gradient-to-r from-white via-transparent to-transparent opacity-70 hidden md:block" />
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent opacity-70 md:hidden" />
             </div>
           </div>
 
           {/* Card 5: Frame to Design - Vertical */}
           <div
             ref={addSpotlightRef}
-            className="landing-spotlight-card group relative flex flex-col lg:col-span-4 lg:row-span-2 rounded-[24px] border border-white/10 bg-white/[0.02] overflow-hidden transition-all duration-500"
+            className="landing-spotlight-card group relative flex flex-col lg:col-span-4 lg:row-span-2 rounded-[24px] border border-slate-200/80 bg-white overflow-hidden transition-all duration-500 shadow-[0_1px_2px_rgba(2,12,40,0.04),0_18px_44px_-26px_rgba(2,12,40,0.22)] hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(2,12,40,0.04),0_28px_60px_-24px_rgba(0,114,229,0.28)]"
           >
-            <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[24px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-20" />
+            <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[24px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-20" />
 
             {/* Image - Full height background */}
             <div className="absolute inset-0 z-0 overflow-hidden">
@@ -376,43 +377,45 @@ export default function Page() {
                 alt="Frame to design generation"
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-white/60 via-transparent to-transparent" />
             </div>
 
-            {/* Content - Bottom overlay */}
-            <div className="p-8 relative z-10 mt-auto">
-              <span className="inline-flex items-center gap-2 text-[10px] font-mono text-primary uppercase tracking-widest mb-3">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                AI Magic
-              </span>
-              <h3 className="text-xl font-semibold tracking-tight text-white mb-2">
-                Frame to Design
-              </h3>
-              <p className="text-sm text-white/50 leading-relaxed font-light">
-                Sketch a wireframe and let AI bring it to life. Transform rough
-                ideas into polished designs instantly.
-              </p>
+            {/* Content - Bottom frosted panel */}
+            <div className="p-6 relative z-10 mt-auto">
+              <div className="rounded-2xl border border-white/70 bg-white/80 backdrop-blur-md p-5 shadow-[0_8px_24px_-12px_rgba(2,12,40,0.3)]">
+                <span className="inline-flex items-center gap-2 text-[10px] font-mono text-primary uppercase tracking-widest mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                  AI Magic
+                </span>
+                <h3 className="text-xl font-semibold tracking-tight text-[#15151c] mb-2">
+                  Frame to Design
+                </h3>
+                <p className="text-sm text-slate-600 leading-relaxed font-light">
+                  Sketch a wireframe and let AI bring it to life. Transform
+                  rough ideas into polished designs instantly.
+                </p>
+              </div>
             </div>
           </div>
 
           {/* Card 6: Chrome Extension - Wide bottom */}
           <div
             ref={addSpotlightRef}
-            className="landing-spotlight-card group relative flex flex-col md:flex-row-reverse lg:col-span-8 rounded-[24px] border border-white/10 bg-white/[0.02] overflow-hidden transition-all duration-500"
+            className="landing-spotlight-card group relative flex flex-col md:flex-row-reverse md:col-span-2 lg:col-span-8 rounded-[24px] border border-slate-200/80 bg-white overflow-hidden transition-all duration-500 shadow-[0_1px_2px_rgba(2,12,40,0.04),0_18px_44px_-26px_rgba(2,12,40,0.22)] hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(2,12,40,0.04),0_28px_60px_-24px_rgba(0,114,229,0.28)]"
           >
             <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[24px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
             {/* Content - Right */}
             <div className="p-8 relative z-10 flex flex-col justify-center md:w-1/2">
-              <span className="inline-block text-[10px] font-mono text-white/30 uppercase tracking-widest mb-2">
+              <span className="inline-block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2">
                 Chrome Extension
               </span>
-              <h3 className="text-xl font-semibold tracking-tight text-white mb-3">
+              <h3 className="text-xl font-semibold tracking-tight text-[#15151c] mb-3">
                 Remix <span className="italic font-serif font-normal">any</span>{" "}
                 component
               </h3>
-              <p className="text-sm text-white/40 leading-relaxed font-light">
+              <p className="text-sm text-slate-500 leading-relaxed font-light">
                 See a component you love? Capture and remix it into your own
                 customized version with our browser extension.
               </p>
@@ -426,8 +429,55 @@ export default function Page() {
                 alt="Chrome extension for component remix"
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-l from-[#080808] via-transparent to-transparent opacity-60 hidden md:block" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-transparent opacity-60 md:hidden" />
+              <div className="absolute inset-0 bg-gradient-to-l from-white via-transparent to-transparent opacity-70 hidden md:block" />
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent opacity-70 md:hidden" />
+            </div>
+          </div>
+
+          {/* Card 7: Create Flow - Full-width Flagship */}
+          <div
+            ref={addSpotlightRef}
+            className="landing-spotlight-card group relative flex flex-col lg:flex-row md:col-span-2 lg:col-span-12 rounded-[24px] border border-slate-200/80 bg-white overflow-hidden transition-all duration-500 shadow-[0_1px_2px_rgba(2,12,40,0.04),0_18px_44px_-26px_rgba(2,12,40,0.22)] hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(2,12,40,0.04),0_30px_70px_-24px_rgba(0,114,229,0.3)] min-h-[360px]"
+          >
+            <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[24px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+            {/* Content - Left */}
+            <div className="p-8 lg:p-12 relative z-10 flex flex-col justify-center lg:w-2/5">
+              <span className="inline-flex items-center gap-2 text-[10px] font-mono text-primary uppercase tracking-widest mb-3">
+                <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[9px] font-semibold tracking-wider">
+                  New
+                </span>
+                Sandbox · Create Flow
+              </span>
+              <h3 className="text-2xl md:text-3xl font-serif font-medium tracking-tight text-[#15151c] mb-3">
+                From shape to{" "}
+                <span className="text-primary italic">live screen</span>
+              </h3>
+              <p className="text-sm md:text-base text-slate-500 leading-relaxed font-light max-w-md">
+                Drop a screen shape on the canvas, hit{" "}
+                <span className="text-slate-700 font-medium">Create Flow</span>,
+                and OpenCraft spins up a live sandbox — your design running as
+                real, editable code in seconds. Chain screens together to
+                prototype an entire product flow.
+              </p>
+
+              <div className="mt-6 flex items-center gap-2 text-xs font-medium text-primary">
+                <span>See it in action</span>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+
+            {/* Image - Right */}
+            <div className="relative z-10 flex-1 min-h-[260px] lg:min-h-0 overflow-hidden border-t lg:border-t-0 lg:border-l border-slate-200/70">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/feature_7.png"
+                alt="Create Flow — turn a screen shape into a live sandbox preview"
+                className="w-full h-full object-cover object-left-top group-hover:scale-[1.02] transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-white opacity-60 hidden lg:block" />
+              <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-white opacity-60 lg:hidden" />
             </div>
           </div>
         </div>
@@ -436,33 +486,30 @@ export default function Page() {
       {/* Philosophy Section */}
       <section
         id="philosophy"
-        className="overflow-hidden flex flex-col px-6 md:px-8 lg:px-12 z-10 bg-[#030303]/80 w-full border-white/5 border-t pt-32 pb-32 relative backdrop-blur-xl items-center"
+        className="overflow-hidden flex flex-col px-6 md:px-8 lg:px-12 z-10 bg-[#faf9f6] w-full border-slate-200/70 border-t pt-32 pb-32 relative items-center"
       >
         {/* Subtle Background Grid */}
-        <div className="absolute inset-0 landing-grid-bg opacity-50 pointer-events-none" />
+        <div className="absolute inset-0 landing-grid-bg opacity-60 pointer-events-none" />
 
         <div className="max-w-7xl w-full relative z-10">
           {/* Header Group */}
           <div className="flex flex-col gap-6 mb-20 max-w-5xl">
-            {/* <span className="text-xs font-mono text-primary/80 uppercase tracking-[0.3em]">
-              Our Philosophy
-            </span> */}
-            <h2 className="text-3xl md:text-4xl lg:text-6xl font-serif font-medium tracking-tight text-white leading-[1.15]">
+            <h2 className="text-3xl md:text-4xl lg:text-6xl font-serif font-medium tracking-tight text-[#15151c] leading-[1.15]">
               Stop juggling between{" "}
-              <span className="line-through text-white/30 decoration-white/20">
+              <span className="line-through text-slate-400 decoration-slate-300">
                 Figma
               </span>
               ,{" "}
-              <span className="line-through text-white/30 decoration-white/20">
+              <span className="line-through text-slate-400 decoration-slate-300">
                 IDEs
               </span>
               , and{" "}
-              <span className="line-through text-white/30 decoration-white/20">
+              <span className="line-through text-slate-400 decoration-slate-300">
                 vibe coding tools
               </span>
               .
               <br />
-              <span className="text-white/50 italic">
+              <span className="text-slate-400 italic">
                 Let us handle the design.
               </span>
             </h2>
@@ -472,20 +519,20 @@ export default function Page() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-end">
             {/* Visual / Portrait Block */}
             <div className="lg:col-span-4 relative group">
-              <div className="relative w-full aspect-[3.5/4] rounded-[24px] overflow-hidden border border-white/10 bg-white/[0.02]">
+              <div className="relative w-full aspect-[3.5/4] rounded-[24px] overflow-hidden border border-slate-200/80 bg-slate-50 shadow-[0_18px_44px_-26px_rgba(2,12,40,0.25)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="./vibe_coder.png"
                   alt="Vibe Coder"
-                  className="w-full h-full object-cover grayscale mix-blend-luminosity opacity-60 group-hover:opacity-80 group-hover:scale-105 transition-all duration-700 ease-out"
+                  className="w-full h-full object-cover grayscale-[0.25] opacity-95 group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700 ease-out"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-transparent opacity-80" />
+                <div className="absolute inset-0 bg-gradient-to-t from-white/70 via-transparent to-transparent" />
                 <div className="absolute top-5 left-5 right-5 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                   <div className="flex gap-1.5">
-                    <div className="w-1 h-1 bg-white/40 rounded-full" />
-                    <div className="w-1 h-1 bg-white/40 rounded-full" />
+                    <div className="w-1 h-1 bg-slate-400 rounded-full" />
+                    <div className="w-1 h-1 bg-slate-400 rounded-full" />
                   </div>
-                  <div className="px-2 py-0.5 rounded border border-white/10 bg-black/20 backdrop-blur-md">
+                  <div className="px-2 py-0.5 rounded border border-slate-200 bg-white/80 backdrop-blur-md">
                     <span className="text-[9px] font-mono text-primary tracking-wider">
                       LIVE
                     </span>
@@ -499,13 +546,13 @@ export default function Page() {
               {/* Quote */}
               <blockquote className="mb-12 relative">
                 <svg
-                  className="absolute -top-6 -left-8 w-6 h-6 text-white/10"
+                  className="absolute -top-6 -left-8 w-6 h-6 text-slate-200"
                   fill="currentColor"
                   viewBox="0 0 24 24"
                 >
                   <path d="M14.017 21L14.017 18C14.017 16.8954 14.9124 16 16.017 16H19.017C19.5693 16 20.017 15.5523 20.017 15V9C20.017 8.44772 19.5693 8 19.017 8H15.017C14.4647 8 14.017 8.44772 14.017 9V11C14.017 11.5523 13.5693 12 13.017 12H12.017V5H22.017V15C22.017 18.3137 19.3307 21 16.017 21H14.017ZM5.0166 21L5.0166 18C5.0166 16.8954 5.91203 16 7.0166 16H10.0166C10.5689 16 11.0166 15.5523 11.0166 15V9C11.0166 8.44772 10.5689 8 10.0166 8H6.0166C5.46432 8 5.0166 8.44772 5.0166 9V11C5.0166 11.5523 4.56889 12 4.0166 12H3.0166V5H13.0166V15C13.0166 18.3137 10.3303 21 7.0166 21H5.0166Z" />
                 </svg>
-                <p className="text-xl md:text-2xl lg:text-3xl text-white/80 font-light leading-relaxed tracking-tight">
+                <p className="text-xl md:text-2xl lg:text-3xl text-slate-700 font-light leading-relaxed tracking-tight">
                   All-in-one vibe coding tools try to do everything and end up
                   generating AI slop. OpenCraft focuses on{" "}
                   <span className="text-primary font-medium">design</span> —
@@ -516,14 +563,14 @@ export default function Page() {
 
               {/* Author */}
               <div className="mb-12 flex items-center gap-4">
-                <div className="h-px w-8 bg-primary/30" />
+                <div className="h-px w-8 bg-primary/40" />
               </div>
 
               {/* Bottom Row: Stat & CTA */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-t border-white/5 pt-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-t border-slate-200/70 pt-8">
                 {/* Metric Pill */}
-                <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-full border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-colors group cursor-default">
-                  <span className="text-[10px] md:text-xs text-white/50 font-mono uppercase tracking-wide group-hover:text-white/70 transition-colors">
+                <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition-colors group cursor-default shadow-sm">
+                  <span className="text-[10px] md:text-xs text-slate-500 font-mono uppercase tracking-wide group-hover:text-slate-700 transition-colors">
                     The right tool for the{" "}
                     <span className="text-primary">right job</span>
                   </span>
@@ -534,12 +581,15 @@ export default function Page() {
                 <button
                   onClick={() => handleNavigate("philosophy")}
                   disabled={isNavigating === "philosophy"}
-                  className="landing-shiny-cta group !px-7 !py-3 disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="group inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-[0_14px_30px_-10px_rgba(0,114,229,0.6)] hover:bg-primary/90 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isNavigating === "philosophy" ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
-                    <span className="text-sm font-medium">Start Designing</span>
+                    <>
+                      Start Designing
+                      <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                    </>
                   )}
                 </button>
               </div>
@@ -548,91 +598,49 @@ export default function Page() {
         </div>
       </section>
 
-      {/* Exchange/Product Section */}
-      <section className="lg:px-12 flex flex-col overflow-hidden z-10 bg-[#030303]/50 w-full border-white/5 border-t px-6 py-32 relative backdrop-blur-xl items-center">
-        {/* Background Texture */}
-        <div className="absolute inset-0 landing-grid-bg opacity-70 pointer-events-none" />
-
-        <div className="max-w-7xl w-full relative z-10">
-          {/* Header Section */}
-          <div className="w-full mb-20 overflow-hidden rounded-2xl border border-white/10">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/franken.svg"
-              alt="Design Infrastructure"
-              className="w-full h-auto block"
-              style={{
-                transform: "scale(1.02)",
-                transformOrigin: "center center",
-              }}
-            />
-          </div>
-
-          {/* Main Feature Card */}
-          <div className="w-full rounded-[24px] border border-white/10 bg-[#080808] overflow-hidden flex flex-col lg:flex-row relative group">
-            {/* Left Column: Image */}
-            <div className="lg:w-1/2 relative min-h-[280px] overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/anatomy.jpg"
-                alt="Project Anatomy"
-                className="w-full h-full object-cover"
-              />
-            </div>
-
-            {/* Right Column: Text */}
-            <div className="lg:w-1/2 p-6 md:p-8 lg:p-10 flex flex-col justify-center items-start z-10 relative bg-[#080808] border-t lg:border-t-0 lg:border-l border-white/5">
-              <p className="text-white/80 text-base md:text-lg lg:text-xl leading-relaxed font-serif italic">
-                &ldquo;Our project is a technological chimera. We took a Canvas
-                Interface (for drawing), stitched it with a Chrome Extension,
-                grafted on some GenAI, and wired it all with Sandboxes. We
-                forced incompatible mediums—hand-drawn sketches, imported
-                website components, and raw text—to inhabit the same living
-                body. It is a weird, multi-headed beast that allows users to
-                imagine components, sketch and &apos;scavenge&apos; parts from
-                the web and bring them back to life, exactly like Dr.
-                Frankenstein assembling his creation.&rdquo;
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* CTA Banner Section */}
-      <section className="flex lg:px-12 bg-[#030303]/80 w-full z-10 border-white/5 border-t px-6 py-32 relative backdrop-blur-xl justify-center">
-        <div className="w-full max-w-7xl bg-primary rounded-[32px] relative overflow-hidden flex flex-col lg:flex-row items-start lg:items-end justify-between p-10 lg:p-24 group">
+      <section className="flex lg:px-12 bg-[#faf9f6] w-full z-10 border-slate-200/70 border-t px-6 py-32 relative justify-center">
+        <div className="w-full max-w-7xl bg-primary rounded-[32px] relative overflow-hidden flex flex-col lg:flex-row items-start lg:items-end justify-between p-10 lg:p-24 group shadow-[0_40px_90px_-32px_rgba(0,114,229,0.55)]">
           {/* Animated Effects */}
           <div className="absolute inset-0 opacity-20 mix-blend-soft-light bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E')]" />
           <div className="absolute -right-40 -top-40 w-[600px] h-[600px] bg-white/20 blur-[120px] rounded-full pointer-events-none opacity-60 mix-blend-overlay group-hover:scale-110 transition-transform duration-1000" />
-          <div className="absolute bottom-0 left-0 w-full h-full bg-[radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.15),transparent_60%)] pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-full h-full bg-[radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.18),transparent_60%)] pointer-events-none" />
 
           {/* Left Content */}
           <div className="relative z-10 flex flex-col max-w-2xl mb-12 lg:mb-0">
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-medium tracking-tight text-[#030303] mb-8 leading-[1.05]">
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-medium tracking-tight text-white mb-8 leading-[1.05]">
               Ready to transform your{" "}
-              <span className="opacity-60 italic">design workflow?</span>
+              <span className="opacity-70 italic">design workflow?</span>
             </h2>
           </div>
 
           {/* Right Content */}
           <div className="relative z-10 max-w-md pb-2 lg:text-right flex flex-col items-start lg:items-end gap-6">
-            <p className="text-[#030303]/70 text-lg lg:text-xl font-medium leading-relaxed">
+            <p className="text-white/85 text-lg lg:text-xl font-medium leading-relaxed">
               Our AI-powered design tools are ready to help you create stunning
               interfaces in minutes, not hours.
             </p>
 
-            {/* Abstract Decor Lines */}
-            <div className="hidden lg:flex gap-1.5 opacity-30">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#030303]" />
-              <div className="w-1.5 h-1.5 rounded-full bg-[#030303]" />
-              <div className="w-12 h-1.5 rounded-full bg-[#030303]" />
-            </div>
+            <button
+              onClick={() => handleNavigate("cta")}
+              disabled={isNavigating === "cta"}
+              className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-semibold text-primary hover:bg-white/90 transition-colors shadow-[0_10px_30px_-8px_rgba(2,12,40,0.45)] disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isNavigating === "cta" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Start Designing
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="lg:px-12 flex flex-col z-10 overflow-hidden bg-[#030303] w-full border-white/5 border-t pt-12 px-6 pb-12 relative items-center">
+      <footer className="lg:px-12 flex flex-col z-10 overflow-hidden bg-[#faf9f6] w-full border-slate-200/70 border-t pt-12 px-6 pb-12 relative items-center">
         {/* Background Grid */}
         <div className="absolute inset-0 landing-grid-bg [mask-image:linear-gradient(to_bottom,transparent,black_20%)] pointer-events-none" />
 
@@ -645,7 +653,7 @@ export default function Page() {
               alt="OpenCraft"
               className="h-6 w-auto"
             />
-            <p className="text-white/40 text-sm leading-relaxed max-w-[280px] font-light">
+            <p className="text-slate-500 text-sm leading-relaxed max-w-[280px] font-light">
               Engineering the future of design. AI-powered, developer-friendly,
               and infinitely scalable.
             </p>
@@ -653,7 +661,7 @@ export default function Page() {
             <div className="flex gap-5 mt-4">
               <a
                 href="#"
-                className="text-white/30 hover:text-white transition-colors"
+                className="text-slate-400 hover:text-slate-900 transition-colors"
               >
                 <svg
                   className="h-4 w-4"
@@ -665,7 +673,7 @@ export default function Page() {
               </a>
               <a
                 href="#"
-                className="text-white/30 hover:text-white transition-colors"
+                className="text-slate-400 hover:text-slate-900 transition-colors"
               >
                 <svg
                   className="h-4 w-4"
@@ -677,7 +685,7 @@ export default function Page() {
               </a>
               <a
                 href="#"
-                className="text-white/30 hover:text-white transition-colors"
+                className="text-slate-400 hover:text-slate-900 transition-colors"
               >
                 <svg
                   className="h-4 w-4"
@@ -692,14 +700,14 @@ export default function Page() {
 
           {/* Navigation Links */}
           <div className="lg:col-span-2 flex flex-col gap-6 pt-2">
-            <h4 className="text-white font-medium text-sm tracking-wide">
+            <h4 className="text-[#15151c] font-medium text-sm tracking-wide">
               Product
             </h4>
             <ul className="flex flex-col gap-3.5">
               <li>
                 <a
                   href="#"
-                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                  className="text-slate-500 hover:text-primary text-sm transition-colors font-light"
                 >
                   Documentation
                 </a>
@@ -707,7 +715,7 @@ export default function Page() {
               <li>
                 <a
                   href="#"
-                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                  className="text-slate-500 hover:text-primary text-sm transition-colors font-light"
                 >
                   API Reference
                 </a>
@@ -715,7 +723,7 @@ export default function Page() {
               <li>
                 <a
                   href="#"
-                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                  className="text-slate-500 hover:text-primary text-sm transition-colors font-light"
                 >
                   Changelog
                 </a>
@@ -723,7 +731,7 @@ export default function Page() {
               <li>
                 <a
                   href="#"
-                  className="flex items-center gap-2 text-white/40 hover:text-primary text-sm transition-colors font-light"
+                  className="flex items-center gap-2 text-slate-500 hover:text-primary text-sm transition-colors font-light"
                 >
                   System Status
                   <span className="relative flex h-1.5 w-1.5">
@@ -736,14 +744,14 @@ export default function Page() {
           </div>
 
           <div className="lg:col-span-2 flex flex-col gap-6 pt-2">
-            <h4 className="text-white font-medium text-sm tracking-wide">
+            <h4 className="text-[#15151c] font-medium text-sm tracking-wide">
               Company
             </h4>
             <ul className="flex flex-col gap-3.5">
               <li>
                 <a
                   href="#"
-                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                  className="text-slate-500 hover:text-primary text-sm transition-colors font-light"
                 >
                   About
                 </a>
@@ -751,7 +759,7 @@ export default function Page() {
               <li>
                 <a
                   href="#"
-                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                  className="text-slate-500 hover:text-primary text-sm transition-colors font-light"
                 >
                   Careers
                 </a>
@@ -759,7 +767,7 @@ export default function Page() {
               <li>
                 <a
                   href="#"
-                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                  className="text-slate-500 hover:text-primary text-sm transition-colors font-light"
                 >
                   Press Kit
                 </a>
@@ -767,7 +775,7 @@ export default function Page() {
               <li>
                 <a
                   href="#"
-                  className="text-white/40 hover:text-primary text-sm transition-colors font-light"
+                  className="text-slate-500 hover:text-primary text-sm transition-colors font-light"
                 >
                   Legal
                 </a>
@@ -779,14 +787,14 @@ export default function Page() {
           <div className="lg:col-span-5 flex flex-col sm:flex-row lg:flex-row gap-4 mt-8 lg:mt-0">
             <a
               href="#"
-              className="flex-1 group relative p-7 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300 flex flex-col justify-between h-36 lg:h-40 overflow-hidden"
+              className="flex-1 group relative p-7 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all duration-300 flex flex-col justify-between h-36 lg:h-40 overflow-hidden shadow-sm"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="flex justify-between items-start relative z-10">
-                <span className="text-white font-medium text-sm tracking-wide">
+                <span className="text-[#15151c] font-medium text-sm tracking-wide">
                   Contact Sales
                 </span>
-                <ArrowUpRight className="h-4 w-4 text-white/20 group-hover:text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-300" />
+                <ArrowUpRight className="h-4 w-4 text-slate-300 group-hover:text-slate-900 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-300" />
               </div>
               <div className="relative z-10 flex items-end justify-between">
                 <Wallet className="h-8 w-8 text-primary/60 group-hover:scale-110 transition-transform duration-300" />
@@ -795,14 +803,14 @@ export default function Page() {
 
             <a
               href="#"
-              className="flex-1 group relative p-7 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300 flex flex-col justify-between h-36 lg:h-40 overflow-hidden"
+              className="flex-1 group relative p-7 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all duration-300 flex flex-col justify-between h-36 lg:h-40 overflow-hidden shadow-sm"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="flex justify-between items-start relative z-10">
-                <span className="text-white font-medium text-sm tracking-wide">
+                <span className="text-[#15151c] font-medium text-sm tracking-wide">
                   Help Center
                 </span>
-                <ArrowUpRight className="h-4 w-4 text-white/20 group-hover:text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-300" />
+                <ArrowUpRight className="h-4 w-4 text-slate-300 group-hover:text-slate-900 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-300" />
               </div>
               <div className="relative z-10 flex items-end justify-between">
                 <Headphones className="h-8 w-8 text-primary/60 group-hover:scale-110 transition-transform duration-300" />
@@ -812,12 +820,12 @@ export default function Page() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="w-full max-w-7xl mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
-          <span className="text-white/20 text-xs font-mono tracking-wide">
-            © 2025 OpenCraft Technologies. All rights reserved.
+        <div className="w-full max-w-7xl mt-20 pt-8 border-t border-slate-200/70 flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
+          <span className="text-slate-400 text-xs font-mono tracking-wide">
+            © 2026 OpenCraft Technologies. All rights reserved.
           </span>
           <div className="flex items-center gap-8">
-            <span className="text-white/20 text-xs font-mono border-l border-white/10 pl-8"></span>
+            <span className="text-slate-400 text-xs font-mono border-l border-slate-200 pl-8"></span>
           </div>
         </div>
       </footer>
