@@ -16,7 +16,7 @@ export interface AIModel {
  * Models are grouped by provider for the selector UI
  */
 export const AI_MODELS: AIModel[] = [
-  // Google (default: Gemini 3.5 Flash)
+  // Google
   {
     id: "google/gemini-3.5-flash",
     name: "Gemini 3.5 Flash",
@@ -44,8 +44,8 @@ export const AI_MODELS: AIModel[] = [
   },
 ];
 
-/** Default model ID - Google Gemini 3.5 Flash */
-export const DEFAULT_MODEL_ID = "google/gemini-3.5-flash";
+/** Default model ID - Moonshot AI Kimi K2.7 Code */
+export const DEFAULT_MODEL_ID = "moonshotai/kimi-k2.7-code";
 
 /**
  * Get a model by its ID

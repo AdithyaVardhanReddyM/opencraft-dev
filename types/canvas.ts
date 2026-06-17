@@ -95,6 +95,13 @@ export interface FreeDrawShape extends BaseShape {
   strokeType?: "solid" | "dashed";
 }
 
+// A binding ties an arrow endpoint to a shape so the connector follows that shape
+// when it is moved or resized. Endpoints are recomputed from the bound shape's
+// live geometry at render time.
+export interface ArrowBinding {
+  shapeId: string;
+}
+
 export interface ArrowShape extends BaseShape {
   type: "arrow";
   startX: number;
@@ -103,6 +110,9 @@ export interface ArrowShape extends BaseShape {
   endY: number;
   strokeType?: "solid" | "dashed";
   arrowType?: "straight" | "elbow";
+  // Optional bindings for "flow" connectors that auto-follow the connected shapes.
+  startBinding?: ArrowBinding;
+  endBinding?: ArrowBinding;
 }
 
 export interface LineShape extends BaseShape {

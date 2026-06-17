@@ -5,6 +5,7 @@ import type {
   EllipseShape,
   FreeDrawShape,
   ArrowShape,
+  ArrowBinding,
   LineShape,
   TextShape,
   GeneratedUIShape,
@@ -138,6 +139,8 @@ export function createArrow(params: {
   fill?: string | null;
   strokeType?: "solid" | "dashed";
   arrowType?: "straight" | "elbow";
+  startBinding?: ArrowBinding;
+  endBinding?: ArrowBinding;
 }): ArrowShape {
   return {
     id: nanoid(),
@@ -151,6 +154,8 @@ export function createArrow(params: {
     fill: params.fill ?? null,
     strokeType: params.strokeType ?? "solid",
     arrowType: params.arrowType ?? "elbow",
+    ...(params.startBinding && { startBinding: params.startBinding }),
+    ...(params.endBinding && { endBinding: params.endBinding }),
   };
 }
 

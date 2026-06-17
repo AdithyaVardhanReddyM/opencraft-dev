@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAgents } from "@inngest/use-agent";
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -96,16 +96,6 @@ interface ClientState {
   imageUrls?: string[];
 }
 
-// Convert file to base64 data URL
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 /**
  * Custom hook for chat with real-time streaming support using @inngest/use-agent.
  * Receives actual streaming events from the agent and displays tool calls in real-time.
@@ -129,8 +119,13 @@ export function useChatStreaming({
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const lastConvexMessageCountRef = useRef<number>(0);
   const lastStatusTextRef = useRef<string>("");
+  // True once the first run.started of the current request has been handled.
+  // The agent runs as a network (maxIter 35–40), so run.started fires once per
+  // turn; only the first should show "Getting started" (see onEvent below).
+  const hasSeenRunStartedRef = useRef<boolean>(false);
 
   // Convex mutations and queries for persistence
+  const convex = useConvex();
   const createMessage = useMutation(api.messages.createMessage);
   const generateUploadUrl = useMutation(api.messages.generateUploadUrl);
   const convexMessages = useQuery(
@@ -198,11 +193,22 @@ export function useChatStreaming({
         return;
       }
 
-      // For run.started - only add step if we don't have one yet (first event)
-      // This prevents the "Updating" step from being added and then immediately completed
+      // run.started fires once per agent turn, and the network runs many turns
+      // (maxIter 35–40). Only the FIRST one should surface "Getting started":
+      // by later turns the agent is already mid-work (writing code, saving
+      // files), and steps only complete on part.created/stream.ended, so the
+      // last step is still "pending". Without this guard, every subsequent
+      // run.started would overwrite that live step text back to "Getting
+      // started", making the indicator look stuck/reset while it's actually
+      // coding. So we handle the first one and ignore the rest.
       if (eventType === "run.started") {
+        if (hasSeenRunStartedRef.current) {
+          return;
+        }
+        hasSeenRunStartedRef.current = true;
         setStreamingSteps((prev) => {
-          // If we already have a pending step, just update its text
+          // If we already have a pending step (the synthetic "Starting…" step),
+          // just relabel it instead of stacking a duplicate.
           if (prev.length > 0 && prev[prev.length - 1].status === "pending") {
             const last = prev[prev.length - 1];
             return [...prev.slice(0, -1), { ...last, text }];
@@ -446,6 +452,7 @@ export function useChatStreaming({
     if (prevScreenIdRef.current !== screenId) {
       setError(null);
       setStatusText("");
+      hasSeenRunStartedRef.current = false;
       setIsLoadingHistory(!!screenId);
       prevScreenIdRef.current = screenId;
     }
@@ -472,6 +479,8 @@ export function useChatStreaming({
       lastMessageRef.current = trimmedContent;
       lastOptionsRef.current = options;
       pendingUserMessageRef.current = trimmedContent;
+      // New request: allow the next run.started to show "Getting started" again.
+      hasSeenRunStartedRef.current = false;
       setStatusText(images.length > 0 ? "Uploading images..." : "Starting...");
       // Create initial step immediately so UI shows activity right away
       setStreamingSteps([
@@ -486,9 +495,12 @@ export function useChatStreaming({
       lastConvexMessageCountRef.current = convexMessages?.length || 0;
 
       try {
-        // Upload images to Convex storage and convert to base64 for API
+        // Upload images to Convex storage. We pass the resulting public storage
+        // URLs (not base64) to the agent: base64-encoding a single photo can
+        // exceed Inngest's 3MB max event size, which would reject the whole
+        // chat request. The OpenAI-compatible image_url field accepts remote
+        // URLs, so the model fetches the image directly from Convex storage.
         const imageStorageIds: Id<"_storage">[] = [];
-        const imageBase64Urls: string[] = [];
 
         for (const image of images) {
           // Upload to Convex storage
@@ -500,13 +512,21 @@ export function useChatStreaming({
           });
           const { storageId } = await uploadResult.json();
           imageStorageIds.push(storageId as Id<"_storage">);
-
-          // Convert to base64 for API
-          const base64 = await fileToBase64(image.file);
-          imageBase64Urls.push(base64);
         }
 
-        if (imageBase64Urls.length > 0) {
+        // Resolve the public storage URLs for the uploaded images. These short
+        // URLs are what we hand to the model, keeping the Inngest event small.
+        let imageAgentUrls: string[] = [];
+        if (imageStorageIds.length > 0) {
+          const urlMap = await convex.query(api.messages.getImageUrls, {
+            storageIds: imageStorageIds,
+          });
+          imageAgentUrls = imageStorageIds
+            .map((id) => urlMap[id])
+            .filter((url): url is string => Boolean(url));
+        }
+
+        if (imageStorageIds.length > 0) {
           pendo.track("image_uploaded", {
             image_count: images.length,
             file_types: images.map((img) => img.file.type).join(","),
@@ -532,7 +552,7 @@ export function useChatStreaming({
 
         // Update refs before sending so state() picks up the values
         currentModelIdRef.current = modelId;
-        currentImageUrlsRef.current = imageBase64Urls;
+        currentImageUrlsRef.current = imageAgentUrls;
 
         // Send message via the useAgents hook with model and images in state
         // The state function will be called by useAgents to get current state
@@ -569,6 +589,7 @@ export function useChatStreaming({
       isLoading,
       screenId,
       projectId,
+      convex,
       createMessage,
       generateUploadUrl,
       agentSendMessage,

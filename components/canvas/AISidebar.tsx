@@ -52,6 +52,7 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { StreamingIndicator } from "@/components/canvas/StreamingIndicator";
 import { ReasoningPanel } from "@/components/canvas/ReasoningPanel";
+import { LiveReasoningPanel } from "@/components/canvas/LiveReasoningPanel";
 import { useChatStreaming, type ChatMessage } from "@/hooks/use-chat-streaming";
 import { CodeExplorer } from "@/components/canvas/code-explorer";
 import { EditModeProvider } from "@/contexts/EditModeContext";
@@ -130,6 +131,8 @@ export function AISidebar({
   initialModelId,
   onInitialDataConsumed,
   onGeneratingChange,
+  autoSendPrompt,
+  onAutoSendConsumed,
 }: {
   isOpen: boolean;
   onClose?: () => void;
@@ -144,6 +147,13 @@ export function AISidebar({
   onInitialDataConsumed?: () => void;
   /** Notifies the parent when the agent starts/stops generating for the selected screen. */
   onGeneratingChange?: (isGenerating: boolean) => void;
+  /**
+   * When set, this prompt is sent automatically once the selected screen resolves.
+   * Used by the "Create flow" action, where the user has already typed the prompt
+   * before the child screen is selected.
+   */
+  autoSendPrompt?: string;
+  onAutoSendConsumed?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState("chat");
 
@@ -184,6 +194,22 @@ export function AISidebar({
   useEffect(() => {
     onGeneratingChange?.(isLoading);
   }, [isLoading, onGeneratingChange]);
+
+  // Auto-send the queued flow prompt once the target screen has resolved. The
+  // parent only sets `autoSendPrompt` after selecting the freshly-created child,
+  // so `selectedScreenId` here is the child's id. A ref guards against re-sending.
+  const autoSentPromptRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!autoSendPrompt) {
+      autoSentPromptRef.current = null;
+      return;
+    }
+    if (!selectedScreenId) return;
+    if (autoSentPromptRef.current === autoSendPrompt) return;
+    autoSentPromptRef.current = autoSendPrompt;
+    sendMessage(autoSendPrompt);
+    onAutoSendConsumed?.();
+  }, [autoSendPrompt, selectedScreenId, sendMessage, onAutoSendConsumed]);
 
   const handleSuggestionClick = (suggestion: string) => {
     if (!canGenerate) return;
@@ -338,6 +364,9 @@ export function AISidebar({
                   {messages.map((msg) => (
                     <ChatMessageItem key={msg.id} message={msg} />
                   ))}
+                  {/* Live "thinking" stream — the model's readable reasoning,
+                      revealed with a typewriter effect as the run progresses. */}
+                  <LiveReasoningPanel active={isLoading} />
                   {/* Show streaming indicator with step history when processing */}
                   <StreamingIndicator
                     statusText={statusText || "Processing..."}
@@ -882,7 +911,7 @@ function ChatInput({
       />
 
       {/* Credit bar and input container */}
-      <div className="rounded-xl overflow-hidden border border-border/40 bg-muted/30 hover:bg-muted/40 transition-colors focus-within:bg-muted/50 focus-within:border-border/60 focus-within:ring-[3px] focus-within:ring-primary/70 focus-within:ring-offset-0 focus-within:shadow-[0_0_24px_rgba(0,114,229,0.35)]">
+      <div className="rounded-xl overflow-hidden border border-border/40 bg-white dark:bg-muted/40 shadow-sm transition-colors focus-within:border-border/60 focus-within:ring-[3px] focus-within:ring-primary/70 focus-within:ring-offset-0 focus-within:shadow-[0_0_24px_rgba(0,114,229,0.35)]">
         {/* Generation Limit Bar */}
         <CreditBar
           generationsRemaining={generationsRemaining}

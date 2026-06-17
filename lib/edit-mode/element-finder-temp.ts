@@ -62,76 +62,99 @@ export interface ElementValidationResult {
 // ============================================================================
 
 /**
- * Tailwind class conflict groups - classes in the same group conflict with each other
+ * Tailwind class conflict groups - classes in the same group conflict with
+ * each other (so a new class replaces the old one instead of stacking).
+ *
+ * IMPORTANT: getConflictGroup() returns the FIRST matching group in iteration
+ * order, so more specific patterns must come before more generic ones (e.g.
+ * `text-center`/`text-2xl` must be matched before the generic `text-<color>`).
+ * Color patterns deliberately only match color-shaped tokens (named scales,
+ * white/black/transparent, or arbitrary `[#...]`/`[rgb...]`) so that sizing,
+ * alignment, width and style utilities sharing the same prefix don't collide.
  */
 export const CLASS_CONFLICT_GROUPS: Record<string, RegExp> = {
-  // Text colors
-  textColor: /^text-([\w-]+)(?:\[.+\])?$/,
-  // Background colors
-  bgColor: /^bg-([\w-]+)(?:\[.+\])?$/,
-  // Flex direction
+  // --- Display (before flex-* / grid so the bare keywords win) ---
+  display:
+    /^(block|inline-block|inline-flex|inline-grid|inline|flex|grid|hidden|contents|flow-root|table)$/,
+
+  // --- Flex / alignment ---
   flexDirection: /^flex-(row|col|row-reverse|col-reverse)$/,
-  // Justify content
+  flexWrap: /^flex-(wrap|nowrap|wrap-reverse)$/,
   justifyContent:
     /^justify-(start|end|center|between|around|evenly|normal|stretch)$/,
-  // Align items
   alignItems: /^items-(start|end|center|baseline|stretch)$/,
-  // Font size
-  fontSize: /^text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl|\[.+\])$/,
-  // Font weight
-  fontWeight:
-    /^font-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black|\[.+\])$/,
-  // Gap (all directions)
-  gap: /^gap-(\d+|px|\[.+\])$/,
-  // Gap X
-  gapX: /^gap-x-(\d+|px|\[.+\])$/,
-  // Gap Y
-  gapY: /^gap-y-(\d+|px|\[.+\])$/,
-  // Padding (all sides)
-  padding: /^p-(\d+|px|auto|\[.+\])$/,
-  // Padding top
-  paddingTop: /^pt-(\d+|px|auto|\[.+\])$/,
-  // Padding right
-  paddingRight: /^pr-(\d+|px|auto|\[.+\])$/,
-  // Padding bottom
-  paddingBottom: /^pb-(\d+|px|auto|\[.+\])$/,
-  // Padding left
-  paddingLeft: /^pl-(\d+|px|auto|\[.+\])$/,
-  // Padding X
-  paddingX: /^px-(\d+|px|auto|\[.+\])$/,
-  // Padding Y
-  paddingY: /^py-(\d+|px|auto|\[.+\])$/,
-  // Margin (all sides)
-  margin: /^m-(\d+|px|auto|\[.+\])$/,
-  // Margin top
-  marginTop: /^mt-(\d+|px|auto|\[.+\])$/,
-  // Margin right
-  marginRight: /^mr-(\d+|px|auto|\[.+\])$/,
-  // Margin bottom
-  marginBottom: /^mb-(\d+|px|auto|\[.+\])$/,
-  // Margin left
-  marginLeft: /^ml-(\d+|px|auto|\[.+\])$/,
-  // Margin X
-  marginX: /^mx-(\d+|px|auto|\[.+\])$/,
-  // Margin Y
-  marginY: /^my-(\d+|px|auto|\[.+\])$/,
-  // Border radius
-  borderRadius: /^rounded(-[a-z]+)?(-[a-z0-9]+)?$/,
-  // Display
-  display:
-    /^(block|inline|inline-block|flex|inline-flex|grid|inline-grid|hidden|contents|flow-root)$/,
-  // Width
-  width: /^w-(\d+|px|auto|full|screen|min|max|fit|\[.+\])$/,
-  // Height
-  height: /^h-(\d+|px|auto|full|screen|min|max|fit|\[.+\])$/,
-  // Opacity
-  opacity: /^opacity-(\d+|\[.+\])$/,
-  // Text align
+
+  // --- Typography (specific text-* before generic text-<color>) ---
   textAlign: /^text-(left|center|right|justify|start|end)$/,
-  // Flex wrap
-  flexWrap: /^flex-(wrap|nowrap|wrap-reverse)$/,
-  // Border color
-  borderColor: /^border-([\w-]+)(?:\[.+\])?$/,
+  fontSize: /^text-(xs|sm|base|lg|[2-9]?xl|\[[\d.]+(px|rem|em)\])$/,
+  textColor:
+    /^text-(\[(?:#|rgb|hsl).+\]|[a-z]+-\d{1,3}|white|black|transparent|current|inherit)$/,
+  fontWeight:
+    /^font-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black|\[\d+\])$/,
+  fontFamily: /^font-(sans|serif|mono)$/,
+  fontStyle: /^(italic|not-italic)$/,
+  textDecoration: /^(underline|line-through|no-underline|overline)$/,
+  lineHeight: /^leading-(none|tight|snug|normal|relaxed|loose|\d+|\[.+\])$/,
+  letterSpacing: /^tracking-(tighter|tight|normal|wide|wider|widest|\[.+\])$/,
+
+  // --- Sizing ---
+  width: /^w-(\d+(\.\d+)?|px|auto|full|screen|min|max|fit|\[.+\])$/,
+  height: /^h-(\d+(\.\d+)?|px|auto|full|screen|min|max|fit|\[.+\])$/,
+
+  // --- Gap ---
+  gapX: /^gap-x-(\d+(\.\d+)?|px|\[.+\])$/,
+  gapY: /^gap-y-(\d+(\.\d+)?|px|\[.+\])$/,
+  gap: /^gap-(\d+(\.\d+)?|px|\[.+\])$/,
+
+  // --- Padding ---
+  paddingX: /^px-(\d+(\.\d+)?|px|auto|\[.+\])$/,
+  paddingY: /^py-(\d+(\.\d+)?|px|auto|\[.+\])$/,
+  paddingTop: /^pt-(\d+(\.\d+)?|px|auto|\[.+\])$/,
+  paddingRight: /^pr-(\d+(\.\d+)?|px|auto|\[.+\])$/,
+  paddingBottom: /^pb-(\d+(\.\d+)?|px|auto|\[.+\])$/,
+  paddingLeft: /^pl-(\d+(\.\d+)?|px|auto|\[.+\])$/,
+  padding: /^p-(\d+(\.\d+)?|px|auto|\[.+\])$/,
+
+  // --- Margin (negative allowed) ---
+  marginX: /^-?mx-(-?\d+(\.\d+)?|px|auto|\[.+\])$/,
+  marginY: /^-?my-(-?\d+(\.\d+)?|px|auto|\[.+\])$/,
+  marginTop: /^-?mt-(-?\d+(\.\d+)?|px|auto|\[.+\])$/,
+  marginRight: /^-?mr-(-?\d+(\.\d+)?|px|auto|\[.+\])$/,
+  marginBottom: /^-?mb-(-?\d+(\.\d+)?|px|auto|\[.+\])$/,
+  marginLeft: /^-?ml-(-?\d+(\.\d+)?|px|auto|\[.+\])$/,
+  margin: /^-?m-(-?\d+(\.\d+)?|px|auto|\[.+\])$/,
+
+  // --- Border radius (per-corner / per-side before the all-corners token) ---
+  borderRadiusTL: /^rounded-tl(-.+)?$/,
+  borderRadiusTR: /^rounded-tr(-.+)?$/,
+  borderRadiusBL: /^rounded-bl(-.+)?$/,
+  borderRadiusBR: /^rounded-br(-.+)?$/,
+  borderRadiusTop: /^rounded-t(-.+)?$/,
+  borderRadiusBottom: /^rounded-b(-.+)?$/,
+  borderRadiusLeft: /^rounded-l(-.+)?$/,
+  borderRadiusRight: /^rounded-r(-.+)?$/,
+  borderRadius: /^rounded(-(none|sm|md|lg|xl|2xl|3xl|full|\[.+\]))?$/,
+
+  // --- Border (style / width / color are independent groups) ---
+  borderStyle: /^border-(solid|dashed|dotted|double|hidden|none)$/,
+  borderWidth: /^border(-(0|2|4|8|\[[\d.]+px\]))?$/,
+  borderColor:
+    /^border-(\[(?:#|rgb|hsl).+\]|[a-z]+-\d{1,3}|white|black|transparent|current|inherit)$/,
+
+  // --- Outline (offset / width / style / color, in that precedence order) ---
+  outlineOffset: /^outline-offset-(-?\d+|\[.+\])$/,
+  outlineWidth: /^outline-(0|1|2|4|8|\[[\d.]+px\])$/,
+  outlineStyle: /^outline$|^outline-(dashed|dotted|double|none)$/,
+  outlineColor:
+    /^outline-(\[(?:#|rgb|hsl).+\]|[a-z]+-\d{1,3}|white|black|transparent|current|inherit)$/,
+
+  // --- Background ---
+  bgColor:
+    /^bg-(\[(?:#|rgb|hsl).+\]|[a-z]+-\d{1,3}|white|black|transparent|current|inherit)$/,
+
+  // --- Effects ---
+  boxShadow: /^shadow(-(sm|md|lg|xl|2xl|inner|none|\[.+\]))?$/,
+  opacity: /^opacity-(\d+|\[.+\])$/,
 };
 
 /**

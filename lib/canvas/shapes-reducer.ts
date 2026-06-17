@@ -91,6 +91,8 @@ type ShapesActionCore =
         strokeWidth?: number;
         strokeType?: "solid" | "dashed";
         arrowType?: "straight" | "elbow";
+        startBinding?: import("@/types/canvas").ArrowBinding;
+        endBinding?: import("@/types/canvas").ArrowBinding;
       };
     }
   | {

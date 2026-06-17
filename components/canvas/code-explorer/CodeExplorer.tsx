@@ -6,6 +6,7 @@ import type { CodeExplorerProps } from "@/lib/canvas/code-explorer-types";
 import { useCodeExplorer } from "@/hooks/use-code-explorer";
 import { FileTree } from "./FileTree";
 import { CodeViewer } from "./CodeViewer";
+import { OpenLocallyButton } from "./OpenLocallyButton";
 
 /**
  * CodeExplorer component - main container with split-panel layout
@@ -69,10 +70,11 @@ export function CodeExplorer({
     <div className="flex h-full scrollbar-thin bg-background">
       {/* File Tree Panel - 30% width */}
       <div className="w-[30%] min-w-[180px] border-r border-border/40 overflow-auto scrollbar-thin bg-muted/20">
-        <div className="px-4 py-2.5 border-b border-border/40 bg-muted/30 sticky top-0 z-10 backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border/40 bg-muted/30 sticky top-0 z-10 backdrop-blur-sm">
           <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             Explorer
           </span>
+          <OpenLocallyButton sandboxId={sandboxId} />
         </div>
         <FileTree
           sandboxId={sandboxId}

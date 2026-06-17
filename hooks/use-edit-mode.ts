@@ -12,6 +12,7 @@ import { isEditModeMessage } from "@/lib/edit-mode/types";
 import {
   cssToTailwind,
   updateElementClassNameWithResult,
+  updateElementAttributeWithResult,
 } from "@/lib/edit-mode/style-mapper";
 import {
   writeSourceFile,
@@ -379,10 +380,14 @@ export function useEditMode({
     setSaveWarning(null);
 
     try {
+      // 'src' is an attribute (e.g. on <img>), not a CSS class — handle separately.
+      const srcChange =
+        typeof pendingChanges.src === "string" ? pendingChanges.src : null;
+
       // Convert pending changes to Tailwind classes
       const tailwindClasses = cssToTailwind(pendingChanges);
 
-      if (tailwindClasses.length === 0) {
+      if (tailwindClasses.length === 0 && srcChange === null) {
         setPendingChanges(null);
         setIsSaving(false);
         return;
@@ -439,39 +444,74 @@ export function useEditMode({
         );
       }
 
-      // Use the new updateElementClassNameWithResult for precise element finding
-      // with integrated conflict resolution and fallback behavior
-      const updateResult = updateElementClassNameWithResult(
-        sourceContent,
-        uniqueSelector.method === "id" || uniqueSelector.method === "data-attr"
-          ? uniqueSelector.selector
-          : selectedElement.elementPath,
-        tailwindClasses,
-        selectedElement // Pass elementInfo for precise finding
-      );
+      let updatedContent = sourceContent;
+      let updateMethod = "none";
+      const warnings: string[] = [];
+      if (validation.warning) warnings.push(validation.warning);
 
-      console.log(
-        "[useEditMode] Update result - method:",
-        updateResult.method,
-        "success:",
-        updateResult.success
-      );
-
-      // Handle update failure - only throw if all strategies failed
-      if (!updateResult.success) {
-        throw new Error(
-          updateResult.error || "Failed to update element className."
+      // Apply style (className) changes if there are any.
+      if (tailwindClasses.length > 0) {
+        // Use updateElementClassNameWithResult for precise element finding
+        // with integrated conflict resolution and fallback behavior.
+        const updateResult = updateElementClassNameWithResult(
+          updatedContent,
+          uniqueSelector.method === "id" ||
+            uniqueSelector.method === "data-attr"
+            ? uniqueSelector.selector
+            : selectedElement.elementPath,
+          tailwindClasses,
+          selectedElement // Pass elementInfo for precise finding
         );
+
+        console.log(
+          "[useEditMode] Update result - method:",
+          updateResult.method,
+          "success:",
+          updateResult.success
+        );
+
+        // Handle update failure - only throw if all strategies failed
+        if (!updateResult.success) {
+          throw new Error(
+            updateResult.error || "Failed to update element className."
+          );
+        }
+
+        if (updateResult.warning) warnings.push(updateResult.warning);
+        updateMethod = updateResult.method || "unknown";
+        updatedContent = updateResult.sourceCode;
       }
 
-      // Set warning from update result or validation
-      const warningToShow = updateResult.warning || validation.warning;
-      if (warningToShow) {
-        setSaveWarning(warningToShow);
-        console.warn("[useEditMode] Warning:", warningToShow);
+      // Persist an image src change (an attribute, not a Tailwind class).
+      if (srcChange !== null) {
+        const attrResult = updateElementAttributeWithResult(
+          updatedContent,
+          selectedElement,
+          "src",
+          srcChange
+        );
+        if (attrResult.success) {
+          updatedContent = attrResult.sourceCode;
+          if (attrResult.warning) warnings.push(attrResult.warning);
+        } else if (tailwindClasses.length === 0) {
+          // src was the only change and it couldn't be located — surface as an
+          // error so the user knows it wasn't saved (and can add an id).
+          throw new Error(
+            attrResult.error || "Could not save the image source change."
+          );
+        } else {
+          // Styles still saved; warn that the src couldn't be located.
+          warnings.push(
+            attrResult.error || "Could not save the image source change."
+          );
+        }
       }
 
-      const updatedContent = updateResult.sourceCode;
+      // Surface any accumulated warnings.
+      if (warnings.length > 0) {
+        setSaveWarning(warnings.join(" "));
+        console.warn("[useEditMode] Warnings:", warnings);
+      }
 
       // Write back to sandbox
       try {
@@ -501,9 +541,11 @@ export function useEditMode({
       // Verify the changes were written correctly
       try {
         const verifyContent = await readSourceFile(sandboxId, sourceFilePath);
-        const hasChanges = tailwindClasses.some((cls) =>
-          verifyContent.includes(cls)
-        );
+        const expectedTokens = [...tailwindClasses];
+        if (srcChange !== null) expectedTokens.push(srcChange);
+        const hasChanges =
+          expectedTokens.length === 0 ||
+          expectedTokens.some((t) => verifyContent.includes(t));
         if (!hasChanges) {
           console.warn(
             "[useEditMode] Verification warning: Changes may not have been persisted correctly"
@@ -525,8 +567,9 @@ export function useEditMode({
       pendo.track("visual_edit_saved", {
         sandbox_id: sandboxId,
         source_file_path: sourceFilePath,
-        changed_properties_count: tailwindClasses.length,
-        update_method: updateResult.method || "unknown",
+        changed_properties_count:
+          tailwindClasses.length + (srcChange !== null ? 1 : 0),
+        update_method: updateMethod,
       });
 
       console.log("[useEditMode] Changes saved successfully");

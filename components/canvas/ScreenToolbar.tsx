@@ -21,6 +21,8 @@ import {
   Loader2,
   ChevronDown,
   AlertCircle,
+  Workflow,
+  ArrowRight,
 } from "lucide-react";
 import {
   Popover,
@@ -45,18 +47,24 @@ interface ScreenToolbarProps {
     theme?: string;
   };
   viewport: ViewportState;
+  /** True while the AI agent is actively generating for this screen. */
+  isGenerating?: boolean;
   onDelete: () => void;
   onResize: (width: number, height: number) => void;
   onRefresh: () => void;
+  /** Create a connected flow page (new route in the same sandbox) from a prompt. */
+  onCreateFlow: (prompt: string) => void;
 }
 
 export function ScreenToolbar({
   shape,
   screenData,
   viewport,
+  isGenerating = false,
   onDelete,
   onResize,
   onRefresh,
+  onCreateFlow,
 }: ScreenToolbarProps) {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +76,10 @@ export function ScreenToolbar({
 
   // Device dropdown state
   const [isDeviceDropdownOpen, setIsDeviceDropdownOpen] = useState(false);
+
+  // Create-flow popover state
+  const [isFlowPopoverOpen, setIsFlowPopoverOpen] = useState(false);
+  const [flowPrompt, setFlowPrompt] = useState("");
 
   // Sandbox state
   const { status, resume } = useSandboxResume({
@@ -226,6 +238,35 @@ export function ScreenToolbar({
     }
   }, [status, screenData?.sandboxUrl, resume]);
 
+  // Handle create-flow submit
+  const handleFlowSubmit = useCallback(() => {
+    const trimmed = flowPrompt.trim();
+    if (!trimmed) return;
+
+    onCreateFlow(trimmed);
+
+    pendo.track("flow_created", {
+      parent_screen_id: screenData?._id ? String(screenData._id) : "",
+      sandbox_id: screenData?.sandboxId || "",
+      prompt_length: trimmed.length,
+    });
+
+    setFlowPrompt("");
+    setIsFlowPopoverOpen(false);
+  }, [flowPrompt, onCreateFlow, screenData]);
+
+  const handleFlowKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleFlowSubmit();
+      } else if (e.key === "Escape") {
+        setIsFlowPopoverOpen(false);
+      }
+    },
+    [handleFlowSubmit]
+  );
+
   // Determine button states
   const isLoading = status === "resuming" || status === "checking";
   const isExpired = status === "expired";
@@ -233,6 +274,10 @@ export function ScreenToolbar({
   const isIdle = status === "idle" && !screenData?.sandboxId;
   const canPreview = status === "ready" && !!screenData?.sandboxUrl;
   const canRefresh = status === "ready";
+  // A flow child reuses this screen's sandbox, so it can only be created once the
+  // sandbox is ready and has an id to copy.
+  const canCreateFlow =
+    canPreview && !!screenData?._id && !!screenData?.sandboxId;
 
   // Get preview tooltip text
   const getPreviewTooltip = () => {
@@ -425,6 +470,73 @@ export function ScreenToolbar({
             </TooltipTrigger>
             <TooltipContent>{getRefreshTooltip()}</TooltipContent>
           </Tooltip>
+
+          {/* Create Flow Button — connects a new page (route) built in this same
+              sandbox. Requires a ready sandbox the child can reuse. */}
+          <Popover
+            open={isFlowPopoverOpen}
+            onOpenChange={(open) => {
+              if (open && (!canCreateFlow || isGenerating)) return;
+              setIsFlowPopoverOpen(open);
+            }}
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <button
+                    className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                      canCreateFlow && !isGenerating
+                        ? "text-foreground hover:bg-accent hover:text-accent-foreground"
+                        : "text-muted-foreground/40 cursor-not-allowed"
+                    )}
+                    disabled={!canCreateFlow || isGenerating}
+                    aria-label="Create flow"
+                  >
+                    <Workflow className="w-3.5 h-3.5" />
+                  </button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isGenerating
+                  ? "Generating…"
+                  : canCreateFlow
+                    ? "Create flow"
+                    : "Generate this screen first"}
+              </TooltipContent>
+            </Tooltip>
+            <PopoverContent className="w-72 p-2" align="center" sideOffset={8}>
+              <div className="flex flex-col gap-2">
+                <p className="px-1 text-xs font-medium text-muted-foreground">
+                  Connect a new page in this flow
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={flowPrompt}
+                    onChange={(e) => setFlowPrompt(e.target.value)}
+                    onKeyDown={handleFlowKeyDown}
+                    placeholder="Describe the next screen, e.g. checkout page"
+                    className="flex-1 h-9 px-2.5 text-sm bg-accent rounded-md border-none outline-none focus:ring-2 focus:ring-primary text-foreground placeholder:text-muted-foreground"
+                    autoFocus
+                  />
+                  <button
+                    className={cn(
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors",
+                      flowPrompt.trim()
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "bg-muted text-muted-foreground/50 cursor-not-allowed"
+                    )}
+                    onClick={handleFlowSubmit}
+                    disabled={!flowPrompt.trim()}
+                    aria-label="Create flow"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </>
       )}
 

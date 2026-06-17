@@ -13,7 +13,7 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     try {
-      const { screenId, sandboxUrl, sandboxId, files, title } =
+      const { screenId, sandboxUrl, sandboxId, files, title, route } =
         await request.json();
 
       if (!screenId) {
@@ -29,6 +29,7 @@ http.route({
         sandboxId,
         files,
         title,
+        route,
       });
 
       return new Response(JSON.stringify({ success: true }), {
@@ -266,6 +267,85 @@ http.route({
           status: 500,
           headers: { "Content-Type": "application/json" },
         }
+      );
+    }
+  }),
+});
+
+/**
+ * HTTP endpoint for the OpenRouter proxy to store reasoning_details, keyed by
+ * tool_call_id. Called after an inference that produced tool calls so the
+ * details can be re-injected on the next tool-call continuation.
+ */
+http.route({
+  path: "/inngest/storeReasoning",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const { toolCallIds, details } = await request.json();
+
+      if (!Array.isArray(toolCallIds) || toolCallIds.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "toolCallIds (non-empty array) is required" }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      const result = await ctx.runMutation(
+        internal.reasoning.internalStoreReasoning,
+        { toolCallIds, details }
+      );
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error storing reasoning details:", error);
+      return new Response(
+        JSON.stringify({
+          error: error instanceof Error ? error.message : "Internal error",
+        }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }),
+});
+
+/**
+ * HTTP endpoint for the OpenRouter proxy to fetch reasoning_details for a set of
+ * tool_call_ids. Returns `{ details: <payload> | null }`.
+ */
+http.route({
+  path: "/inngest/getReasoning",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const { toolCallIds } = await request.json();
+
+      if (!Array.isArray(toolCallIds) || toolCallIds.length === 0) {
+        return new Response(JSON.stringify({ details: null }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const result = await ctx.runQuery(
+        internal.reasoning.internalGetReasoning,
+        { toolCallIds }
+      );
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error getting reasoning details:", error);
+      return new Response(
+        JSON.stringify({
+          error: error instanceof Error ? error.message : "Internal error",
+        }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
   }),

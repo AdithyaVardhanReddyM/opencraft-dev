@@ -4,10 +4,10 @@
  */
 
 /** Prefix used to identify extension content in clipboard */
-export const CLIPBOARD_PREFIX = "UNITSET_CAPTURE:";
+export const CLIPBOARD_PREFIX = "OPENCRAFT_CAPTURE:";
 
 /** Type marker for extension content */
-export const CAPTURE_TYPE = "unitset-element-capture" as const;
+export const CAPTURE_TYPE = "opencraft-element-capture" as const;
 
 /**
  * Map of CSS selectors to their computed style properties

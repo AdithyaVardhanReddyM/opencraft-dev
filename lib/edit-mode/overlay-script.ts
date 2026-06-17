@@ -231,6 +231,8 @@ export const OVERLAY_SCRIPT = `
       marginBottom: computed.marginBottom,
       marginLeft: computed.marginLeft,
       gap: computed.gap,
+      columnGap: computed.columnGap,
+      rowGap: computed.rowGap,
       flexDirection: computed.flexDirection,
       flexWrap: computed.flexWrap,
       justifyContent: computed.justifyContent,
@@ -462,6 +464,7 @@ export const OVERLAY_SCRIPT = `
       uniqueIdentifier: generateUniqueIdentifier(element),
       siblingIndex: getSiblingIndex(element),
       dataAttributes: getDataAttributes(element),
+      src: element.tagName === 'IMG' ? (element.getAttribute('src') || '') : undefined,
       // Enhanced identification fields
       parentTagName: parentInfo.parentTagName,
       parentId: parentInfo.parentId,
@@ -609,7 +612,12 @@ export const OVERLAY_SCRIPT = `
               break;
             }
             
-            selectedElement.style[data.property] = data.value;
+            // 'src' is an attribute (e.g. on <img>), not a CSS style.
+            if (data.property === 'src') {
+              selectedElement.setAttribute('src', data.value);
+            } else {
+              selectedElement.style[data.property] = data.value;
+            }
             // Update selection overlay position in case size changed
             updateSelection(selectedElement);
           } catch (err) {

@@ -179,6 +179,7 @@ export interface SelectedElementInfo {
   uniqueIdentifier: string; // Unique ID for targeting (id, data-attr, or generated)
   siblingIndex: number; // Position among same-tag siblings
   dataAttributes: Record<string, string>; // All data-* attributes
+  src?: string; // Original src attribute (for img elements)
   // Enhanced identification fields
   parentTagName?: string; // Tag name of the parent element
   parentId?: string; // ID of the parent element if available

@@ -113,6 +113,22 @@ export const BORDER_RADIUS_MAP: Record<string, string> = {
 const BORDER_RADIUS_VALUES = [0, 2, 4, 6, 8, 12, 16, 24, 9999];
 
 /**
+ * Border radius suffixes (px to the Tailwind size token). An empty string maps
+ * to the bare prefix (e.g. `rounded` / `rounded-tl`).
+ */
+const BORDER_RADIUS_SUFFIX: Record<string, string> = {
+  "0": "none",
+  "2": "sm",
+  "4": "",
+  "6": "md",
+  "8": "lg",
+  "12": "xl",
+  "16": "2xl",
+  "24": "3xl",
+  "9999": "full",
+};
+
+/**
  * Font weight mapping (numeric to Tailwind font-* classes)
  */
 export const FONT_WEIGHT_MAP: Record<string, string> = {
@@ -363,7 +379,7 @@ export function fontSizeToTailwind(value: string): string {
 
 export function colorToTailwind(
   value: string,
-  property: "text" | "bg" | "border"
+  property: "text" | "bg" | "border" | "outline"
 ): string {
   const trimmed = value.trim();
 
@@ -415,29 +431,186 @@ export function spacingToTailwind(value: string, property: string): string {
   return `${property}-[${Math.round(numValue)}px]`;
 }
 
-export function borderRadiusToTailwind(value: string): string {
+/**
+ * Build a radius class for a given Tailwind prefix and size suffix.
+ * An empty suffix yields the bare prefix (e.g. `rounded`, `rounded-tl`).
+ */
+function radiusClass(prefix: string, suffix: string): string {
+  return suffix ? `${prefix}-${suffix}` : prefix;
+}
+
+/**
+ * Convert a border-radius value to a Tailwind class.
+ * @param value - CSS radius value (e.g. "8px")
+ * @param prefix - Tailwind prefix: "rounded" for all corners, or a per-corner
+ *   prefix such as "rounded-tl", "rounded-tr", "rounded-bl", "rounded-br".
+ */
+export function borderRadiusToTailwind(
+  value: string,
+  prefix: string = "rounded"
+): string {
   const numValue = parseNumericValue(value);
 
   if (numValue === null) {
-    return createArbitraryValueClass("rounded", value);
+    return `${prefix}-[${escapeArbitraryValue(value)}]`;
   }
 
   if (numValue === 0) {
-    return "rounded-none";
+    return radiusClass(prefix, "none");
   }
 
   if (numValue >= 9999 || value.includes("9999")) {
-    return "rounded-full";
+    return radiusClass(prefix, "full");
   }
 
   const nearest = findNearestValue(numValue, BORDER_RADIUS_VALUES);
-  const tailwindClass = BORDER_RADIUS_MAP[String(nearest)];
+  const suffix = BORDER_RADIUS_SUFFIX[String(nearest)];
 
-  if (tailwindClass && Math.abs(numValue - nearest) <= 2) {
-    return tailwindClass;
+  if (suffix !== undefined && Math.abs(numValue - nearest) <= 2) {
+    return radiusClass(prefix, suffix);
   }
 
-  return `rounded-[${Math.round(numValue)}px]`;
+  return `${prefix}-[${Math.round(numValue)}px]`;
+}
+
+// ============================================================================
+// Border / Outline / Typography Conversions
+// ============================================================================
+
+/**
+ * Border / outline width values that map to standard Tailwind tokens.
+ */
+const BORDER_WIDTH_MAP: Record<string, string> = {
+  "0": "border-0",
+  "1": "border",
+  "2": "border-2",
+  "4": "border-4",
+  "8": "border-8",
+};
+const OUTLINE_WIDTH_MAP: Record<string, string> = {
+  "0": "outline-0",
+  "1": "outline-1",
+  "2": "outline-2",
+  "4": "outline-4",
+  "8": "outline-8",
+};
+
+export function borderWidthToTailwind(value: string): string {
+  const numValue = parseNumericValue(value);
+  if (numValue === null) return createArbitraryValueClass("border", value);
+  if (numValue === 0) return "border-0";
+
+  // Borders are typically small exact integers; only collapse to a standard
+  // token on an exact match to avoid visibly losing 1px (e.g. 3px -> border-2).
+  const mapped = BORDER_WIDTH_MAP[String(numValue)];
+  if (mapped) return mapped;
+  return `border-[${Math.round(numValue)}px]`;
+}
+
+export function outlineWidthToTailwind(value: string): string {
+  const numValue = parseNumericValue(value);
+  if (numValue === null) return createArbitraryValueClass("outline", value);
+  if (numValue === 0) return "outline-0";
+
+  const mapped = OUTLINE_WIDTH_MAP[String(numValue)];
+  if (mapped) return mapped;
+  return `outline-[${Math.round(numValue)}px]`;
+}
+
+export function outlineOffsetToTailwind(value: string): string {
+  const numValue = parseNumericValue(value);
+  if (numValue === null) return `outline-offset-[${value}]`;
+  const rounded = Math.round(numValue);
+  const standard = [0, 1, 2, 4, 8];
+  if (rounded >= 0 && standard.includes(rounded)) {
+    return `outline-offset-${rounded}`;
+  }
+  // Tailwind requires negative arbitrary offsets to be bracketed.
+  return `outline-offset-[${rounded}px]`;
+}
+
+/**
+ * Border style keyword -> Tailwind class.
+ */
+export function borderStyleToTailwind(value: string): string | null {
+  const map: Record<string, string> = {
+    solid: "border-solid",
+    dashed: "border-dashed",
+    dotted: "border-dotted",
+    double: "border-double",
+    hidden: "border-hidden",
+    none: "border-none",
+  };
+  return map[value.trim().toLowerCase()] || null;
+}
+
+/**
+ * Outline style keyword -> Tailwind class.
+ * Tailwind has no `outline-solid`; the bare `outline` utility is solid.
+ */
+export function outlineStyleToTailwind(value: string): string | null {
+  const map: Record<string, string> = {
+    solid: "outline",
+    dashed: "outline-dashed",
+    dotted: "outline-dotted",
+    double: "outline-double",
+    none: "outline-none",
+  };
+  return map[value.trim().toLowerCase()] || null;
+}
+
+export function fontStyleToTailwind(value: string): string | null {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "italic" || normalized === "oblique") return "italic";
+  if (normalized === "normal") return "not-italic";
+  return null;
+}
+
+export function textDecorationToTailwind(value: string): string | null {
+  const normalized = value.trim().toLowerCase();
+  if (normalized.includes("line-through")) return "line-through";
+  if (normalized.includes("underline")) return "underline";
+  if (normalized.includes("overline")) return "overline";
+  if (normalized === "none" || normalized === "") return "no-underline";
+  return null;
+}
+
+export function fontFamilyToTailwind(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  // Order matters: "sans-serif" contains "serif" as a substring.
+  if (normalized.includes("monospace") || normalized.includes("ui-monospace")) {
+    return "font-mono";
+  }
+  if (normalized.includes("sans-serif") || normalized.includes("system-ui")) {
+    return "font-sans";
+  }
+  if (normalized.includes("serif")) {
+    return "font-serif";
+  }
+  return "font-sans";
+}
+
+export function lineHeightToTailwind(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed || trimmed === "normal") return "leading-normal";
+  // The panel emits a unitless ratio (e.g. "1.5"); preserve precision.
+  return `leading-[${escapeArbitraryValue(trimmed)}]`;
+}
+
+export function letterSpacingToTailwind(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed || trimmed === "normal") return "tracking-normal";
+  const numValue = parseNumericValue(trimmed);
+  if (numValue === 0) return "tracking-normal";
+  return `tracking-[${escapeArbitraryValue(trimmed)}]`;
+}
+
+export function boxShadowToTailwind(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === "none") return "shadow-none";
+  // Arbitrary box-shadow: spaces become underscores, commas (between layers and
+  // inside rgba()) and parentheses are preserved as-is.
+  return `shadow-[${trimmed.replace(/\s+/g, "_")}]`;
 }
 
 export function fontWeightToTailwind(value: string): string {
@@ -533,8 +706,56 @@ export function cssToTailwind(styles: StyleChanges): string[] {
       case "borderRadius":
         tailwindClass = borderRadiusToTailwind(value);
         break;
+      case "borderTopLeftRadius":
+        tailwindClass = borderRadiusToTailwind(value, "rounded-tl");
+        break;
+      case "borderTopRightRadius":
+        tailwindClass = borderRadiusToTailwind(value, "rounded-tr");
+        break;
+      case "borderBottomLeftRadius":
+        tailwindClass = borderRadiusToTailwind(value, "rounded-bl");
+        break;
+      case "borderBottomRightRadius":
+        tailwindClass = borderRadiusToTailwind(value, "rounded-br");
+        break;
+      case "borderWidth":
+        tailwindClass = borderWidthToTailwind(value);
+        break;
+      case "borderStyle":
+        tailwindClass = borderStyleToTailwind(value);
+        break;
+      case "outlineColor":
+        tailwindClass = colorToTailwind(value, "outline");
+        break;
+      case "outlineWidth":
+        tailwindClass = outlineWidthToTailwind(value);
+        break;
+      case "outlineStyle":
+        tailwindClass = outlineStyleToTailwind(value);
+        break;
+      case "outlineOffset":
+        tailwindClass = outlineOffsetToTailwind(value);
+        break;
+      case "boxShadow":
+        tailwindClass = boxShadowToTailwind(value);
+        break;
       case "opacity":
         tailwindClass = opacityToTailwind(value);
+        break;
+      case "fontFamily":
+        tailwindClass = fontFamilyToTailwind(value);
+        break;
+      case "fontStyle":
+        tailwindClass = fontStyleToTailwind(value);
+        break;
+      case "textDecoration":
+        tailwindClass = textDecorationToTailwind(value);
+        break;
+      case "lineHeight":
+        tailwindClass = lineHeightToTailwind(value);
+        break;
+      case "letterSpacing":
+        tailwindClass = letterSpacingToTailwind(value);
         break;
       case "width":
       case "height":
@@ -933,6 +1154,79 @@ export function updateElementClassNameWithResult(
     success: false,
     method: "none",
     error: "Could not find any className attribute in the source code.",
+  };
+}
+
+/**
+ * Result of updating an element attribute (e.g. an image `src`).
+ */
+export interface UpdateAttributeResult {
+  sourceCode: string;
+  success: boolean;
+  method: "element-info" | "none";
+  warning?: string;
+  error?: string;
+}
+
+/**
+ * Update a plain HTML attribute (such as `src`) on the located element in
+ * JSX/TSX source code. Attributes cannot be expressed as Tailwind classes, so
+ * this is used for image-source edits that the className path can't carry.
+ *
+ * Only updates when the element can be located precisely via elementInfo
+ * (id / data-testid / unique text). Returns success:false otherwise so the
+ * caller can surface a clear, non-destructive warning.
+ */
+export function updateElementAttributeWithResult(
+  sourceCode: string,
+  elementInfo: SelectedElementInfo,
+  attrName: string,
+  attrValue: string
+): UpdateAttributeResult {
+  const location = findElementInSource(sourceCode, elementInfo);
+
+  if (!location) {
+    return {
+      sourceCode,
+      success: false,
+      method: "none",
+      error: `Could not locate <${elementInfo.tagName}> in source to update its "${attrName}". Add an id to the element for reliable saving.`,
+    };
+  }
+
+  const tag = location.tagContent;
+
+  // Choose a quote that doesn't appear in the value.
+  const quote = attrValue.includes('"') ? "'" : '"';
+  const newAttr = `${attrName}=${quote}${attrValue}${quote}`;
+
+  // Match an existing attribute: attr="..." | '...' | {...}
+  const attrRegex = new RegExp(
+    `${escapeRegexChars(attrName)}\\s*=\\s*(?:"[^"]*"|'[^']*'|\\{[^}]*\\})`
+  );
+
+  let updatedTag: string;
+  if (attrRegex.test(tag)) {
+    updatedTag = tag.replace(attrRegex, newAttr);
+  } else {
+    // Insert before the closing `/>` or `>`.
+    const insertPos = tag.endsWith("/>") ? tag.length - 2 : tag.length - 1;
+    updatedTag = `${tag.slice(0, insertPos)} ${newAttr}${tag.slice(insertPos)}`;
+  }
+
+  const updatedSource =
+    sourceCode.slice(0, location.start) +
+    updatedTag +
+    sourceCode.slice(location.end);
+
+  return {
+    sourceCode: updatedSource,
+    success: true,
+    method: "element-info",
+    warning:
+      location.confidence !== "high"
+        ? `Image located with ${location.confidence} confidence. Verify the saved change.`
+        : undefined,
   };
 }
 

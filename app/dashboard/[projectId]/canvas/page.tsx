@@ -63,6 +63,8 @@ import {
   type TextAlignOption,
 } from "@/lib/canvas/properties-utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { resolveBoundArrow } from "@/lib/canvas/arrow-utils";
+import { joinSandboxUrl } from "@/lib/sandbox-url";
 
 function CanvasContent({ projectId }: { projectId: string }) {
   // Autosave hook
@@ -103,6 +105,9 @@ function CanvasContent({ projectId }: { projectId: string }) {
 
   // Get selected shapes as array
   const selectedShapesList = shapes.filter((s) => selectedShapes[s.id]);
+
+  // Lookup of shape id -> shape, used to resolve bound flow connectors at render.
+  const shapesById = new Map(shapes.map((s) => [s.id, s]));
 
   // Handle property change for selected shapes
   const handlePropertyChange = useCallback(
@@ -233,27 +238,52 @@ function CanvasContent({ projectId }: { projectId: string }) {
     sourceFrameId: string;
   } | null>(null);
 
+  // A flow prompt queued to auto-send once the newly created child screen is
+  // selected. Keyed by the child's shape id so it only fires for that screen.
+  const [pendingFlowPrompt, setPendingFlowPrompt] = useState<{
+    shapeId: string;
+    prompt: string;
+  } | null>(null);
+
   // Convex mutations and queries
   const deleteScreenMutation = useMutation(api.screens.deleteScreen);
   const createScreenMutation = useMutation(api.screens.createScreen);
+  const createFlowScreenMutation = useMutation(api.screens.createFlowScreen);
 
   // Query all screens for this project to get their data (sandboxUrl, title, etc.)
   const screensData = useQuery(api.screens.getScreensByProject, {
     projectId: projectId as Id<"projects">,
   });
 
-  // Create a map of shapeId -> screen data for quick lookup
+  // Map of Convex screen _id -> screen doc, used to resolve a flow child's parent.
+  const screensById = new Map((screensData ?? []).map((s) => [s._id, s]));
+
+  // Create a map of shapeId -> screen data for quick lookup.
+  // Flow children share their parent's sandbox and display a different route; their
+  // iframe URL is resolved from the parent's current base + the child's route so it
+  // survives sandbox resume (host changes). `route` is also passed through so the
+  // resume hook can re-append it after a resume.
   const screenDataMap = new Map(
-    (screensData ?? []).map((screen) => [
-      screen.shapeId,
-      {
-        _id: screen._id,
-        sandboxUrl: screen.sandboxUrl,
-        sandboxId: screen.sandboxId,
-        title: screen.title,
-        theme: screen.theme,
-      },
-    ])
+    (screensData ?? []).map((screen) => {
+      let sandboxUrl = screen.sandboxUrl;
+      if (screen.parentScreenId) {
+        const parent = screensById.get(screen.parentScreenId);
+        const base = screen.sandboxUrl ?? parent?.sandboxUrl;
+        sandboxUrl = joinSandboxUrl(base, screen.route) ?? base;
+      }
+      return [
+        screen.shapeId,
+        {
+          _id: screen._id,
+          sandboxUrl,
+          sandboxId: screen.sandboxId,
+          title: screen.title,
+          theme: screen.theme,
+          parentScreenId: screen.parentScreenId,
+          route: screen.route,
+        },
+      ];
+    })
   );
 
   // AI Sidebar opens when a screen is selected
@@ -362,6 +392,19 @@ function CanvasContent({ projectId }: { projectId: string }) {
 
     setIsDeleting(true);
     try {
+      // Remove any flow connectors bound to this screen so dangling arrows don't
+      // linger after the screen is gone.
+      shapes
+        .filter(
+          (s) =>
+            s.type === "arrow" &&
+            (s.startBinding?.shapeId === screenToDelete.shapeId ||
+              s.endBinding?.shapeId === screenToDelete.shapeId)
+        )
+        .forEach((arrow) =>
+          dispatchShapes({ type: "REMOVE_SHAPE", payload: arrow.id })
+        );
+
       // Delete from canvas
       dispatchShapes({ type: "REMOVE_SHAPE", payload: screenToDelete.shapeId });
 
@@ -382,7 +425,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
       setDeleteModalOpen(false);
       setScreenToDelete(null);
     }
-  }, [screenToDelete, dispatchShapes, deleteScreenMutation]);
+  }, [screenToDelete, dispatchShapes, deleteScreenMutation, shapes, projectId]);
 
   // Handle screen toolbar delete - opens the delete modal
   const handleToolbarDelete = useCallback(() => {
@@ -420,6 +463,85 @@ function CanvasContent({ projectId }: { projectId: string }) {
       })
     );
   }, [selectedScreenShape]);
+
+  // Handle "Create flow" - spin up a child screen that shares this screen's
+  // sandbox, connect it with a bound elbow arrow, and queue the prompt to build a
+  // new page (route) in the same app.
+  const handleCreateFlow = useCallback(
+    async (prompt: string) => {
+      if (!selectedScreenShape || selectedScreenShape.type !== "screen") return;
+      const parentShape = selectedScreenShape as ScreenShape;
+      const parentScreenId = screensData?.find(
+        (s) => s.shapeId === parentShape.id
+      )?._id;
+      if (!parentScreenId) return;
+
+      try {
+        const { nanoid } = await import("nanoid");
+        const childShapeId = nanoid();
+
+        const childScreenId = await createFlowScreenMutation({
+          shapeId: childShapeId,
+          projectId: projectId as Id<"projects">,
+          parentScreenId,
+        });
+
+        // Position the child below and slightly right of the parent.
+        const childX = parentShape.x + parentShape.w / 2 + 80;
+        const childY = parentShape.y + parentShape.h + 160;
+
+        dispatchShapes({
+          type: "ADD_SCREEN",
+          payload: {
+            x: childX,
+            y: childY,
+            w: SCREEN_DEFAULTS.width,
+            h: SCREEN_DEFAULTS.height,
+            screenId: childScreenId,
+            id: childShapeId,
+          },
+        });
+
+        // Bound elbow connector parent -> child. Endpoints are recomputed at render
+        // from the shapes' live geometry, so these initial values are just a seed.
+        dispatchShapes({
+          type: "ADD_ARROW",
+          payload: {
+            startX: parentShape.x + parentShape.w / 2,
+            startY: parentShape.y + parentShape.h,
+            endX: childX + SCREEN_DEFAULTS.width / 2,
+            endY: childY,
+            stroke: "#94a3b8",
+            strokeWidth: 2,
+            arrowType: "elbow",
+            startBinding: { shapeId: parentShape.id },
+            endBinding: { shapeId: childShapeId },
+          },
+        });
+
+        // Select the child (opens the AI sidebar) and queue the prompt to auto-send.
+        dispatchShapes({ type: "CLEAR_SELECTION" });
+        dispatchShapes({ type: "SELECT_SHAPE", payload: childShapeId });
+        setPendingFlowPrompt({ shapeId: childShapeId, prompt });
+
+        pendo.track("flow_screen_created", {
+          project_id: projectId,
+          parent_screen_id: String(parentScreenId),
+          child_screen_id: String(childScreenId),
+        });
+      } catch (error) {
+        console.error("Failed to create flow:", error);
+        toast.error("Failed to create flow");
+      }
+    },
+    [
+      selectedScreenShape,
+      screensData,
+      createFlowScreenMutation,
+      projectId,
+      dispatchShapes,
+    ]
+  );
 
   const handleDeleteCancel = useCallback(() => {
     setDeleteModalOpen(false);
@@ -598,6 +720,13 @@ function CanvasContent({ projectId }: { projectId: string }) {
         initialModelId={generationContext ? DEFAULT_MODEL_ID : undefined}
         onInitialDataConsumed={() => setGenerationContext(null)}
         onGeneratingChange={setIsSelectedScreenGenerating}
+        autoSendPrompt={
+          pendingFlowPrompt &&
+          selectedScreenShape?.id === pendingFlowPrompt.shapeId
+            ? pendingFlowPrompt.prompt
+            : undefined
+        }
+        onAutoSendConsumed={() => setPendingFlowPrompt(null)}
       />
 
       {/* Toolbar */}
@@ -701,7 +830,14 @@ function CanvasContent({ projectId }: { projectId: string }) {
               return <Line key={shape.id} shape={shape} />;
             }
             if (shape.type === "arrow") {
-              return <Arrow key={shape.id} shape={shape} />;
+              // Flow connectors carry bindings; resolve their endpoints from the
+              // connected shapes' live geometry so they follow on move/resize.
+              return (
+                <Arrow
+                  key={shape.id}
+                  shape={resolveBoundArrow(shape, shapesById)}
+                />
+              );
             }
             if (shape.type === "text") {
               return <Text key={shape.id} shape={shape} />;
@@ -835,9 +971,11 @@ function CanvasContent({ projectId }: { projectId: string }) {
               shape={selectedScreenShape as ScreenShape}
               screenData={screenDataMap.get(selectedScreenShape.id)}
               viewport={viewport}
+              isGenerating={isSelectedScreenGenerating}
               onDelete={handleToolbarDelete}
               onResize={handleToolbarResize}
               onRefresh={handleToolbarRefresh}
+              onCreateFlow={handleCreateFlow}
             />
           )}
         </div>

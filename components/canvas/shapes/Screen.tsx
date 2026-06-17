@@ -17,6 +17,8 @@ interface ScreenProps {
     sandboxUrl?: string;
     sandboxId?: string;
     title?: string;
+    /** Route path for flow children; preserved across sandbox resumes. */
+    route?: string;
   };
   onClick?: () => void;
 }
@@ -68,6 +70,7 @@ export function Screen({
   const { status, error, currentUrl, resume } = useSandboxResume({
     sandboxId: screenData?.sandboxId,
     sandboxUrl: screenData?.sandboxUrl,
+    route: screenData?.route,
     autoResume: true,
   });
 

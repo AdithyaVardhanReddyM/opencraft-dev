@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { joinSandboxUrl } from "@/lib/sandbox-url";
 
 export type SandboxStatus =
   | "idle"
@@ -13,6 +14,12 @@ export type SandboxStatus =
 interface UseSandboxResumeOptions {
   sandboxId?: string;
   sandboxUrl?: string;
+  /**
+   * Route path to preserve across resumes. The resume endpoint returns only the
+   * bare base URL, so for flow-child screens the route is re-appended to keep the
+   * iframe pointed at the correct page.
+   */
+  route?: string;
   /** Auto-resume when sandboxId is provided */
   autoResume?: boolean;
 }
@@ -31,6 +38,7 @@ interface UseSandboxResumeReturn {
 export function useSandboxResume({
   sandboxId,
   sandboxUrl,
+  route,
   autoResume = true,
 }: UseSandboxResumeOptions): UseSandboxResumeReturn {
   const [status, setStatus] = useState<SandboxStatus>("idle");
@@ -71,13 +79,14 @@ export function useSandboxResume({
         return;
       }
 
-      setCurrentUrl(data.sandboxUrl);
+      // Resume returns the bare base URL; re-append the route for flow children.
+      setCurrentUrl(joinSandboxUrl(data.sandboxUrl, route) ?? data.sandboxUrl);
       setStatus("ready");
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Failed to resume sandbox");
     }
-  }, [sandboxId]);
+  }, [sandboxId, route]);
 
   const reset = useCallback(() => {
     setStatus("idle");

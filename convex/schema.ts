@@ -43,6 +43,10 @@ export default defineSchema({
     sandboxId: v.optional(v.string()), // E2B sandbox ID for persistence and lifecycle management
     files: v.optional(v.any()), // Generated files JSON: { [path: string]: string }
     theme: v.optional(v.string()), // Selected theme ID (default, claude, vercel, etc.)
+    // Flow fields: a "flow child" is a screen that shares its parent's sandbox and
+    // displays a different route (page) of the same app — used to model user flows.
+    parentScreenId: v.optional(v.id("screens")), // Set on flow children; references the originating screen
+    route: v.optional(v.string()), // Path this screen displays ("/" for roots, e.g. "/checkout" for children)
     createdAt: v.number(), // Creation timestamp
     updatedAt: v.number(), // Last update timestamp
   })
@@ -59,4 +63,18 @@ export default defineSchema({
     reasoningDetails: v.optional(v.any()), // Reasoning details for reasoning models (pass back unmodified)
     createdAt: v.number(), // Creation timestamp
   }).index("by_screenId", ["screenId"]),
+
+  // Durable store for OpenRouter reasoning_details, keyed by tool_call_id.
+  // Reasoning models require their reasoning_details to be re-submitted on every
+  // tool-call continuation. The OpenRouter proxy writes them here after each
+  // inference and reads them back when re-sending the assistant message — replacing
+  // a per-process in-memory Map that was wiped on dev reloads and not shared across
+  // serverless instances (the source of intermittent "Provider returned error").
+  reasoningTokens: defineTable({
+    toolCallId: v.string(), // OpenRouter assistant tool_call id
+    details: v.any(), // reasoning_details payload, stored/returned unmodified
+    createdAt: v.number(), // Creation timestamp (used for TTL cleanup)
+  })
+    .index("by_toolCallId", ["toolCallId"])
+    .index("by_createdAt", ["createdAt"]),
 });

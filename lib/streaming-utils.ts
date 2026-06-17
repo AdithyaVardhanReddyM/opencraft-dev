@@ -32,6 +32,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   terminal: "Executing command",
   createOrUpdateFiles: "Writing code",
   readFiles: "Reading files",
+  scrapeWebpage: "Inspecting webpage",
 };
 
 /**
@@ -71,7 +72,7 @@ export function getStatusTextForEvent(event: AgentKitEvent): string {
 
   switch (eventType) {
     case "run.started":
-      return "Updating";
+      return "Getting started";
 
     // Reasoning models emit these while "thinking" before any text/tool output.
     // Surfacing "Thinking" here fills the otherwise-dead gap after run.started.
@@ -80,7 +81,7 @@ export function getStatusTextForEvent(event: AgentKitEvent): string {
       return "Thinking";
 
     case "text.delta":
-      return "Composing response";
+      return "Writing the response";
 
     case "tool_call.arguments.delta": {
       const toolName = data.toolName as string | undefined;
@@ -101,6 +102,9 @@ export function getStatusTextForEvent(event: AgentKitEvent): string {
       if (toolName === "readFiles") {
         return "Scanning files";
       }
+      if (toolName === "scrapeWebpage") {
+        return "Reading webpage";
+      }
       return "Processing result";
     }
 
@@ -117,10 +121,13 @@ export function getStatusTextForEvent(event: AgentKitEvent): string {
         if (toolName === "readFiles") {
           return "Locating files";
         }
+        if (toolName === "scrapeWebpage") {
+          return "Fetching webpage";
+        }
         return "Invoking tool";
       }
       if (partType === "text") {
-        return "Generating";
+        return "Drafting the UI";
       }
       return "Working";
     }
@@ -137,6 +144,9 @@ export function getStatusTextForEvent(event: AgentKitEvent): string {
         }
         if (toolName === "readFiles") {
           return "Files read";
+        }
+        if (toolName === "scrapeWebpage") {
+          return "Webpage analyzed";
         }
         return "Tool finished";
       }
@@ -250,18 +260,21 @@ export function getActivityForToolPart(
   switch (part.toolName) {
     case "createOrUpdateFiles": {
       const files = Array.isArray(input.files) ? input.files : [];
-      const firstPath = files
+      const paths = files
         .map((f) =>
           f && typeof f === "object" && "path" in f
             ? (f as { path?: unknown }).path
             : undefined
         )
-        .find((p): p is string => typeof p === "string" && p.length > 0);
-      if (!firstPath) return null;
-      const extra = files.length - 1;
+        .filter((p): p is string => typeof p === "string" && p.length > 0);
+      if (paths.length === 0) return null;
+      if (paths.length === 1) return `Writing ${truncate(paths[0], 48)}`;
+      // Show a couple of file names (basenames) plus a count for the rest.
+      const shown = paths.slice(0, 2).map((p) => p.split("/").pop() || p);
+      const extra = paths.length - shown.length;
       return extra > 0
-        ? `Writing ${truncate(firstPath, 40)} (+${extra} more)`
-        : `Writing ${truncate(firstPath, 48)}`;
+        ? `Writing ${shown.join(", ")} (+${extra} more)`
+        : `Writing ${shown.join(", ")}`;
     }
 
     case "terminal": {
@@ -280,6 +293,12 @@ export function getActivityForToolPart(
       return extra > 0
         ? `Reading ${truncate(firstPath, 40)} (+${extra} more)`
         : `Reading ${truncate(firstPath, 48)}`;
+    }
+
+    case "scrapeWebpage": {
+      const url = input.url;
+      if (typeof url !== "string" || url.length === 0) return null;
+      return `Inspecting ${truncate(url, 52)}`;
     }
 
     default:

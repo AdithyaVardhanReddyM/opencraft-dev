@@ -43,6 +43,59 @@ export const createScreen = mutation({
 });
 
 /**
+ * Create a flow-child screen that reuses its parent's sandbox.
+ * The child shares the parent's E2B sandbox (sandboxId) and theme so the AI agent
+ * builds a new route inside the same app, preserving the design system. The child
+ * displays a different route, resolved at render time from the parent's sandboxUrl.
+ */
+export const createFlowScreen = mutation({
+  args: {
+    shapeId: v.string(),
+    projectId: v.id("projects"),
+    parentScreenId: v.id("screens"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    // Verify project exists and user owns it
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+    if (project.userId !== identity.subject) {
+      throw new Error("Not authorized to access this project");
+    }
+
+    // Verify the parent screen exists and belongs to the same project
+    const parent = await ctx.db.get(args.parentScreenId);
+    if (!parent) {
+      throw new Error("Parent screen not found");
+    }
+    if (parent.projectId !== args.projectId) {
+      throw new Error("Parent screen does not belong to this project");
+    }
+
+    const now = Date.now();
+    const screenId = await ctx.db.insert("screens", {
+      shapeId: args.shapeId,
+      projectId: args.projectId,
+      parentScreenId: args.parentScreenId,
+      // Share the parent's sandbox so the agent connects to the same app, and
+      // inherit its theme for visual consistency.
+      sandboxId: parent.sandboxId,
+      theme: parent.theme,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return screenId;
+  },
+});
+
+/**
  * Update a screen record with sandbox URL, files, title, and theme
  * Called by Inngest workflow after AI generation completes
  */
@@ -53,6 +106,7 @@ export const updateScreen = mutation({
     files: v.optional(v.any()),
     title: v.optional(v.string()),
     theme: v.optional(v.string()),
+    route: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -78,6 +132,7 @@ export const updateScreen = mutation({
       files?: unknown;
       title?: string;
       theme?: string;
+      route?: string;
       updatedAt: number;
     } = {
       updatedAt: Date.now(),
@@ -94,6 +149,9 @@ export const updateScreen = mutation({
     }
     if (args.theme !== undefined) {
       patch.theme = args.theme;
+    }
+    if (args.route !== undefined) {
+      patch.route = args.route;
     }
 
     await ctx.db.patch(args.screenId, patch);
@@ -216,6 +274,7 @@ export const internalUpdateScreen = internalMutation({
     sandboxId: v.optional(v.string()),
     files: v.optional(v.any()),
     title: v.optional(v.string()),
+    route: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Verify screen exists
@@ -230,6 +289,7 @@ export const internalUpdateScreen = internalMutation({
       sandboxId?: string;
       files?: unknown;
       title?: string;
+      route?: string;
       updatedAt: number;
     } = {
       updatedAt: Date.now(),
@@ -246,6 +306,9 @@ export const internalUpdateScreen = internalMutation({
     }
     if (args.title !== undefined) {
       patch.title = args.title;
+    }
+    if (args.route !== undefined) {
+      patch.route = args.route;
     }
 
     await ctx.db.patch(args.screenId, patch);

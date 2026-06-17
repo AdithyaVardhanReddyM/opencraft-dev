@@ -33,6 +33,8 @@ async function scanStreamForError(
     const decoder = new TextDecoder();
     let buffer = "";
     let logged = false;
+    let sawDone = false;
+    let sawAnyData = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -46,15 +48,32 @@ async function scanStreamForError(
 
         if (!line.startsWith("data:")) continue;
         const payload = line.slice(5).trim();
-        if (payload === "" || payload === "[DONE]") continue;
+        if (payload === "") continue;
+        if (payload === "[DONE]") {
+          sawDone = true;
+          continue;
+        }
+        sawAnyData = true;
 
         try {
           const parsed = JSON.parse(payload);
-          if (!logged && parsed?.error) {
+          // OpenRouter can surface a provider failure as a top-level `error`, a
+          // per-choice `error`, or a `finish_reason` of "error"/"content_filter".
+          // Check all three so the real cause is never swallowed.
+          const choiceError = Array.isArray(parsed?.choices)
+            ? parsed.choices.find(
+                (c: Record<string, unknown>) =>
+                  c?.error ||
+                  c?.finish_reason === "error" ||
+                  c?.finish_reason === "content_filter"
+              )
+            : undefined;
+          const errorPayload = parsed?.error || choiceError?.error || choiceError;
+          if (!logged && errorPayload) {
             logged = true;
             console.error(
               `[OpenRouter Proxy] Error chunk in 200 stream for model "${modelId}": ${JSON.stringify(
-                parsed.error
+                errorPayload
               ).slice(0, 2000)}`
             );
           }
@@ -63,19 +82,36 @@ async function scanStreamForError(
         }
       }
     }
+
+    // A well-formed OpenRouter stream ends with `data: [DONE]`. If it didn't —
+    // and we never logged an explicit error chunk — the stream was likely cut
+    // off mid-flight (provider drop, timeout), which AgentKit would otherwise
+    // resurface only as a generic "Provider returned error".
+    if (!logged && sawAnyData && !sawDone) {
+      console.error(
+        `[OpenRouter Proxy] Stream for model "${modelId}" ended without [DONE] and without an error chunk — likely a truncated/dropped provider response.`
+      );
+    }
   } catch (err) {
     console.error("[OpenRouter Proxy] Failed scanning stream for errors:", err);
   }
 }
 
 /**
- * In-memory store for reasoning_details keyed by tool_call_id
- * This allows us to match reasoning_details to the correct assistant message
- * when tool results come back
+ * Resolve the Convex HTTP (.site) endpoint used to durably store/fetch
+ * reasoning_details. Mirrors getConvexHttpUrl() in inngest/functions.ts.
  *
- * Note: In production, consider using Redis or similar for multi-instance support
+ * This replaces the previous per-process in-memory Map, which was wiped on every
+ * dev recompile and not shared across serverless instances — the root cause of
+ * the intermittent "Provider returned error". Returns null if Convex isn't
+ * configured, in which case the proxy gracefully degrades to disabling reasoning
+ * on tool-call continuations.
  */
-const reasoningStoreByToolCallId = new Map<string, unknown[]>();
+const getConvexHttpUrl = (): string | null => {
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!convexUrl) return null;
+  return convexUrl.replace(".convex.cloud", ".convex.site");
+};
 
 /**
  * Extract tool_call_ids from an assistant message
@@ -87,59 +123,80 @@ function extractToolCallIds(message: Record<string, unknown>): string[] {
 }
 
 /**
- * Inject reasoning_details into assistant messages that are missing them
- * Matches by tool_call_id to ensure correct pairing
+ * Inject reasoning_details into assistant messages that have tool_calls but are
+ * missing reasoning_details, fetching them from the durable Convex store by
+ * tool_call_id. Async because each lookup is an HTTP round-trip; failures are
+ * swallowed so the caller falls through to graceful degradation.
  */
-function injectReasoningDetails(
+async function injectReasoningDetails(
   messages: Array<Record<string, unknown>>
-): Array<Record<string, unknown>> {
-  return messages.map((msg) => {
-    // Only process assistant messages with tool_calls but no reasoning_details
-    if (msg.role === "assistant" && msg.tool_calls && !msg.reasoning_details) {
-      const toolCallIds = extractToolCallIds(msg);
+): Promise<Array<Record<string, unknown>>> {
+  const base = getConvexHttpUrl();
+  if (!base) return messages;
 
-      // Try to find stored reasoning_details for any of the tool_call_ids
-      for (const toolCallId of toolCallIds) {
-        const storedReasoningDetails =
-          reasoningStoreByToolCallId.get(toolCallId);
-        if (storedReasoningDetails) {
-          console.log(
-            `[OpenRouter Proxy] Injecting reasoning_details for tool_call_id: ${toolCallId}`
+  return await Promise.all(
+    messages.map(async (msg) => {
+      if (
+        msg.role === "assistant" &&
+        msg.tool_calls &&
+        !msg.reasoning_details
+      ) {
+        const toolCallIds = extractToolCallIds(msg);
+        if (toolCallIds.length === 0) return msg;
+        try {
+          const res = await fetch(`${base}/inngest/getReasoning`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ toolCallIds }),
+          });
+          if (res.ok) {
+            const { details } = (await res.json()) as { details: unknown };
+            if (details) {
+              console.log(
+                `[OpenRouter Proxy] Injected reasoning_details for tool_call_id: ${toolCallIds[0]}`
+              );
+              return { ...msg, reasoning_details: details };
+            }
+          }
+        } catch (err) {
+          console.error(
+            "[OpenRouter Proxy] Failed to fetch reasoning_details from Convex:",
+            err
           );
-          return {
-            ...msg,
-            reasoning_details: storedReasoningDetails,
-          };
         }
       }
-    }
-    return msg;
-  });
+      return msg;
+    })
+  );
 }
 
 /**
- * Store reasoning_details keyed by tool_call_ids
+ * Persist reasoning_details to the durable Convex store, keyed by tool_call_ids.
+ * Best-effort: logs and continues on failure (the next continuation simply
+ * degrades to reasoning-disabled rather than hard-failing).
  */
-function storeReasoningDetails(
+async function storeReasoningDetails(
   toolCallIds: string[],
-  reasoningDetails: unknown[]
-): void {
-  for (const toolCallId of toolCallIds) {
-    reasoningStoreByToolCallId.set(toolCallId, reasoningDetails);
+  reasoningDetails: unknown
+): Promise<void> {
+  const base = getConvexHttpUrl();
+  if (!base || toolCallIds.length === 0) return;
+  try {
+    await fetch(`${base}/inngest/storeReasoning`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toolCallIds, details: reasoningDetails }),
+    });
     console.log(
-      `[OpenRouter Proxy] Stored reasoning_details for tool_call_id: ${toolCallId}`
+      `[OpenRouter Proxy] Stored reasoning_details for tool_call_ids: ${toolCallIds.join(
+        ", "
+      )}`
     );
-  }
-
-  // Clean up old entries (keep only last 500)
-  if (reasoningStoreByToolCallId.size > 500) {
-    const keysToDelete = Array.from(reasoningStoreByToolCallId.keys()).slice(
-      0,
-      100
+  } catch (err) {
+    console.error(
+      "[OpenRouter Proxy] Failed to store reasoning_details to Convex:",
+      err
     );
-    for (const key of keysToDelete) {
-      reasoningStoreByToolCallId.delete(key);
-    }
   }
 }
 
@@ -202,7 +259,7 @@ export async function POST(req: NextRequest) {
     console.log(
       `[OpenRouter Proxy] Request: model="${modelId}", stream=${!!body.stream}, messages=${
         messages?.length ?? 0
-      }, reasoningModel=${!!isReasoningModel}, toolResults=${hasToolResults}`
+      }, reasoningModel=${!!isReasoningModel}, toolResults=${hasToolResults}, convexStore=${!!getConvexHttpUrl()}`
     );
 
     // Build the request body for OpenRouter
@@ -213,8 +270,8 @@ export async function POST(req: NextRequest) {
       if (messages && messages.length > 0 && hasToolResults) {
         // Tool-call continuation: OpenRouter requires the prior assistant
         // message's reasoning_details to be re-submitted. Try to restore them
-        // from the store first.
-        const injected = injectReasoningDetails(messages);
+        // from the durable store first.
+        const injected = await injectReasoningDetails(messages);
 
         if (hasUnresolvedReasoning(injected)) {
           // We couldn't supply reasoning_details for at least one tool-call
@@ -332,7 +389,7 @@ export async function POST(req: NextRequest) {
       const toolCallIds = extractToolCallIds(assistantMessage);
 
       if (reasoningDetails && toolCallIds.length > 0) {
-        storeReasoningDetails(toolCallIds, reasoningDetails);
+        await storeReasoningDetails(toolCallIds, reasoningDetails);
       }
     }
 

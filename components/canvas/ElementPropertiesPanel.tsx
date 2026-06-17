@@ -59,8 +59,9 @@ export function ElementPropertiesPanel({
     onStyleChange("src", src);
   };
 
-  // Get current image src from element (would need to be passed from overlay)
-  const currentImageSrc = element.dataAttributes?.src || "";
+  // Current image src: reflect a pending edit if present, else the original
+  // src captured from the element in the sandbox iframe.
+  const currentImageSrc = pendingChanges?.src ?? element.src ?? "";
 
   return (
     <div className="flex flex-col h-full">

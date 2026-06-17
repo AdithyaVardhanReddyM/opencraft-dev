@@ -15,6 +15,8 @@ import {
   lastAssistantTextMessageContent,
   formatMessagesForAgent,
   shouldCreateNewSandbox,
+  extractRoute,
+  deriveRouteFromFiles,
   type ConvexScreen,
   type ConvexMessage,
 } from "./utils";
@@ -24,6 +26,7 @@ interface AgentState {
   summary: string;
   filesSummary: string;
   title: string;
+  route: string; // Route the agent built (flow pages); empty for normal builds
   files: { [path: string]: string };
   reasoningDetails?: unknown; // For reasoning models that require reasoning token storage
 }
@@ -90,8 +93,8 @@ const extractTitle = (content: string): string => {
 // Auto-pause timeout for sandboxes (15 minutes)
 const SANDBOX_AUTO_PAUSE_TIMEOUT_MS = 15 * 60 * 1000;
 
-// Default model ID - Google Gemini 3.5 Flash
-const DEFAULT_MODEL_ID = "google/gemini-3.5-flash";
+// Default model ID - Moonshot AI Kimi K2.7 Code
+const DEFAULT_MODEL_ID = "moonshotai/kimi-k2.7-code";
 
 // Models that require reasoning token storage (reasoning_details must be
 // preserved across tool calls per OpenRouter docs). All current models are
@@ -100,6 +103,7 @@ const REASONING_MODELS = [
   "google/gemini-3.5-flash",
   "moonshotai/kimi-k2.7-code",
   "minimax/minimax-m3",
+  "anthropic/claude-sonnet-4.6",
 ];
 
 /**
@@ -309,17 +313,69 @@ export const runChatAgent = inngest.createFunction(
       }
     );
 
+    // Flow build: this screen is a "flow child" that adds a new page/route to its
+    // parent's app inside the SAME sandbox. Seed file context from the parent (the
+    // child's own files are empty initially) and instruct the agent to build a new
+    // route instead of overwriting the home page.
+    const isFlowBuild = !!screen?.parentScreenId;
+
+    const parentScreen = isFlowBuild
+      ? await step.run("get-parent-screen", async () => {
+          const convexHttpUrl = getConvexHttpUrl();
+          const response = await fetch(`${convexHttpUrl}/inngest/getScreen`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ screenId: screen!.parentScreenId }),
+          });
+          if (!response.ok) {
+            return null;
+          }
+          return (await response.json()) as ConvexScreen | null;
+        })
+      : null;
+
+    // Seed the agent's known files from the parent for flow builds so it reuses the
+    // existing codebase/components; normal builds use the screen's own files.
+    const seedFiles =
+      isFlowBuild && parentScreen?.files
+        ? parentScreen.files
+        : screen?.files || {};
+
+    // Extra system guidance appended only for flow builds.
+    const flowSystemAddendum = isFlowBuild
+      ? `
+
+## Flow Page (IMPORTANT — this is a new page in an EXISTING app)
+You are adding a NEW page to an existing Next.js app that already has pages, components, theme, and design tokens in place from earlier work in this same sandbox.
+
+- Create the page at a NEW route — e.g. \`app/checkout/page.tsx\` serves "/checkout". Pick a short, sensible route slug from the user's request.
+- DO NOT modify or overwrite \`app/page.tsx\` or any other existing page. Only add the new route's files (plus genuinely-new shared components if truly needed).
+- REUSE the existing components, layout primitives, and theme for visual consistency. The design system is already established — you do NOT need to read the whole codebase. Read at most one or two key files only if you need a specific pattern, then build.
+- STAY STEP-EFFICIENT: batch your work into as few \`createOrUpdateFiles\` calls as possible and avoid unnecessary re-reads so you reach the final output well within the step budget.
+- During validation, ONLY fix errors in files you created or edited. Do NOT attempt to fix pre-existing errors in files you did not touch.
+- You MUST still finish with the full output block from "Final Output" (<title>, <task_summary>, <files_summary>). IN ADDITION, include the exact route you created:
+
+<route>
+/your-new-route
+</route>`
+      : "";
+
     // Create state with previous messages for agent context
     const state = createState<AgentState>(
       {
         summary: "",
         filesSummary: "",
         title: "",
-        files: screen?.files || {},
+        route: "",
+        files: seedFiles,
         reasoningDetails: undefined, // Will be populated for reasoning model responses
       },
       { messages: previousMessages }
     );
+
+    // Counts agent turns that produced readable reasoning, so the UI can order
+    // the live "thinking" stream across the run's multiple inferences.
+    let reasoningTurn = 0;
 
     // UI Coding Agent
     const chatAgent = createAgent<AgentState>({
@@ -332,7 +388,7 @@ export const runChatAgent = inngest.createFunction(
 - Dev server running on port 3000 with hot reload (DO NOT run npm run dev/build/start)
 - Main entry: app/page.tsx
 - layout.tsx already defined — never include <html>, <body>, or top-level layout
-- Tailwind CSS and PostCSS preconfigured
+- Tailwind CSS **v4** and PostCSS preconfigured (CSS-first config — there is NO tailwind.config.js/ts; do NOT create one)
 - shadcn/ui components in @/components/ui (radix-ui, lucide-react, class-variance-authority, tailwind-merge pre-installed)
 - Theme system with CSS variables in globals.css — colors may change based on user's selected theme
 
@@ -356,6 +412,12 @@ Read file contents.
 - Use actual paths (e.g., "app/page.tsx", "components/ui/button.tsx")
 - NEVER use "@" alias in file paths — it will fail
 - Use this before modifying existing files
+
+### 4. scrapeWebpage
+Fetch a live webpage and get its HTML structure, design tokens (colors/fonts/spacing), markdown content, and links as text context.
+- ONLY use when the user provides a URL AND asks to recreate / clone / redesign / take inspiration from that specific page
+- Do NOT use it for generic build requests that don't reference a real URL
+- See "Webpage Recreation" below for how to use the returned context
 
 ## Critical Rules
 
@@ -381,6 +443,11 @@ Read file contents.
 - Only use hardcoded colors (like bg-blue-500, text-red-600) when the user explicitly requests a specific color
 - Avoid multi-color gradients; prefer single-color opacity variations (e.g., bg-primary/10)
 - Dark mode first (default theme)
+- **Tailwind v4 specifics** (this project is on Tailwind v4, NOT v3):
+  - There is NO \`tailwind.config.js/ts\`. NEVER create one — a config file with a \`theme.extend\` block is silently ignored in v4 and your custom colors/fonts will not apply.
+  - To add a NEW custom theme token, define it as a CSS variable in \`app/globals.css\` inside the existing \`:root\`/\`.dark\` blocks AND map it under \`@theme inline\` (e.g. \`--color-brand: var(--brand);\`) — then \`bg-brand\` works. Prefer the existing semantic tokens above; only add new ones when genuinely needed.
+  - Use v4 utility names: \`shadow-xs\`/\`shadow-sm\` (the scale shifted), \`rounded-xs\`, \`outline-hidden\` (not \`outline-none\` for the hidden case), and opacity via the slash syntax (\`bg-black/50\`, not \`bg-opacity-50\`). The default \`ring\` is 1px — use \`ring-2\`/\`ring-3\` for a thicker ring.
+  - Dark mode is class-based via the \`.dark\` selector (already wired in globals.css) — use \`dark:\` variants as normal.
 
 ### shadcn/ui Usage
 - Import from individual paths: import { Button } from "@/components/ui/button"
@@ -408,7 +475,26 @@ Read file contents.
 - Proper visual hierarchy
 - Responsive and accessible by default
 - Use Lucide React icons
-- No external images — use emojis, colored divs with aspect ratios
+- For photographic content, use REAL stock images — see "Images" below
+
+### Images
+- For any photographic content (hero/banner, gallery, card thumbnails, blog covers, backgrounds, product shots, team/testimonial photos) use REAL stock images that are RELEVANT to the page's subject. A skincare site shows skincare/beauty photos; a coffee shop shows coffee; a SaaS dashboard shows workspaces/people working. Random or unrelated images are NOT acceptable — relevance matters as much as quality.
+- NEVER hand-author SVG illustrations, inline data-URI graphics, "abstract art", or gradient/solid-color placeholder divs as a substitute for a real photo. This is the #1 thing to avoid.
+- Render stock images with a plain \`<img>\` tag, NOT \`next/image\`. This sidesteps all Next.js image-domain/config errors and works regardless of host. Always set explicit dimensions (width/height attributes or a fixed aspect-ratio + \`object-cover\` class) so layout never shifts, and a short descriptive \`alt\`.
+- How to pick RELEVANT photos — search the **Pexels API at GENERATION TIME** with the \`terminal\` tool, then hardcode the returned URLs:
+  - Do this EARLY and in BULK: run just **1–2 broad searches total** for the whole page with a high \`per_page\` so one call returns enough photos for every section. ONE search of 15 results usually covers a full landing page (hero + cards + gallery). Do NOT run a separate curl per image — that wastes your limited step budget and risks not finishing the page.
+    \`curl -s -H "Authorization: 3Wk3ZtcPCSiQxXZNJ2ZeX2xtSmXJeeNqjyUqfFo1nsrb06f7klZJGn06" "https://api.pexels.com/v1/search?query=<url-encoded keywords>&per_page=15&orientation=landscape"\`
+    - Use SPECIFIC keywords drawn from the page subject. Examples: \`skincare%20serum\`, \`face%20cream%20cosmetics\`, \`coffee%20latte\`, \`team%20meeting%20office\`. For tall/profile images use \`orientation=portrait\`; for square-ish use \`orientation=square\`.
+    - The response is JSON: \`{ "photos": [ { "src": { "original", "large2x", "large", "medium", "small", "landscape", "portrait", "tiny" }, "alt": "…" }, … ] }\`. Take the URLs from \`photos[].src\` — use \`src.large\` (or \`src.landscape\` for wide heroes, \`src.medium\`/\`src.small\` for cards/thumbnails). They look like \`https://images.pexels.com/photos/<id>/...jpeg?...\`.
+    - To list candidate URLs quickly you can pipe it: \`curl -s -H "Authorization: <key>" "https://api.pexels.com/v1/search?query=skincare%20serum&per_page=15" | grep -o '"large":"[^"]*"'\`.
+    - Assign a DIFFERENT photo from the returned list to each image slot so nothing repeats, and use the EXACT URLs returned by the API in your \`<img>\` tags. Also use each photo's \`alt\` text from the response for the \`<img alt>\`.
+  - CRITICAL: Pexels is for YOUR generation-time search only. Do NOT call the Pexels API (or put the API key) anywhere in the generated app code — bake the resolved \`images.pexels.com\` URLs in as static \`<img src>\` values. The final app must make no external API calls.
+  - If a Pexels search fails or returns nothing usable, fall back to keyword-matched LoremFlickr (always resolves): \`https://loremflickr.com/<width>/<height>/<comma-separated-keywords>?lock=<n>\` (different \`lock\` per image).
+  - **Avatars / profile pictures:** prefer Pexels portrait results; otherwise \`https://i.pravatar.cc/<size>?img=<1-70>\` (real faces) or \`https://api.dicebear.com/9.x/avataaars/svg?seed=<name>\` (illustrated).
+  - **Abstract/decorative backgrounds ONLY (where the subject genuinely doesn't matter):** \`https://picsum.photos/seed/<seed>/<width>/<height>\`. Do NOT use Picsum for content images — it returns photos unrelated to your topic (this is exactly what makes a page look wrong).
+  - **Labeled placeholder (only when no photo fits, e.g. a logo slot):** \`https://placehold.co/<width>x<height>?text=<label>\`.
+- Match the requested image size to the rendered box (e.g. a 3-column card grid → ~600x400 per card) so images stay crisp and load fast.
+- Icons remain Lucide React components — do not fetch icon images.
 
 ### Layout Requirements
 - Build complete layouts: navbar, sidebar, footer, content sections
@@ -424,18 +510,19 @@ Read file contents.
 6. Use terminal for package installation
 
 ## Validation (REQUIRED)
-After writing coding in the files, you MUST run this validation command:
+After writing code in the files, you MUST run this validation command:
 \`./node_modules/.bin/tsc --noEmit\`
 
 This catches:
 - TypeScript + import errors (tsc --noEmit)
+- **"Cannot find module" / "Module not found" errors** — every component or file you \`import\` MUST actually be created. This is the most common failure: \`app/page.tsx\` imports \`@/components/foo\` but \`components/foo.tsx\` was never written. Before validating, double-check that EVERY import in every file you wrote points to a file that exists (a shadcn/ui component, an npm package, or a file you created this run).
 
 If validation fails:
 1. Read the error output carefully
-2. Fix ALL errors in your code
+2. Fix ALL errors in your code (create any missing files; correct any wrong import paths)
 3. Re-run the validation command
 
-DO NOT output the task_summary until the validation passes successfully.
+DO NOT output the task_summary until the validation passes successfully. Emitting task_summary ENDS the run immediately — if you emit it while imports are still unresolved, the app ships broken with a "Module not found" build error. Never declare done with a missing file.
 
 ## Final Output
 After ALL tool calls complete AND validation passes, respond with ONLY:
@@ -470,6 +557,20 @@ List each file you created or modified with a one-line description:
 </files_summary>
 
 Do not include these tags until the task is 100% complete and validation has passed.
+
+## Webpage Recreation (scrapeWebpage)
+
+When the user provides a URL and asks to recreate, clone, redesign, or take inspiration from that page:
+
+1. **Call \`scrapeWebpage\` FIRST** with the URL, before writing any code. Build only after you have the scraped context.
+2. **Recreate structure from the returned HTML** — match the section layout, hierarchy, and ordering (navbar, hero, features, pricing, footer, etc.).
+3. **Use the copy from the returned markdown** — reuse the page's actual headings and text content, not lorem ipsum.
+4. **Match the styling exactly** — derive colors, fonts, sizes, and spacing from the HTML's class names and inline \`style\` attributes. DO NOT convert to the theme system. Use arbitrary Tailwind values like \`bg-[#0a0a0a]\`, \`text-[15px]\`, \`font-[Inter]\` to match precisely, unless the user explicitly asks to adapt it to the theme.
+5. **Images:** keep external image URLs found in the scraped HTML as-is. If a scraped image fails to load, fall back to a same-size Lorem Picsum image (\`https://picsum.photos/seed/<seed>/<w>/<h>\`) rather than a blank placeholder div.
+6. If \`scrapeWebpage\` returns an error (e.g. out of credits, rate limited, bad URL), tell the user what happened and ask how to proceed — do not fabricate the page from memory.
+7. **Stay step-efficient.** Recreation is large, so batch your work: write multiple files in a single \`createOrUpdateFiles\` call and avoid unnecessary re-reads. You MUST still finish with the \`<task_summary>\` block (after validation passes) exactly as described in "Final Output" — never stop after building without emitting it, even for big pages.
+
+The goal is a faithful, high-fidelity recreation of the real page — close to exact replication, not a loose theme-adapted interpretation.
 
 ## Captured Element Replication
 
@@ -513,7 +614,7 @@ The captured data includes:
 7. **Make it functional** — add appropriate click handlers and state
 
 ### Output
-Create a React component that is a PIXEL-PERFECT replica of the captured element. The goal is exact visual replication, not adaptation to the design system.`,
+Create a React component that is a PIXEL-PERFECT replica of the captured element. The goal is exact visual replication, not adaptation to the design system.${flowSystemAddendum}`,
       model: openrouter({ model: modelId }),
       tools: [
         createTool({
@@ -567,35 +668,58 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
             // Get current files from state before the step
             const currentFiles = { ...(network.state.data.files || {}) };
 
+            // Write each file independently so one failure can't discard the
+            // whole batch: record every success and report exactly which files
+            // failed, so the agent retries only those instead of assuming none
+            // were written (which previously left imports pointing at files that
+            // were actually on disk, or silently dropped a whole batch).
             const result = await step?.run("createorUpdateFiles", async () => {
+              let sandbox;
               try {
-                const sandbox = await getSandbox(sandboxId);
-                const writtenFiles: Record<string, string> = {};
-                for (const file of files) {
+                sandbox = await getSandbox(sandboxId);
+              } catch (error) {
+                return {
+                  files: {} as Record<string, string>,
+                  failed: files.map((f) => ({
+                    path: f.path,
+                    error: String(error),
+                  })),
+                };
+              }
+              const writtenFiles: Record<string, string> = {};
+              const failed: { path: string; error: string }[] = [];
+              for (const file of files) {
+                try {
                   await sandbox.files.write(file.path, file.content);
                   writtenFiles[file.path] = file.content;
+                } catch (error) {
+                  failed.push({ path: file.path, error: String(error) });
                 }
-                return { success: true, files: writtenFiles };
-              } catch (error) {
-                return { success: false, error: String(error) };
               }
+              return { files: writtenFiles, failed };
             });
 
-            // Update state with the written files
-            if (result && typeof result === "object" && "success" in result) {
-              if (result.success && "files" in result) {
-                const writtenFiles = result.files as Record<string, string>;
-                // Merge written files into current files
-                network.state.data.files = {
-                  ...currentFiles,
-                  ...writtenFiles,
-                };
-                return `Successfully wrote ${
-                  Object.keys(writtenFiles).length
-                } file(s): ${Object.keys(writtenFiles).join(", ")}`;
-              } else if ("error" in result) {
-                return `Error: ${result.error}`;
+            // Merge whatever was written into state, then surface any failures.
+            if (result && typeof result === "object" && "files" in result) {
+              const writtenFiles = result.files as Record<string, string>;
+              network.state.data.files = {
+                ...currentFiles,
+                ...writtenFiles,
+              };
+              const failed =
+                (result.failed as { path: string; error: string }[]) || [];
+              const wrote = Object.keys(writtenFiles);
+              const okMsg = `Successfully wrote ${wrote.length} file(s): ${wrote.join(
+                ", "
+              )}`;
+              if (failed.length > 0) {
+                return `${okMsg}. FAILED to write ${
+                  failed.length
+                } file(s) — you MUST retry these: ${failed
+                  .map((f) => `${f.path} (${f.error})`)
+                  .join("; ")}`;
               }
+              return okMsg;
             }
             return "Unknown error occurred";
           },
@@ -618,6 +742,152 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
                 return JSON.stringify(contents);
               } catch (error) {
                 return `Error: ${error}`;
+              }
+            });
+          },
+        }),
+        createTool({
+          name: "scrapeWebpage",
+          description:
+            "Fetch a live webpage via Firecrawl and return its structure and content as text context for recreation. " +
+            "Returns the page's cleaned HTML (with class names and inline styles), markdown content, and links. " +
+            "ONLY use this when the user provides a URL AND asks to recreate, clone, redesign, or take inspiration from that specific page. " +
+            "Do NOT use it for generic build requests that don't reference a real URL.",
+          parameters: z.object({
+            url: z
+              .string()
+              .describe(
+                "The full URL of the webpage to scrape, e.g. 'https://stripe.com/pricing'"
+              ),
+          }),
+          handler: async ({ url }, { step }) => {
+            return await step?.run("scrapeWebpage", async () => {
+              const apiKey = process.env.FIRECRAWL_API_KEY;
+              if (!apiKey) {
+                return "Error: FIRECRAWL_API_KEY is not configured. Cannot scrape the webpage.";
+              }
+
+              try {
+                const response = await fetch(
+                  "https://api.firecrawl.dev/v2/scrape",
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${apiKey}`,
+                    },
+                    body: JSON.stringify({
+                      url,
+                      // Keep nav/header/footer — they are part of a landing page's design.
+                      // NOTE: the "branding" format is intentionally omitted — it runs an
+                      // LLM extraction that takes 60s+ even on trivial pages and times out.
+                      // The cleaned HTML retains class names + inline styles, which carry
+                      // the design signal the model needs.
+                      formats: ["markdown", "html", "links"],
+                      onlyMainContent: false,
+                      blockAds: true,
+                      waitFor: 1500, // allow JS-rendered content to settle
+                      timeout: 60000,
+                    }),
+                  }
+                );
+
+                if (!response.ok) {
+                  if (response.status === 402) {
+                    return "Error: Firecrawl request failed (402) — out of Firecrawl credits. Tell the user the scraping quota is exhausted.";
+                  }
+                  if (response.status === 429) {
+                    return "Error: Firecrawl request failed (429) — rate limited. Wait a few seconds and try again.";
+                  }
+                  const errorText = await response.text().catch(() => "");
+                  return `Error: Firecrawl request failed (${
+                    response.status
+                  }). ${errorText.slice(0, 500)}`;
+                }
+
+                const json = (await response.json()) as {
+                  success?: boolean;
+                  data?: {
+                    markdown?: string;
+                    html?: string;
+                    links?: string[];
+                    metadata?: {
+                      title?: string;
+                      description?: string;
+                      language?: string;
+                      sourceURL?: string;
+                    };
+                  };
+                  error?: string;
+                };
+
+                if (!json.success || !json.data) {
+                  return `Error: Firecrawl returned no data. ${
+                    json.error || ""
+                  }`.trim();
+                }
+
+                const data = json.data;
+                const meta = data.metadata || {};
+
+                // Caps protect the model's context window; tune as needed.
+                const MARKDOWN_CAP = 12000;
+                const HTML_CAP = 18000;
+                const LINKS_CAP = 50;
+
+                const sections: string[] = [];
+
+                sections.push(
+                  `# Scraped webpage: ${meta.title || "(untitled)"}\n` +
+                    `Source URL: ${meta.sourceURL || url}` +
+                    (meta.description
+                      ? `\nDescription: ${meta.description}`
+                      : "") +
+                    (meta.language ? `\nLanguage: ${meta.language}` : "")
+                );
+
+                if (data.markdown) {
+                  const truncated = data.markdown.length > MARKDOWN_CAP;
+                  sections.push(
+                    `## Content (markdown)${
+                      truncated ? " — truncated" : ""
+                    }\n` + data.markdown.slice(0, MARKDOWN_CAP)
+                  );
+                }
+
+                if (data.html) {
+                  const truncated = data.html.length > HTML_CAP;
+                  sections.push(
+                    `## HTML structure (cleaned)${
+                      truncated ? " — truncated" : ""
+                    }\n` +
+                      "```html\n" +
+                      data.html.slice(0, HTML_CAP) +
+                      "\n```"
+                  );
+                }
+
+                if (Array.isArray(data.links) && data.links.length > 0) {
+                  const shown = data.links.slice(0, LINKS_CAP);
+                  sections.push(
+                    `## Links (${shown.length}${
+                      data.links.length > LINKS_CAP
+                        ? ` of ${data.links.length}`
+                        : ""
+                    })\n` + shown.join("\n")
+                  );
+                }
+
+                sections.push(
+                  "## Recreation guidance\n" +
+                    "Recreate this page faithfully: match the structure from the HTML and the copy from the markdown. " +
+                    "Derive the EXACT colors, fonts, and spacing from the HTML's class names and inline styles (do not substitute theme colors). " +
+                    "Keep external image URLs found in the HTML as-is; if an image fails, use a same-size placeholder div."
+                );
+
+                return sections.join("\n\n");
+              } catch (error) {
+                return `Error: Failed to scrape the webpage — ${String(error)}`;
               }
             });
           },
@@ -646,6 +916,11 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
             if (filesSummaryMatch) {
               network.state.data.filesSummary = filesSummaryMatch[0];
             }
+            // Extract the route the agent built (flow pages)
+            const route = extractRoute(lastAssistantTextMessageText);
+            if (route) {
+              network.state.data.route = route;
+            }
           }
 
           // Extract reasoning_details from the last assistant message for reasoning models
@@ -658,6 +933,38 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
             if (messageWithReasoning?.reasoning_details) {
               network.state.data.reasoningDetails =
                 messageWithReasoning.reasoning_details;
+
+              // Publish this turn's human-readable reasoning so the UI can show
+              // live "thinking". Gemini returns a mix of reasoning.text (readable
+              // summaries) and reasoning.encrypted (opaque) — surface only the
+              // readable parts. Isolated to its own realtime topic so the main
+              // agent_stream pipeline is untouched; failures are swallowed.
+              try {
+                const ch = userId || channelKey || screenId;
+                const details = messageWithReasoning.reasoning_details;
+                if (ch && Array.isArray(details)) {
+                  const text = details
+                    .filter(
+                      (d: { type?: string; text?: string }) =>
+                        d?.type === "reasoning.text" &&
+                        typeof d?.text === "string"
+                    )
+                    .map((d: { text?: string }) => d.text as string)
+                    .join("\n\n")
+                    .trim();
+                  if (text) {
+                    reasoningTurn += 1;
+                    await publish(
+                      userChannel(ch).agent_reasoning({
+                        turn: reasoningTurn,
+                        text,
+                      })
+                    );
+                  }
+                }
+              } catch (e) {
+                console.warn("[runChatAgent] failed to publish reasoning:", e);
+              }
             }
           }
 
@@ -669,7 +976,15 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
     const network = createNetwork<AgentState>({
       name: "chat-agent-network",
       agents: [chatAgent],
-      maxIter: 15,
+      // Cap on agent iterations. It's only hit when the agent doesn't finish, so
+      // raising it doesn't slow normal generations — it just gives heavier tasks
+      // enough room to reach their final <task_summary> instead of being cut off.
+      // Flow pages reuse an existing codebase (extra reads + project-wide
+      // validation), so they need more room than a from-scratch build.
+      // From-scratch builds also need headroom: image-heavy pages spend extra
+      // turns on Pexels searches, and being cut off mid-build ships a page whose
+      // imports point at component files that were never written (Module not found).
+      maxIter: isFlowBuild ? 40 : 35,
       defaultState: state,
       router: async ({ network }) => {
         const summary = network.state.data.summary;
@@ -704,17 +1019,84 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
     }
 
     // Run the network with streaming enabled if we have a channel
-    // For multimodal content, AgentKit will pass it through to the model
-    const result = await network.run(runMessage, {
-      state,
-      ...(targetChannel && {
-        streaming: {
-          publish: async (chunk: AgentMessageChunk) => {
-            await publish(userChannel(targetChannel).agent_stream(chunk));
+    // For multimodal content, AgentKit will pass it through to the model.
+    // Wrap in try/catch so a failure is never silent: AgentKit collapses provider
+    // failures into a generic "Provider returned error", so we log the real cause
+    // + context here, and guarantee the user gets a visible message instead of a
+    // hung UI. Transient transport errors (e.g. provider 500s) are already retried
+    // by step.ai.infer before reaching here, so this is the final-failure handler.
+    let result;
+    try {
+      result = await network.run(runMessage, {
+        state,
+        ...(targetChannel && {
+          streaming: {
+            publish: async (chunk: AgentMessageChunk) => {
+              await publish(userChannel(targetChannel).agent_stream(chunk));
+            },
           },
-        },
-      }),
-    });
+        }),
+      });
+    } catch (err) {
+      const detail =
+        err instanceof Error ? err.stack || err.message : String(err);
+      console.error(`[runChatAgent] network.run failed: ${detail}`);
+      console.error(
+        `[runChatAgent] failure context: ${JSON.stringify({
+          modelId,
+          screenId,
+          projectId,
+          messageCount: previousMessages?.length ?? 0,
+          hasImages: imageUrls.length > 0,
+        })}`
+      );
+
+      // Make sure the user sees an error instead of an indefinitely-spinning UI.
+      if (screenId) {
+        await step.run("create-network-error-message", async () => {
+          const convexHttpUrl = getConvexHttpUrl();
+          const response = await fetch(
+            `${convexHttpUrl}/inngest/createMessage`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                screenId,
+                role: "assistant",
+                content:
+                  "I encountered an error while generating the UI. Please try again with a different prompt or provide more details about what you'd like to create.",
+              }),
+            }
+          );
+          if (!response.ok) {
+            const e = await response.json();
+            throw new Error(`Failed to create error message: ${e.error}`);
+          }
+          return { success: true };
+        });
+      }
+
+      await step.run("track-pendo-network-error", async () => {
+        await trackPendoEvent("ai_generation_failed", clerkId || "system", {
+          screen_id: screenId,
+          project_id: projectId,
+          model_id: modelId,
+          error: detail.slice(0, 500),
+        });
+      });
+
+      return {
+        screenId,
+        projectId,
+        files: {} as Record<string, string>,
+        summary: undefined as string | undefined,
+        url: undefined as string | undefined,
+        isError: true,
+        // Surfaced in the Inngest run output so the real cause is visible there
+        // (not just in the next dev terminal). Truncated to keep the payload small.
+        errorDetail: detail.slice(0, 1000),
+      };
+    }
 
     // Check if the generation was successful
     // A generation is successful if we have a task_summary in the response
@@ -754,6 +1136,20 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
             extractTitle(result.state.data.summary || "")
           : undefined;
 
+        // For flow builds, persist the route the agent created so the child's
+        // iframe points at the new page. Prefer the route derived from the file
+        // the agent actually wrote (ground truth: the URL must map to a real
+        // page file), then the model's <route> tag, then any existing route.
+        const route = isFlowBuild
+          ? deriveRouteFromFiles(
+              result.state.data.files,
+              parentScreen?.files
+            ) ||
+            result.state.data.route ||
+            screen?.route ||
+            undefined
+          : undefined;
+
         const response = await fetch(`${convexHttpUrl}/inngest/updateScreen`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -763,6 +1159,7 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
             sandboxId,
             files: result.state.data.files,
             ...(title && { title }),
+            ...(route && { route }),
           }),
         });
 
@@ -784,6 +1181,7 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
           .replace(/<\/task_summary>/gi, "")
           .replace(/<title>[\s\S]*?<\/title>/gi, "")
           .replace(/<files_summary>[\s\S]*?<\/files_summary>/gi, "")
+          .replace(/<route>[\s\S]*?<\/route>/gi, "")
           .trim();
 
         // Get the agent-generated files_summary (keep the tags for parsing later)
