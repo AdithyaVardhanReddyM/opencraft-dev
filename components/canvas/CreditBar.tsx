@@ -1,7 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Sparkle } from "lucide-react";
+import { Sparkle, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
 
 interface CreditBarProps {
   generationsRemaining: number;
@@ -12,6 +13,7 @@ interface CreditBarProps {
 /**
  * Credit bar showing remaining generations.
  * Appears at the top of the input area with a gradient background.
+ * When the user runs out of messages it surfaces an Upgrade link to /pricing.
  */
 export function CreditBar({
   generationsRemaining,
@@ -24,7 +26,7 @@ export function CreditBar({
   return (
     <div
       className={cn(
-        "flex items-center px-3 py-0.5",
+        "flex items-center justify-between gap-2 px-3 py-0.5",
         isExhausted
           ? "bg-linear-to-r from-destructive/20 via-destructive/15 to-destructive/10 border-b border-destructive/30"
           : isLow
@@ -51,6 +53,16 @@ export function CreditBar({
           <span className="text-muted-foreground ml-1">• Limit reached</span>
         )}
       </div>
+
+      {isExhausted && (
+        <Link
+          href="/pricing"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+        >
+          Upgrade
+          <ArrowUpRight className="h-3 w-3" />
+        </Link>
+      )}
     </div>
   );
 }
