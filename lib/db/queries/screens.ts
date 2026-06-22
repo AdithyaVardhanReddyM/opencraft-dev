@@ -1,0 +1,209 @@
+import "server-only";
+import { eq } from "drizzle-orm";
+import { db } from "../index";
+import { projects, screens } from "../schema";
+import { toDoc, toDocs } from "../serialize";
+import { ApiError } from "../../server/errors";
+import { isUuid } from "../../server/uuid";
+import type { ScreenDoc } from "../types";
+
+async function getScreenRow(screenId: string) {
+  if (!isUuid(screenId)) return null;
+  const [row] = await db
+    .select()
+    .from(screens)
+    .where(eq(screens.id, screenId))
+    .limit(1);
+  return row ?? null;
+}
+
+/** Throw unless the user owns the project the screen belongs to. */
+async function assertScreenOwner(userId: string, screenId: string) {
+  const screen = await getScreenRow(screenId);
+  if (!screen) throw new ApiError(404, "Screen not found");
+  const [project] = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, screen.projectId))
+    .limit(1);
+  if (!project || project.userId !== userId) {
+    throw new ApiError(403, "Not authorized to access this screen");
+  }
+  return screen;
+}
+
+async function assertProjectOwner(userId: string, projectId: string) {
+  if (!isUuid(projectId)) throw new ApiError(404, "Project not found");
+  const [project] = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+  if (!project) throw new ApiError(404, "Project not found");
+  if (project.userId !== userId) {
+    throw new ApiError(403, "Not authorized to access this project");
+  }
+}
+
+/** Create a screen record (a Screen shape added to the canvas). */
+export async function createScreen(
+  userId: string,
+  shapeId: string,
+  projectId: string
+): Promise<string> {
+  await assertProjectOwner(userId, projectId);
+  const now = Date.now();
+  const [row] = await db
+    .insert(screens)
+    .values({ shapeId, projectId, createdAt: now, updatedAt: now })
+    .returning({ id: screens.id });
+  return row.id;
+}
+
+/**
+ * Create a flow-child screen that reuses its parent's sandbox + theme so the
+ * agent builds a new route inside the same app.
+ */
+export async function createFlowScreen(
+  userId: string,
+  shapeId: string,
+  projectId: string,
+  parentScreenId: string
+): Promise<string> {
+  await assertProjectOwner(userId, projectId);
+
+  const parent = await getScreenRow(parentScreenId);
+  if (!parent) throw new ApiError(404, "Parent screen not found");
+  if (parent.projectId !== projectId) {
+    throw new ApiError(400, "Parent screen does not belong to this project");
+  }
+
+  const now = Date.now();
+  const [row] = await db
+    .insert(screens)
+    .values({
+      shapeId,
+      projectId,
+      parentScreenId,
+      sandboxId: parent.sandboxId,
+      theme: parent.theme,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning({ id: screens.id });
+  return row.id;
+}
+
+export interface ScreenPatch {
+  sandboxUrl?: string;
+  sandboxId?: string;
+  files?: unknown;
+  title?: string;
+  theme?: string;
+  route?: string;
+}
+
+function buildPatch(input: ScreenPatch) {
+  const patch: Record<string, unknown> = { updatedAt: Date.now() };
+  for (const key of [
+    "sandboxUrl",
+    "sandboxId",
+    "files",
+    "title",
+    "theme",
+    "route",
+  ] as const) {
+    if (input[key] !== undefined) patch[key] = input[key];
+  }
+  return patch;
+}
+
+/** Update a screen (ownership-checked). Used by the screen toolbar. */
+export async function updateScreen(
+  userId: string,
+  screenId: string,
+  input: ScreenPatch
+): Promise<{ success: boolean }> {
+  await assertScreenOwner(userId, screenId);
+  await db
+    .update(screens)
+    .set(buildPatch(input))
+    .where(eq(screens.id, screenId));
+  return { success: true };
+}
+
+/** Delete a screen and its messages (messages also cascade via FK). */
+export async function deleteScreen(
+  userId: string,
+  screenId: string
+): Promise<{ success: boolean }> {
+  await assertScreenOwner(userId, screenId);
+  await db.delete(screens).where(eq(screens.id, screenId));
+  return { success: true };
+}
+
+/** Screen by canvas shape id, or null (not found / not owner). */
+export async function getScreenByShapeId(
+  userId: string,
+  shapeId: string
+): Promise<ScreenDoc | null> {
+  const [screen] = await db
+    .select()
+    .from(screens)
+    .where(eq(screens.shapeId, shapeId))
+    .limit(1);
+  if (!screen) return null;
+
+  const [project] = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, screen.projectId))
+    .limit(1);
+  if (!project || project.userId !== userId) return null;
+
+  return toDoc(screen) as ScreenDoc;
+}
+
+/** All screens for a project (empty if not found / not owner). */
+export async function getScreensByProject(
+  userId: string,
+  projectId: string
+): Promise<ScreenDoc[]> {
+  if (!isUuid(projectId)) return [];
+  const [project] = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+  if (!project || project.userId !== userId) return [];
+
+  const rows = await db
+    .select()
+    .from(screens)
+    .where(eq(screens.projectId, projectId));
+  return toDocs(rows) as ScreenDoc[];
+}
+
+// ---- Internal (server-to-server; used by the Inngest workflow) -------------
+
+/** Internal: get a screen by id, no auth. */
+export async function internalGetScreen(
+  screenId: string
+): Promise<ScreenDoc | null> {
+  const screen = await getScreenRow(screenId);
+  return screen ? (toDoc(screen) as ScreenDoc) : null;
+}
+
+/** Internal: patch a screen by id, no auth (Inngest also sets sandboxId). */
+export async function internalUpdateScreen(
+  screenId: string,
+  input: ScreenPatch
+): Promise<{ success: boolean }> {
+  const screen = await getScreenRow(screenId);
+  if (!screen) throw new ApiError(404, "Screen not found");
+  await db
+    .update(screens)
+    .set(buildPatch(input))
+    .where(eq(screens.id, screenId));
+  return { success: true };
+}

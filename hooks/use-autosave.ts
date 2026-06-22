@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useCallback, useRef, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { saveCanvasState as saveCanvasStateRequest } from "@/lib/api/mutations";
+import { useCanvasState } from "@/lib/api/hooks";
 import { useCanvasContext } from "@/contexts/CanvasContext";
 import {
   serializeCanvasState,
@@ -69,11 +68,9 @@ export function useAutosave(
   const initialLoadDoneRef = useRef(false);
   const pendingCloudSyncRef = useRef(false);
 
-  // Convex mutation and query
-  const saveCanvasState = useMutation(api.projects.saveCanvasState);
-  const cloudState = useQuery(api.projects.getCanvasState, {
-    projectId: projectId as Id<"projects">,
-  });
+  // One-shot load of cloud canvas state (SWR: `undefined` while loading, then
+  // the state object or `null`). The cloud save is a request to our API.
+  const { data: cloudState } = useCanvasState(projectId);
 
   // Derive save status
   const saveStatus = deriveSaveStatus(isDirty, isSyncing, !!error, isOffline);
@@ -117,8 +114,8 @@ export function useAutosave(
     try {
       const data = serializeCanvasState(viewport, shapes);
 
-      await saveCanvasState({
-        projectId: projectId as Id<"projects">,
+      await saveCanvasStateRequest({
+        projectId,
         canvasData: {
           viewport: data.viewport,
           shapes: data.shapes,
@@ -167,7 +164,7 @@ export function useAutosave(
     } finally {
       setIsSyncing(false);
     }
-  }, [viewport, shapes, projectId, saveCanvasState, isOffline, maxRetries]);
+  }, [viewport, shapes, projectId, isOffline, maxRetries]);
 
   // Save to localStorage (debounced)
   const saveToLocal = useCallback(() => {
@@ -250,9 +247,9 @@ export function useAutosave(
       const cloudData: CanvasProjectData | null = cloudState
         ? {
             viewport: cloudState.viewport,
-            shapes: cloudState.shapes,
+            shapes: cloudState.shapes as CanvasProjectData["shapes"],
             tool: cloudState.tool as CanvasProjectData["tool"],
-            selected: cloudState.selected,
+            selected: cloudState.selected as CanvasProjectData["selected"],
             frameCounter: cloudState.frameCounter,
             version: cloudState.version,
             lastModified: cloudState.lastModified,

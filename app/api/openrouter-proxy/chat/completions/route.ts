@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getReasoning, storeReasoning } from "@/lib/db/queries/reasoning";
+
+export const runtime = "nodejs";
 
 // Models that require reasoning token storage. Per OpenRouter docs,
 // reasoning_details must be preserved and re-submitted across tool calls for
@@ -98,22 +101,6 @@ async function scanStreamForError(
 }
 
 /**
- * Resolve the Convex HTTP (.site) endpoint used to durably store/fetch
- * reasoning_details. Mirrors getConvexHttpUrl() in inngest/functions.ts.
- *
- * This replaces the previous per-process in-memory Map, which was wiped on every
- * dev recompile and not shared across serverless instances — the root cause of
- * the intermittent "Provider returned error". Returns null if Convex isn't
- * configured, in which case the proxy gracefully degrades to disabling reasoning
- * on tool-call continuations.
- */
-const getConvexHttpUrl = (): string | null => {
-  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-  if (!convexUrl) return null;
-  return convexUrl.replace(".convex.cloud", ".convex.site");
-};
-
-/**
  * Extract tool_call_ids from an assistant message
  */
 function extractToolCallIds(message: Record<string, unknown>): string[] {
@@ -124,16 +111,13 @@ function extractToolCallIds(message: Record<string, unknown>): string[] {
 
 /**
  * Inject reasoning_details into assistant messages that have tool_calls but are
- * missing reasoning_details, fetching them from the durable Convex store by
- * tool_call_id. Async because each lookup is an HTTP round-trip; failures are
- * swallowed so the caller falls through to graceful degradation.
+ * missing reasoning_details, fetching them from the durable Aurora store by
+ * tool_call_id. Failures are swallowed so the caller falls through to graceful
+ * degradation.
  */
 async function injectReasoningDetails(
   messages: Array<Record<string, unknown>>
 ): Promise<Array<Record<string, unknown>>> {
-  const base = getConvexHttpUrl();
-  if (!base) return messages;
-
   return await Promise.all(
     messages.map(async (msg) => {
       if (
@@ -144,23 +128,16 @@ async function injectReasoningDetails(
         const toolCallIds = extractToolCallIds(msg);
         if (toolCallIds.length === 0) return msg;
         try {
-          const res = await fetch(`${base}/inngest/getReasoning`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ toolCallIds }),
-          });
-          if (res.ok) {
-            const { details } = (await res.json()) as { details: unknown };
-            if (details) {
-              console.log(
-                `[OpenRouter Proxy] Injected reasoning_details for tool_call_id: ${toolCallIds[0]}`
-              );
-              return { ...msg, reasoning_details: details };
-            }
+          const { details } = await getReasoning(toolCallIds);
+          if (details) {
+            console.log(
+              `[OpenRouter Proxy] Injected reasoning_details for tool_call_id: ${toolCallIds[0]}`
+            );
+            return { ...msg, reasoning_details: details };
           }
         } catch (err) {
           console.error(
-            "[OpenRouter Proxy] Failed to fetch reasoning_details from Convex:",
+            "[OpenRouter Proxy] Failed to fetch reasoning_details:",
             err
           );
         }
@@ -171,7 +148,7 @@ async function injectReasoningDetails(
 }
 
 /**
- * Persist reasoning_details to the durable Convex store, keyed by tool_call_ids.
+ * Persist reasoning_details to the durable Aurora store, keyed by tool_call_ids.
  * Best-effort: logs and continues on failure (the next continuation simply
  * degrades to reasoning-disabled rather than hard-failing).
  */
@@ -179,14 +156,9 @@ async function storeReasoningDetails(
   toolCallIds: string[],
   reasoningDetails: unknown
 ): Promise<void> {
-  const base = getConvexHttpUrl();
-  if (!base || toolCallIds.length === 0) return;
+  if (toolCallIds.length === 0) return;
   try {
-    await fetch(`${base}/inngest/storeReasoning`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ toolCallIds, details: reasoningDetails }),
-    });
+    await storeReasoning(toolCallIds, reasoningDetails);
     console.log(
       `[OpenRouter Proxy] Stored reasoning_details for tool_call_ids: ${toolCallIds.join(
         ", "
@@ -194,7 +166,7 @@ async function storeReasoningDetails(
     );
   } catch (err) {
     console.error(
-      "[OpenRouter Proxy] Failed to store reasoning_details to Convex:",
+      "[OpenRouter Proxy] Failed to store reasoning_details:",
       err
     );
   }
@@ -259,7 +231,7 @@ export async function POST(req: NextRequest) {
     console.log(
       `[OpenRouter Proxy] Request: model="${modelId}", stream=${!!body.stream}, messages=${
         messages?.length ?? 0
-      }, reasoningModel=${!!isReasoningModel}, toolResults=${hasToolResults}, convexStore=${!!getConvexHttpUrl()}`
+      }, reasoningModel=${!!isReasoningModel}, toolResults=${hasToolResults}`
     );
 
     // Build the request body for OpenRouter

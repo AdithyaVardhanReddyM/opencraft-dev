@@ -2,12 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useUserMetadata } from "@/lib/api/hooks";
 
 export function PendoInitializer() {
   const { user, isSignedIn } = useUser();
-  const userData = useQuery(api.users.getUserMetadata);
+  const { data: userData } = useUserMetadata();
   const initializedRef = useRef(false);
 
   // Initialize Pendo once with anonymous visitor

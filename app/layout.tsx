@@ -4,7 +4,6 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { ClerkProvider } from "@clerk/nextjs";
-import ConvexClientProvider from "@/components/ConvexClientProvider";
 import { AgentProviderWrapper } from "@/components/AgentProviderWrapper";
 import { PendoInitializer } from "@/components/PendoInitializer";
 
@@ -70,10 +69,8 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <ConvexClientProvider>
-              <PendoInitializer />
-              <AgentProviderWrapper>{children}</AgentProviderWrapper>
-            </ConvexClientProvider>
+            <PendoInitializer />
+            <AgentProviderWrapper>{children}</AgentProviderWrapper>
             <Toaster />
           </ThemeProvider>
         </body>

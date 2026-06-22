@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useMemo, useOptimistic, useTransition } from "react";
-import { useQuery, useConvexAuth } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useAuth } from "@clerk/nextjs";
+import { useProjects } from "@/lib/api/hooks";
 import { sortProjects, ProjectSortOption } from "@/lib/project-utils";
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
 import { EmptyState } from "@/components/dashboard/EmptyState";
@@ -10,7 +10,6 @@ import { ProjectCard } from "@/components/dashboard/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, SearchX } from "lucide-react";
 import { Project } from "@/types/project";
-import { Id } from "@/convex/_generated/dataModel";
 import { NewProjectCard } from "./NewProjectCard";
 
 interface ProjectsGridProps {
@@ -20,7 +19,7 @@ interface ProjectsGridProps {
 }
 
 type OptimisticAction =
-  | { type: "delete"; projectId: Id<"projects"> }
+  | { type: "delete"; projectId: string }
   | { type: "create"; project: Project };
 
 export function ProjectsGrid({
@@ -29,23 +28,19 @@ export function ProjectsGrid({
   onCreateProject,
 }: ProjectsGridProps) {
   // Track projects being deleted for fade-out animation
-  const [deletingProjects, setDeletingProjects] = useState<Set<Id<"projects">>>(
+  const [deletingProjects, setDeletingProjects] = useState<Set<string>>(
     new Set()
   );
 
   // Transition for optimistic updates
   const [, startTransition] = useTransition();
 
-  // Wait for Convex to finish authenticating before querying. Right after
-  // sign-in/sign-up the Clerk session exists but its token hasn't reached
-  // Convex yet; querying during that window throws "Not authenticated".
-  const { isAuthenticated } = useConvexAuth();
+  // Only fetch once Clerk reports a signed-in session, so the request to our
+  // API carries the auth cookie (otherwise it would 401).
+  const { isSignedIn } = useAuth();
 
   // Fetch all projects for the authenticated user
-  const projects = useQuery(
-    api.projects.getAllProjects,
-    isAuthenticated ? {} : "skip"
-  );
+  const { data: projects, error } = useProjects(!!isSignedIn);
 
   // Optimistic state for immediate UI updates
   const [optimisticProjects, setOptimisticProjects] = useOptimistic<
@@ -63,7 +58,7 @@ export function ProjectsGrid({
   });
 
   // Handle optimistic delete with fade-out animation
-  const handleOptimisticDelete = (projectId: Id<"projects">) => {
+  const handleOptimisticDelete = (projectId: string) => {
     // Add to deleting set for fade-out animation
     setDeletingProjects((prev) => new Set(prev).add(projectId));
 
@@ -100,12 +95,12 @@ export function ProjectsGrid({
   }, [optimisticProjects, sortOption, searchQuery]);
 
   // Handle loading state
-  if (projects === undefined) {
+  if (projects === undefined && !error) {
     return <LoadingSkeleton />;
   }
 
-  // Handle error state (Convex will throw errors that we can catch)
-  if (projects === null) {
+  // Handle error state
+  if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
         <div className="flex flex-col items-center text-center max-w-md space-y-4">
@@ -126,6 +121,11 @@ export function ProjectsGrid({
         </div>
       </div>
     );
+  }
+
+  // Still resolving (e.g. before sign-in is known) — show the skeleton.
+  if (!projects) {
+    return <LoadingSkeleton />;
   }
 
   // Handle empty state

@@ -1,12 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // `pg` is a native Node module; keep it out of the bundler so it loads at
+  // runtime in route handlers / Inngest functions.
+  serverExternalPackages: ["pg"],
   images: {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "**.convex.cloud",
+        hostname: "opencraft-uploads-339712700064.s3.us-east-1.amazonaws.com",
       },
       {
         protocol: "https",

@@ -4,7 +4,6 @@ import { useTransition, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -25,7 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { api } from "@/convex/_generated/api";
+import { createProject } from "@/lib/api/mutations";
 
 // Zod validation schema
 const createProjectSchema = z.object({
@@ -52,7 +51,6 @@ export function CreateProjectDialog({
 }: CreateProjectDialogProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const createProject = useMutation(api.projects.createProject);
 
   // Initialize form with react-hook-form and zod validation
   const form = useForm<CreateProjectFormData>({

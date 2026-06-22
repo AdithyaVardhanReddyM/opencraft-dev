@@ -33,6 +33,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# private AWS infra journal (identifiers/configs, no secrets — keep local)
+AWS_INFRA.md
+
 # vercel
 .vercel
 

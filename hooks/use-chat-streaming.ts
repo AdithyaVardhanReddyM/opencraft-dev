@@ -2,9 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAgents } from "@inngest/use-agent";
-import { useConvex, useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { useMessages } from "@/lib/api/hooks";
+import {
+  createMessage,
+  getUploadUrl,
+  resolveImageUrls,
+  refreshScreens,
+  refreshStats,
+} from "@/lib/api/mutations";
 import {
   getStatusTextForEvent,
   getActivityForToolPart,
@@ -124,13 +129,13 @@ export function useChatStreaming({
   // turn; only the first should show "Getting started" (see onEvent below).
   const hasSeenRunStartedRef = useRef<boolean>(false);
 
-  // Convex mutations and queries for persistence
-  const convex = useConvex();
-  const createMessage = useMutation(api.messages.createMessage);
-  const generateUploadUrl = useMutation(api.messages.generateUploadUrl);
-  const convexMessages = useQuery(
-    api.messages.getMessages,
-    screenId ? { screenId: screenId as Id<"screens"> } : "skip"
+  // Persisted message history. While awaiting a response we poll so the
+  // assistant message written by the Inngest workflow appears (the
+  // request/response stand-in for Convex's live query). `data` is `undefined`
+  // while loading, matching the former Convex semantics.
+  const { data: convexMessages, mutate: mutateMessages } = useMessages(
+    screenId,
+    { refreshInterval: isWaitingForResponse ? 1500 : 0 }
   );
 
   // Track current model and images for retry and state
@@ -171,6 +176,10 @@ export function useChatStreaming({
         setStreamingSteps((prev) =>
           prev.map((s) => ({ ...s, status: "complete" as const }))
         );
+        // Head-start refetch of the persisted thread; the polling interval
+        // (active while waiting) covers the case where the workflow writes the
+        // assistant message slightly after the stream ends.
+        void mutateMessages();
         return;
       }
 
@@ -417,14 +426,21 @@ export function useChatStreaming({
         });
       }
 
-      // Response received! Clear loading state
+      // Response received! Clear loading state.
       setIsWaitingForResponse(false);
       setStreamingSteps([]);
       setStatusText("");
+
+      // The workflow has now persisted the assistant message — which means it
+      // also updated the screen (sandboxUrl/files/title) and the generation
+      // count just before. Refetch both so the canvas iframe and the credit bar
+      // reflect the new state (Convex did this automatically via live queries).
+      if (projectId) void refreshScreens(projectId);
+      void refreshStats();
     }
 
     lastConvexMessageCountRef.current = currentCount;
-  }, [convexMessages, isWaitingForResponse, screenId]);
+  }, [convexMessages, isWaitingForResponse, screenId, projectId]);
 
   // Use our own loading state based on waiting for response
   const isLoading = isWaitingForResponse;
@@ -495,32 +511,35 @@ export function useChatStreaming({
       lastConvexMessageCountRef.current = convexMessages?.length || 0;
 
       try {
-        // Upload images to Convex storage. We pass the resulting public storage
-        // URLs (not base64) to the agent: base64-encoding a single photo can
-        // exceed Inngest's 3MB max event size, which would reject the whole
-        // chat request. The OpenAI-compatible image_url field accepts remote
-        // URLs, so the model fetches the image directly from Convex storage.
-        const imageStorageIds: Id<"_storage">[] = [];
+        // Upload images to S3. We pass the resulting presigned URLs (not base64)
+        // to the agent: base64-encoding a single photo can exceed Inngest's 3MB
+        // max event size, which would reject the whole chat request. The
+        // OpenAI-compatible image_url field accepts remote URLs, so the model
+        // fetches the image directly from S3.
+        const imageStorageIds: string[] = [];
 
         for (const image of images) {
-          // Upload to Convex storage
-          const uploadUrl = await generateUploadUrl({});
-          const uploadResult = await fetch(uploadUrl, {
-            method: "POST",
-            headers: { "Content-Type": image.file.type },
+          // The presigned PUT is bound to the exact Content-Type it was signed
+          // with, so use one resolved value for both the signing request and the
+          // upload header (an empty file.type would otherwise mismatch -> 403).
+          const contentType = image.file.type || "application/octet-stream";
+          const { key, uploadUrl } = await getUploadUrl(contentType);
+          const putRes = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": contentType },
             body: image.file,
           });
-          const { storageId } = await uploadResult.json();
-          imageStorageIds.push(storageId as Id<"_storage">);
+          if (!putRes.ok) {
+            throw new Error(`Image upload failed (${putRes.status})`);
+          }
+          imageStorageIds.push(key);
         }
 
-        // Resolve the public storage URLs for the uploaded images. These short
-        // URLs are what we hand to the model, keeping the Inngest event small.
+        // Resolve presigned GET URLs for the uploaded images. These are what we
+        // hand to the model, keeping the Inngest event small.
         let imageAgentUrls: string[] = [];
         if (imageStorageIds.length > 0) {
-          const urlMap = await convex.query(api.messages.getImageUrls, {
-            storageIds: imageStorageIds,
-          });
+          const urlMap = await resolveImageUrls(imageStorageIds);
           imageAgentUrls = imageStorageIds
             .map((id) => urlMap[id])
             .filter((url): url is string => Boolean(url));
@@ -537,9 +556,9 @@ export function useChatStreaming({
 
         setStatusText("Starting...");
 
-        // Save user message to Convex with image IDs and model
+        // Persist the user message with image keys and model
         await createMessage({
-          screenId: screenId as Id<"screens">,
+          screenId,
           role: "user",
           content:
             trimmedContent || (images.length > 0 ? "[Image attached]" : ""),
@@ -569,7 +588,7 @@ export function useChatStreaming({
           is_first_message: !convexMessages || convexMessages.length === 0,
         });
 
-        // Note: isWaitingForResponse will be cleared when Convex receives assistant message
+        // Note: isWaitingForResponse clears once the persisted assistant message is fetched
         pendingUserMessageRef.current = null;
       } catch (err) {
         const errorMessage =
@@ -589,9 +608,6 @@ export function useChatStreaming({
       isLoading,
       screenId,
       projectId,
-      convex,
-      createMessage,
-      generateUploadUrl,
       agentSendMessage,
       convexMessages?.length,
     ]

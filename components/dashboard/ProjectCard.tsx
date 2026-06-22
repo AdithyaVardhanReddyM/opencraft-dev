@@ -8,12 +8,11 @@ import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/lib/date-utils";
 import { Project } from "@/types/project";
 import { DeleteProjectDialog } from "@/components/dashboard/DeleteProjectDialog";
-import { Id } from "@/convex/_generated/dataModel";
 
 interface ProjectCardProps {
   project: Project;
   isDeleting?: boolean;
-  onOptimisticDelete?: (projectId: Id<"projects">) => void;
+  onOptimisticDelete?: (projectId: string) => void;
 }
 
 export function ProjectCard({

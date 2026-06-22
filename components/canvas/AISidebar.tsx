@@ -76,9 +76,8 @@ import {
 } from "@/lib/ai-models";
 import { CreditBar } from "@/components/canvas/CreditBar";
 import { nanoid } from "nanoid";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { useGenerationStats, useImageUrls } from "@/lib/api/hooks";
+import { ensureUser } from "@/lib/api/mutations";
 
 type ChatInputStatus = "submitted" | "streaming" | "ready" | "error";
 
@@ -158,15 +157,15 @@ export function AISidebar({
   const [activeTab, setActiveTab] = useState("chat");
 
   // Get generation stats for the user
-  const generationStats = useQuery(api.users.getGenerationStats);
-  const getOrCreateUser = useMutation(api.users.getOrCreateUser);
+  const { data: generationStats } = useGenerationStats();
 
-  // Ensure user record exists on mount
+  // Ensure the user record exists (once on mount).
+  const ensuredUserRef = useRef(false);
   useEffect(() => {
-    if (generationStats === null) {
-      getOrCreateUser();
-    }
-  }, [generationStats, getOrCreateUser]);
+    if (ensuredUserRef.current) return;
+    ensuredUserRef.current = true;
+    ensureUser().catch(() => {});
+  }, []);
 
   const generationsRemaining = generationStats?.generationsRemaining ?? 10;
   const generationsLimit = generationStats?.generationsLimit ?? 10;
@@ -194,6 +193,14 @@ export function AISidebar({
   useEffect(() => {
     onGeneratingChange?.(isLoading);
   }, [isLoading, onGeneratingChange]);
+
+  // Reset the parent's "generating" flag when the sidebar unmounts (e.g. the
+  // user deselects the screen mid-run). Without this the flag stays stuck `true`
+  // and the canvas would poll forever; the page's idle safety-poll still picks
+  // up the finished sandboxUrl afterward.
+  useEffect(() => {
+    return () => onGeneratingChange?.(false);
+  }, [onGeneratingChange]);
 
   // Auto-send the queued flow prompt once the target screen has resolved. The
   // parent only sets `autoSendPrompt` after selecting the freshly-created child,
@@ -536,12 +543,7 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
   const isStreaming = message.isStreaming;
 
   // Fetch image URLs if message has images
-  const imageUrls = useQuery(
-    api.messages.getImageUrls,
-    message.imageIds && message.imageIds.length > 0
-      ? { storageIds: message.imageIds as Id<"_storage">[] }
-      : "skip"
-  );
+  const { data: imageUrls } = useImageUrls(message.imageIds);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);

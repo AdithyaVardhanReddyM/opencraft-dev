@@ -21,6 +21,15 @@ import {
   type ConvexMessage,
 } from "./utils";
 import z from "zod";
+import { canGenerate, incrementGeneration } from "@/lib/db/queries/users";
+import {
+  internalGetScreen,
+  internalUpdateScreen,
+} from "@/lib/db/queries/screens";
+import {
+  internalCreateMessage,
+  internalGetMessages,
+} from "@/lib/db/queries/messages";
 
 interface AgentState {
   summary: string;
@@ -49,17 +58,6 @@ const openrouter = (config: { model: string }) => {
     apiKey: process.env.OPENROUTER_API_KEY,
     baseUrl,
   });
-};
-
-// Get Convex HTTP endpoint URL for internal API calls
-const getConvexHttpUrl = () => {
-  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-  if (!convexUrl) {
-    throw new Error("NEXT_PUBLIC_CONVEX_URL is not set");
-  }
-  // Convert deployment URL to HTTP endpoint URL
-  // e.g., https://happy-animal-123.convex.cloud -> https://happy-animal-123.convex.site
-  return convexUrl.replace(".convex.cloud", ".convex.site");
 };
 
 // Extract title from explicit <title> tag or fall back to task summary
@@ -176,20 +174,11 @@ export const runChatAgent = inngest.createFunction(
       const canGenerateResult = await step.run(
         "check-generation-limit",
         async () => {
-          const convexHttpUrl = getConvexHttpUrl();
-          const response = await fetch(`${convexHttpUrl}/inngest/canGenerate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ clerkId }),
-          });
-          if (!response.ok) {
+          try {
+            return await canGenerate(clerkId);
+          } catch {
             return { canGenerate: true }; // Allow on error to not block users
           }
-          return (await response.json()) as {
-            canGenerate: boolean;
-            reason?: string;
-            remaining?: number;
-          };
         }
       );
 
@@ -197,16 +186,11 @@ export const runChatAgent = inngest.createFunction(
         // Create error message and return early
         if (screenId) {
           await step.run("create-limit-reached-message", async () => {
-            const convexHttpUrl = getConvexHttpUrl();
-            await fetch(`${convexHttpUrl}/inngest/createMessage`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                screenId,
-                role: "assistant",
-                content:
-                  "You've reached your generation limit of 10. Thank you for trying OpenCraft! Stay tuned for more updates.",
-              }),
+            await internalCreateMessage({
+              screenId,
+              role: "assistant",
+              content:
+                "You've reached your generation limit of 10. Thank you for trying OpenCraft! Stay tuned for more updates.",
             });
           });
         }
@@ -228,21 +212,11 @@ export const runChatAgent = inngest.createFunction(
 
     // Step 1: Get screen to check for existing sandbox
     const screen = await step.run("get-screen", async () => {
-      const convexHttpUrl = getConvexHttpUrl();
-      const response = await fetch(`${convexHttpUrl}/inngest/getScreen`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ screenId }),
-      });
-      if (!response.ok) {
-        return null;
-      }
-      return (await response.json()) as ConvexScreen | null;
+      return (await internalGetScreen(screenId)) as ConvexScreen | null;
     });
 
     // Step 2: Get or create sandbox with auto-pause
     const sandboxResult = await step.run("get-or-create-sandbox", async () => {
-      const convexHttpUrl = getConvexHttpUrl();
       let contextLost = false;
 
       if (!shouldCreateNewSandbox(screen)) {
@@ -266,11 +240,7 @@ export const runChatAgent = inngest.createFunction(
       });
 
       // Store sandboxId in screen record
-      await fetch(`${convexHttpUrl}/inngest/updateScreen`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ screenId, sandboxId: sandbox.sandboxId }),
-      });
+      await internalUpdateScreen(screenId, { sandboxId: sandbox.sandboxId });
 
       return { sandboxId: sandbox.sandboxId, contextLost };
     });
@@ -281,16 +251,11 @@ export const runChatAgent = inngest.createFunction(
     // Notify user if context was lost due to sandbox failure
     if (contextLost && screenId) {
       await step.run("notify-context-lost", async () => {
-        const convexHttpUrl = getConvexHttpUrl();
-        await fetch(`${convexHttpUrl}/inngest/createMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            screenId,
-            role: "assistant",
-            content:
-              "Note: The previous sandbox session expired. I've created a new environment, so some context from our earlier conversation may be lost. I'll do my best to help based on the message history.",
-          }),
+        await internalCreateMessage({
+          screenId,
+          role: "assistant",
+          content:
+            "Note: The previous sandbox session expired. I've created a new environment, so some context from our earlier conversation may be lost. I'll do my best to help based on the message history.",
         });
       });
     }
@@ -299,16 +264,10 @@ export const runChatAgent = inngest.createFunction(
     const previousMessages = await step.run(
       "get-previous-messages",
       async () => {
-        const convexHttpUrl = getConvexHttpUrl();
-        const response = await fetch(`${convexHttpUrl}/inngest/getMessages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ screenId, limit: 10 }),
-        });
-        if (!response.ok) {
-          return [];
-        }
-        const messages = (await response.json()) as ConvexMessage[];
+        const messages = (await internalGetMessages(
+          screenId,
+          10
+        )) as unknown as ConvexMessage[];
         return formatMessagesForAgent(messages);
       }
     );
@@ -321,16 +280,9 @@ export const runChatAgent = inngest.createFunction(
 
     const parentScreen = isFlowBuild
       ? await step.run("get-parent-screen", async () => {
-          const convexHttpUrl = getConvexHttpUrl();
-          const response = await fetch(`${convexHttpUrl}/inngest/getScreen`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ screenId: screen!.parentScreenId }),
-          });
-          if (!response.ok) {
-            return null;
-          }
-          return (await response.json()) as ConvexScreen | null;
+          return (await internalGetScreen(
+            screen!.parentScreenId!
+          )) as ConvexScreen | null;
         })
       : null;
 
@@ -1054,24 +1006,12 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
       // Make sure the user sees an error instead of an indefinitely-spinning UI.
       if (screenId) {
         await step.run("create-network-error-message", async () => {
-          const convexHttpUrl = getConvexHttpUrl();
-          const response = await fetch(
-            `${convexHttpUrl}/inngest/createMessage`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                screenId,
-                role: "assistant",
-                content:
-                  "I encountered an error while generating the UI. Please try again with a different prompt or provide more details about what you'd like to create.",
-              }),
-            }
-          );
-          if (!response.ok) {
-            const e = await response.json();
-            throw new Error(`Failed to create error message: ${e.error}`);
-          }
+          await internalCreateMessage({
+            screenId,
+            role: "assistant",
+            content:
+              "I encountered an error while generating the UI. Please try again with a different prompt or provide more details about what you'd like to create.",
+          });
           return { success: true };
         });
       }
@@ -1124,11 +1064,9 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
       return `https://${host}`;
     });
 
-    // Update screen in Convex with sandbox URL, sandboxId, files, and title (only if no existing title)
+    // Update screen with sandbox URL, sandboxId, files, and title (only if no existing title)
     if (!isError && screenId) {
-      await step.run("update-screen-in-convex", async () => {
-        const convexHttpUrl = getConvexHttpUrl();
-
+      await step.run("update-screen", async () => {
         // Only set title if screen doesn't already have one
         const shouldUpdateTitle = !screen?.title;
         const title = shouldUpdateTitle
@@ -1150,31 +1088,19 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
             undefined
           : undefined;
 
-        const response = await fetch(`${convexHttpUrl}/inngest/updateScreen`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            screenId,
-            sandboxUrl,
-            sandboxId,
-            files: result.state.data.files,
-            ...(title && { title }),
-            ...(route && { route }),
-          }),
+        await internalUpdateScreen(screenId, {
+          sandboxUrl,
+          sandboxId,
+          files: result.state.data.files,
+          ...(title && { title }),
+          ...(route && { route }),
         });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(`Failed to update screen: ${error.error}`);
-        }
 
         return { success: true };
       });
 
       // Create assistant message with summary and files_summary for context
       await step.run("create-assistant-message", async () => {
-        const convexHttpUrl = getConvexHttpUrl();
-
         // Clean up the summary for display (remove tags)
         const cleanSummary = (result.state.data.summary || "")
           .replace(/<task_summary>/gi, "")
@@ -1198,28 +1124,15 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
         // Include reasoning_details for reasoning models
         const reasoningDetails = result.state.data.reasoningDetails;
 
-        // Build the message payload
-        const messagePayload: Record<string, unknown> = {
+        await internalCreateMessage({
           screenId,
           role: "assistant",
           content: messageContent,
-        };
-
-        // Add reasoning details if present (for reasoning models)
-        if (reasoningDetails !== undefined && reasoningDetails !== null) {
-          messagePayload.reasoningDetails = reasoningDetails;
-        }
-
-        const response = await fetch(`${convexHttpUrl}/inngest/createMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(messagePayload),
+          // Include reasoning details if present (for reasoning models)
+          ...(reasoningDetails !== undefined && reasoningDetails !== null
+            ? { reasoningDetails }
+            : {}),
         });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(`Failed to create message: ${error.error}`);
-        }
 
         return { success: true };
       });
@@ -1227,12 +1140,7 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
       // Increment generation count on successful generation
       if (clerkId) {
         await step.run("increment-generation-count", async () => {
-          const convexHttpUrl = getConvexHttpUrl();
-          await fetch(`${convexHttpUrl}/inngest/incrementGeneration`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ clerkId }),
-          });
+          await incrementGeneration(clerkId);
         });
       }
 
@@ -1256,24 +1164,12 @@ Create a React component that is a PIXEL-PERFECT replica of the captured element
     // Handle error case - create error message
     if (isError && screenId) {
       await step.run("create-error-message", async () => {
-        const convexHttpUrl = getConvexHttpUrl();
-
-        const response = await fetch(`${convexHttpUrl}/inngest/createMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            screenId,
-            role: "assistant",
-            content:
-              "I encountered an error while generating the UI. Please try again with a different prompt or provide more details about what you'd like to create.",
-          }),
+        await internalCreateMessage({
+          screenId,
+          role: "assistant",
+          content:
+            "I encountered an error while generating the UI. Please try again with a different prompt or provide more details about what you'd like to create.",
         });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(`Failed to create error message: ${error.error}`);
-        }
-
         return { success: true };
       });
 

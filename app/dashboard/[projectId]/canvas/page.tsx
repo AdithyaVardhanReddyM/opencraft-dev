@@ -2,9 +2,13 @@
 
 import { use, useState, useCallback, useEffect } from "react";
 import { Shimmer } from "@/components/ai-elements/shimmer";
-import { useMutation, useQuery, useConvexAuth } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { useAuth } from "@clerk/nextjs";
+import { useScreens } from "@/lib/api/hooks";
+import {
+  createScreen,
+  createFlowScreen,
+  deleteScreen,
+} from "@/lib/api/mutations";
 import { SCREEN_DEFAULTS } from "@/lib/canvas/shape-factories";
 import { CanvasProvider, useCanvasContext } from "@/contexts/CanvasContext";
 import { BackButton } from "@/components/canvas/BackButton";
@@ -227,7 +231,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [screenToDelete, setScreenToDelete] = useState<{
     shapeId: string;
-    screenId: Id<"screens"> | null;
+    screenId: string | null;
     title?: string;
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -245,22 +249,20 @@ function CanvasContent({ projectId }: { projectId: string }) {
     prompt: string;
   } | null>(null);
 
-  // Convex mutations and queries
-  const deleteScreenMutation = useMutation(api.screens.deleteScreen);
-  const createScreenMutation = useMutation(api.screens.createScreen);
-  const createFlowScreenMutation = useMutation(api.screens.createFlowScreen);
-
-  // Wait for Convex auth before querying so a direct load/refresh right after
-  // sign-in doesn't throw "Not authenticated" before the token reaches Convex.
-  const { isAuthenticated } = useConvexAuth();
-
-  // Query all screens for this project to get their data (sandboxUrl, title, etc.)
-  const screensData = useQuery(
-    api.screens.getScreensByProject,
-    isAuthenticated ? { projectId: projectId as Id<"projects"> } : "skip"
+  // Only query once Clerk reports a signed-in session, so the request carries
+  // the auth cookie. Replacing Convex's live query: poll fast (2.5s) while a
+  // screen is generating so its freshly-built sandboxUrl/title appear quickly,
+  // and keep a slow idle poll (15s) as a safety net for the case where a
+  // generation finishes after the sidebar was closed (so the completion refetch
+  // didn't fire). SWR pauses both while the tab is hidden. The chat hook also
+  // revalidates this key immediately on completion for the snappy happy path.
+  const { isSignedIn } = useAuth();
+  const { data: screensData } = useScreens(
+    isSignedIn ? projectId : undefined,
+    { refreshInterval: isSelectedScreenGenerating ? 2500 : 15000 }
   );
 
-  // Map of Convex screen _id -> screen doc, used to resolve a flow child's parent.
+  // Map of screen _id -> screen doc, used to resolve a flow child's parent.
   const screensById = new Map((screensData ?? []).map((s) => [s._id, s]));
 
   // Create a map of shapeId -> screen data for quick lookup.
@@ -280,6 +282,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
         screen.shapeId,
         {
           _id: screen._id,
+          projectId: screen.projectId,
           sandboxUrl,
           sandboxId: screen.sandboxId,
           title: screen.title,
@@ -300,7 +303,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
     : undefined;
   const isAISidebarOpen = !!selectedScreenShape;
 
-  // Handle screen tool click - create screen in Convex and add to canvas
+  // Handle screen tool click - create screen record and add to canvas
   useEffect(() => {
     const handleScreenToolClick = async (e: Event) => {
       const customEvent = e as CustomEvent<{ x: number; y: number }>;
@@ -315,10 +318,10 @@ function CanvasContent({ projectId }: { projectId: string }) {
         const { nanoid } = await import("nanoid");
         const shapeId = nanoid();
 
-        // Create screen record in Convex with the shapeId
-        const convexScreenId = await createScreenMutation({
+        // Create the screen record with the shapeId
+        const newScreenId = await createScreen({
           shapeId: shapeId,
-          projectId: projectId as Id<"projects">,
+          projectId,
         });
 
         // Add the screen shape to the canvas (centered on click position)
@@ -330,8 +333,8 @@ function CanvasContent({ projectId }: { projectId: string }) {
             y: centeredY,
             w: SCREEN_DEFAULTS.width,
             h: SCREEN_DEFAULTS.height,
-            screenId: convexScreenId, // Convex document ID for linking
-            id: shapeId, // Use the same shapeId we registered in Convex
+            screenId: newScreenId, // DB row id for linking
+            id: shapeId, // Use the same shapeId we registered
           },
         });
 
@@ -340,7 +343,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
 
         pendo.track("screen_created", {
           project_id: projectId,
-          screen_id: String(convexScreenId),
+          screen_id: String(newScreenId),
           creation_method: "screen_tool",
         });
       } catch (error) {
@@ -351,7 +354,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
     window.addEventListener("screen-tool-click", handleScreenToolClick);
     return () =>
       window.removeEventListener("screen-tool-click", handleScreenToolClick);
-  }, [createScreenMutation, projectId, dispatchShapes]);
+  }, [projectId, dispatchShapes]);
 
   // Handle delete key for screen shapes - show confirmation modal
   useEffect(() => {
@@ -373,7 +376,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
           e.stopPropagation();
           const screenShape = selectedScreens[0];
           if (screenShape && screenShape.type === "screen") {
-            // Get the Convex screen ID from the screen data map
+            // Get the screen record id from the screen data map
             const screenData = screenDataMap.get(screenShape.id);
             setScreenToDelete({
               shapeId: screenShape.id,
@@ -413,9 +416,9 @@ function CanvasContent({ projectId }: { projectId: string }) {
       // Delete from canvas
       dispatchShapes({ type: "REMOVE_SHAPE", payload: screenToDelete.shapeId });
 
-      // Delete from Convex if we have a screenId
+      // Delete the screen record if we have an id
       if (screenToDelete.screenId) {
-        await deleteScreenMutation({ screenId: screenToDelete.screenId });
+        await deleteScreen({ screenId: screenToDelete.screenId, projectId });
       }
 
       pendo.track("screen_deleted", {
@@ -430,7 +433,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
       setDeleteModalOpen(false);
       setScreenToDelete(null);
     }
-  }, [screenToDelete, dispatchShapes, deleteScreenMutation, shapes, projectId]);
+  }, [screenToDelete, dispatchShapes, shapes, projectId]);
 
   // Handle screen toolbar delete - opens the delete modal
   const handleToolbarDelete = useCallback(() => {
@@ -485,9 +488,9 @@ function CanvasContent({ projectId }: { projectId: string }) {
         const { nanoid } = await import("nanoid");
         const childShapeId = nanoid();
 
-        const childScreenId = await createFlowScreenMutation({
+        const childScreenId = await createFlowScreen({
           shapeId: childShapeId,
-          projectId: projectId as Id<"projects">,
+          projectId,
           parentScreenId,
         });
 
@@ -539,13 +542,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
         toast.error("Failed to create flow");
       }
     },
-    [
-      selectedScreenShape,
-      screensData,
-      createFlowScreenMutation,
-      projectId,
-      dispatchShapes,
-    ]
+    [selectedScreenShape, screensData, projectId, dispatchShapes]
   );
 
   const handleDeleteCancel = useCallback(() => {
@@ -596,10 +593,10 @@ function CanvasContent({ projectId }: { projectId: string }) {
         const { nanoid } = await import("nanoid");
         const shapeId = nanoid();
 
-        // Create screen record in Convex
-        const convexScreenId = await createScreenMutation({
+        // Create the screen record
+        const newScreenId = await createScreen({
           shapeId: shapeId,
-          projectId: projectId as Id<"projects">,
+          projectId,
         });
 
         // Position screen to the right of the frame with 50px gap
@@ -614,7 +611,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
             y: screenY,
             w: SCREEN_DEFAULTS.width,
             h: SCREEN_DEFAULTS.height,
-            screenId: convexScreenId,
+            screenId: newScreenId,
             id: shapeId,
           },
         });
@@ -644,10 +641,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
             error.message.includes("blob")
           ) {
             toast.error("Failed to capture frame contents");
-          } else if (
-            error.message.includes("Convex") ||
-            error.message.includes("screen")
-          ) {
+          } else if (error.message.includes("screen")) {
             toast.error("Failed to create screen");
           } else {
             toast.error("Failed to generate from frame");
@@ -657,7 +651,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
         }
       }
     },
-    [createScreenMutation, projectId, dispatchShapes]
+    [projectId, dispatchShapes]
   );
 
   const draftShape = getDraftShape();
@@ -870,7 +864,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
             }
             if (shape.type === "screen") {
               const isSelected = !!selectedShapes[shape.id];
-              // Get screen data from Convex (sandboxUrl, title) for iframe rendering
+              // Get screen data (sandboxUrl, title) for iframe rendering
               const screenData = screenDataMap.get(shape.id);
               return (
                 <Screen

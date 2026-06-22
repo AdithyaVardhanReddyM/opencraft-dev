@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { updateScreen } from "@/lib/api/mutations";
 import type { ScreenShape, ViewportState } from "@/types/canvas";
 import { useSandboxResume } from "@/hooks/use-sandbox-resume";
 import {
@@ -40,7 +38,8 @@ import { ThemeSelector } from "@/components/canvas/ThemeSelector";
 interface ScreenToolbarProps {
   shape: ScreenShape;
   screenData?: {
-    _id: Id<"screens">;
+    _id: string;
+    projectId?: string;
     sandboxUrl?: string;
     sandboxId?: string;
     title?: string;
@@ -88,10 +87,7 @@ export function ScreenToolbar({
     autoResume: true,
   });
 
-  // Convex mutation for updating screen
-  const updateScreen = useMutation(api.screens.updateScreen);
-
-  // Handle theme change - apply to sandbox and save to Convex
+  // Handle theme change - apply to sandbox and persist
   const handleThemeChange = useCallback(
     async (themeId: string) => {
       if (!screenData?.sandboxId || !screenData?._id) return;
@@ -110,9 +106,10 @@ export function ScreenToolbar({
         throw new Error("Failed to apply theme");
       }
 
-      // Save theme to Convex
+      // Persist theme
       await updateScreen({
         screenId: screenData._id,
+        projectId: screenData.projectId,
         theme: themeId,
       });
 
@@ -156,12 +153,13 @@ export function ScreenToolbar({
       return;
     }
 
-    // Save to Convex
+    // Persist the new title
     if (screenData?._id) {
       setIsSaving(true);
       try {
         await updateScreen({
           screenId: screenData._id,
+          projectId: screenData.projectId,
           title: trimmedName,
         });
 

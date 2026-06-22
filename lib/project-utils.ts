@@ -1,4 +1,4 @@
-import { Doc } from "@/convex/_generated/dataModel";
+import type { ProjectDoc } from "@/lib/db/types";
 
 export type ProjectSortOption =
   | "newest"
@@ -7,7 +7,7 @@ export type ProjectSortOption =
   | "name-desc"
   | "modified";
 
-type Project = Doc<"projects">;
+type Project = ProjectDoc;
 
 /**
  * Sorts an array of projects based on the specified sort option

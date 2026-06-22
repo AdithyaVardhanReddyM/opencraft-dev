@@ -1,10 +1,10 @@
-import { Doc, Id } from "@/convex/_generated/dataModel";
+import type { ProjectDoc } from "@/lib/db/types";
 
-// Export Project type from Convex generated types
-export type Project = Doc<"projects">;
+// Serialized project document (Aurora/Drizzle).
+export type Project = ProjectDoc;
 
-// Export Project ID type
-export type ProjectId = Id<"projects">;
+// Project id (uuid string).
+export type ProjectId = string;
 
 // Sort options for project filtering
 export type ProjectSortOption =

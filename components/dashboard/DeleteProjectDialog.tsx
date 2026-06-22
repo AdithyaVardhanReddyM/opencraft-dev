@@ -1,7 +1,6 @@
 "use client";
 
 import { useTransition, useState } from "react";
-import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -13,15 +12,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { api } from "@/convex/_generated/api";
+import { deleteProject } from "@/lib/api/mutations";
 import { Project } from "@/types/project";
-import { Id } from "@/convex/_generated/dataModel";
 
 interface DeleteProjectDialogProps {
   project: Project;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onOptimisticDelete?: (projectId: Id<"projects">) => void;
+  onOptimisticDelete?: (projectId: string) => void;
 }
 
 export function DeleteProjectDialog({
@@ -32,7 +30,6 @@ export function DeleteProjectDialog({
 }: DeleteProjectDialogProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const deleteProject = useMutation(api.projects.deleteProject);
 
   const handleDelete = () => {
     startTransition(async () => {
