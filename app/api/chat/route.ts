@@ -7,6 +7,7 @@ import {
   internalCreateMessage,
 } from "@/lib/db/queries/messages";
 import { canGenerate } from "@/lib/db/queries/users";
+import { invokeAgentService } from "@/lib/agent-service";
 import type { ScreenDoc } from "@/lib/db/types";
 
 // Needs pg (DB queries) + a long-lived stream → Node runtime, never cached.
@@ -17,8 +18,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const AGENT_SERVICE_URL =
-  process.env.AGENT_SERVICE_URL || "http://localhost:8080";
+// Transport to the agent compute layer lives in lib/agent-service (FastAPI in
+// dev, SigV4 InvokeAgentRuntime in prod when AGENT_RUNTIME_ARN is set).
 const AGENT_SHARED_SECRET = process.env.AGENT_SHARED_SECRET || "";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -130,16 +131,12 @@ export async function POST(req: NextRequest) {
     imageIds: imageIds && imageIds.length > 0 ? imageIds : undefined,
   });
 
-  // Call the agent-service, handing it a durable callback for terminal persistence.
-  let upstream: Response;
+  // Call the agent compute layer, handing it a durable callback for terminal
+  // persistence. The callback fires even if this stream/relay is aborted.
+  let upstream;
   try {
-    upstream = await fetch(`${AGENT_SERVICE_URL}/chat`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(AGENT_SHARED_SECRET ? { "x-agent-secret": AGENT_SHARED_SECRET } : {}),
-      },
-      body: JSON.stringify({
+    upstream = await invokeAgentService(
+      {
         message,
         screen: toScreenPayload(screen),
         history,
@@ -151,12 +148,9 @@ export async function POST(req: NextRequest) {
           secret: AGENT_SHARED_SECRET || undefined,
           context: { screenId, clerkId: userId, modelId },
         },
-      }),
-      // Abort the live relay if the browser disconnects — the agent-service runs
-      // its turn in a decoupled task and still fires the callback, so persistence
-      // is unaffected and we stop wasting this function's time budget.
-      signal: req.signal,
-    });
+      },
+      { screenId, signal: req.signal }
+    );
   } catch {
     return sseError("Could not reach the agent service");
   }
