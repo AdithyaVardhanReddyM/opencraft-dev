@@ -510,6 +510,16 @@
   outline-offset: 2px;
 }
 
+/* Menu items already indicate focus with a background highlight, so the global
+   focus-visible outline above just stacks a clashing ring on them. Suppress it
+   for menu items (the bg highlight remains the focus indicator). */
+[data-slot="dropdown-menu-item"]:focus-visible,
+[data-slot="dropdown-menu-checkbox-item"]:focus-visible,
+[data-slot="dropdown-menu-radio-item"]:focus-visible,
+[data-slot="dropdown-menu-sub-trigger"]:focus-visible {
+  outline: none;
+}
+
 /* Prevent browser history swipe gestures from hijacking canvas scrolling */
 html,
 body {

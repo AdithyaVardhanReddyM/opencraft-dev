@@ -9,10 +9,15 @@ import type { MessageDoc } from "../types";
 
 type Role = "user" | "assistant";
 
+// Ownership/existence check only — select JUST the columns callers use
+// (projectId + id). Never `select()` the whole row here: `screens` carries a
+// heavy `files`/`fileMeta` jsonb (the entire generated source tree, often
+// hundreds of KB to MBs), so a bare select made every chat-history load drag
+// that blob across the wire purely to read projectId — the slow-load bug.
 async function getScreenRow(screenId: string) {
   if (!isUuid(screenId)) return null;
   const [row] = await db
-    .select()
+    .select({ id: screens.id, projectId: screens.projectId })
     .from(screens)
     .where(eq(screens.id, screenId))
     .limit(1);
@@ -36,6 +41,8 @@ export interface CreateMessageInput {
   screenId: string;
   role: Role;
   content: string;
+  /** Terse recap stored for history/context only (assistant turns). */
+  summary?: string;
   modelId?: string;
   imageIds?: string[];
   reasoningDetails?: unknown;
@@ -124,6 +131,7 @@ async function insertMessage(input: CreateMessageInput): Promise<string> {
       screenId: input.screenId,
       role: input.role,
       content: input.content,
+      summary: input.summary ?? null,
       modelId: input.modelId ?? null,
       imageIds: input.imageIds ?? null,
       reasoningDetails:

@@ -37,7 +37,23 @@ export function useScreens(
   return useSWR<ScreenDoc[]>(
     projectId ? keys.screensKey(projectId) : null,
     jsonFetcher,
-    config
+    // The caller drives freshness via refreshInterval (polled), so there's no
+    // need to also refetch the list on every window refocus. Caller config wins.
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+/**
+ * The heavy `files` blob for one screen, fetched on demand (replaces reading
+ * `files` off the polled screens list). `undefined` while loading, `null` for
+ * no/empty files. Files only change when a build finishes, so we don't
+ * revalidate on focus — refreshScreenFiles() invalidates it at that point.
+ */
+export function useScreenFiles(screenId?: string) {
+  return useSWR<Record<string, string> | null>(
+    screenId ? keys.screenFilesKey(screenId) : null,
+    jsonFetcher,
+    { revalidateOnFocus: false }
   );
 }
 

@@ -95,6 +95,15 @@ export function refreshScreens(projectId: string) {
   return mutate(keys.screensKey(projectId));
 }
 
+/**
+ * Revalidate one screen's lazily-loaded `files` blob. The screens list no longer
+ * carries `files`, so call this after a build completes to refresh the Code tab's
+ * content cache for the selected screen.
+ */
+export function refreshScreenFiles(screenId: string) {
+  return mutate(keys.screenFilesKey(screenId));
+}
+
 // ---- Messages -------------------------------------------------------------
 
 export async function createMessage(input: {
@@ -125,4 +134,11 @@ export function resolveImageUrls(
   imageKeys: string[]
 ): Promise<Record<string, string | null>> {
   return postJson("/api/uploads/urls", { keys: imageKeys });
+}
+
+/** Best-effort delete of S3 objects (e.g. when a canvas image is removed). */
+export function deleteUploads(
+  keys: string[]
+): Promise<{ ok: boolean; deleted: number }> {
+  return postJson("/api/uploads/delete", { keys });
 }

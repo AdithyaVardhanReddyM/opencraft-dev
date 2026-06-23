@@ -18,3 +18,6 @@ export const screenByShapeKey = (shapeId: string) =>
 
 export const messagesKey = (screenId: string) =>
   `/api/messages?screenId=${screenId}`;
+
+export const screenFilesKey = (screenId: string) =>
+  `/api/screens/${screenId}/files`;

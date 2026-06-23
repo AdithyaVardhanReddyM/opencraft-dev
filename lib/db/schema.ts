@@ -89,6 +89,11 @@ export const screens = pgTable(
       { onDelete: "set null" }
     ),
     route: text("route"),
+    // Repo-map support for the Strands agent-service (additive; the TS runtime
+    // ignores these). file_meta: { [path]: { description, updatedAt, status } }
+    // feeds the per-turn repo-map one-liners; recent_edits marks last-turn files.
+    fileMeta: jsonb("file_meta"),
+    recentEdits: text("recent_edits").array(),
     createdAt: bigint("created_at", { mode: "number" }).notNull(),
     updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
   },
@@ -107,7 +112,11 @@ export const messages = pgTable(
       .notNull()
       .references(() => screens.id, { onDelete: "cascade" }),
     role: messageRole("role").notNull(),
+    // What the USER sees: the agent's full streamed narration (assistant msgs).
     content: text("content").notNull(),
+    // Terse 1–3 sentence recap used ONLY when building history/context for the
+    // agent (keeps token cost flat); null for user messages / legacy rows.
+    summary: text("summary"),
     modelId: text("model_id"),
     imageIds: text("image_ids").array(), // S3 keys
     reasoningDetails: jsonb("reasoning_details"),

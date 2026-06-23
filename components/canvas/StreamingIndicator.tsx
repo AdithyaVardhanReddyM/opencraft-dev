@@ -14,8 +14,18 @@ export interface StreamingIndicatorProps {
   isVisible: boolean;
   /** Concrete current action (e.g. "Writing app/page.tsx") shown under the active step. */
   activeDetail?: string;
+  /**
+   * When true, a live assistant message (with its own avatar) is already showing
+   * directly above — e.g. while reasoning streams. Drop our avatar and indent so
+   * the steps read as part of that one block instead of a second AI turn.
+   */
+  attached?: boolean;
   className?: string;
 }
+
+// Indent (avatar 24px + gap 10px) used to align attached content under the
+// live message's text column.
+const ATTACHED_INDENT = "ml-[34px]";
 
 // Number of recent steps to always show
 const VISIBLE_STEPS = 2;
@@ -33,21 +43,28 @@ function StreamingIndicatorComponent({
   steps,
   isVisible,
   activeDetail,
+  attached,
   className,
 }: StreamingIndicatorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Deduplicate consecutive steps with same text
+  // Collapse consecutive steps with the same label — but never merge two
+  // distinct tool calls (different toolUseId), even if their generic labels
+  // momentarily match before each one's `tool_detail` refines it.
   const deduplicatedSteps = useMemo(() => {
     if (steps.length === 0) return [];
 
     const result: StreamingStep[] = [];
-    let lastText = "";
+    let last: StreamingStep | undefined;
 
     for (const step of steps) {
-      if (step.text !== lastText) {
+      const sameAsLast =
+        last !== undefined &&
+        step.text === last.text &&
+        step.toolUseId === last.toolUseId;
+      if (!sameAsLast) {
         result.push(step);
-        lastText = step.text;
+        last = step;
       }
     }
 
@@ -93,16 +110,24 @@ function StreamingIndicatorComponent({
   // If no steps yet, show simple shimmer loading
   if (deduplicatedSteps.length === 0) {
     return (
-      <div className={cn("flex gap-2.5 items-start", className)}>
-        <div className="flex h-6 w-6 shrink-0 items-center justify-center mt-0.5">
-          <Image
-            src="/opencraft_logo.svg"
-            alt="AI"
-            width={20}
-            height={20}
-            className="h-5 w-5"
-          />
-        </div>
+      <div
+        className={cn(
+          "flex gap-2.5 items-start",
+          attached && ATTACHED_INDENT,
+          className
+        )}
+      >
+        {!attached && (
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center mt-0.5">
+            <Image
+              src="/opencraft_logo.svg"
+              alt="AI"
+              width={20}
+              height={20}
+              className="h-5 w-5"
+            />
+          </div>
+        )}
         <div className="flex items-center py-1">
           <Shimmer className="text-sm" duration={1.5} spread={3}>
             {statusText || "Working"}
@@ -113,16 +138,24 @@ function StreamingIndicatorComponent({
   }
 
   return (
-    <div className={cn("flex gap-2.5 items-start", className)}>
-      <div className="flex h-6 w-6 shrink-0 items-center justify-center mt-0.5">
-        <Image
-          src="/opencraft_logo.svg"
-          alt="AI"
-          width={20}
-          height={20}
-          className="h-5 w-5"
-        />
-      </div>
+    <div
+      className={cn(
+        "flex gap-2.5 items-start",
+        attached && ATTACHED_INDENT,
+        className
+      )}
+    >
+      {!attached && (
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center mt-0.5">
+          <Image
+            src="/opencraft_logo.svg"
+            alt="AI"
+            width={20}
+            height={20}
+            className="h-5 w-5"
+          />
+        </div>
+      )}
       <div className="flex flex-col gap-0.5 py-1 min-w-0 flex-1">
         {/* Expandable history button */}
         {hasHiddenSteps && (
@@ -180,12 +213,17 @@ function StreamingIndicatorComponent({
             );
           })}
 
-          {/* Concrete current action (e.g. the file being written) */}
-          {isActivePending && activeDetail && (
-            <div className="ml-6 truncate font-mono text-[11px] text-muted-foreground/50">
-              {activeDetail}
-            </div>
-          )}
+          {/* Concrete current action (e.g. the file being written). Only shown
+              when it adds detail beyond the active step's label — the tool frame
+              often carries no args, so activeDetail equals the step text and
+              would otherwise render the same line twice. */}
+          {isActivePending &&
+            activeDetail &&
+            activeDetail !== lastStep?.text && (
+              <div className="ml-6 truncate font-mono text-[11px] text-muted-foreground/50">
+                {activeDetail}
+              </div>
+            )}
 
           {/* Reassurance once a step has been running a while */}
           {isActivePending && elapsedSec >= REASSURE_AFTER && (

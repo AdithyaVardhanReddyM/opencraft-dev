@@ -77,6 +77,7 @@ export function isPointInShape(point: Point, shape: Shape): boolean {
 
     case "generatedui":
     case "screen":
+    case "image":
       return (
         point.x >= shape.x &&
         point.x <= shape.x + shape.w &&
@@ -182,6 +183,7 @@ function isPointInShapeBounds(point: Point, shape: Shape): boolean {
     case "ellipse":
     case "generatedui":
     case "screen":
+    case "image":
       return (
         point.x >= shape.x &&
         point.x <= shape.x + shape.w &&
@@ -245,6 +247,7 @@ function getShapeBoundsArea(shape: Shape): number {
     case "ellipse":
     case "generatedui":
     case "screen":
+    case "image":
       return shape.w * shape.h;
 
     case "freedraw": {
@@ -289,18 +292,28 @@ function getShapeBoundsArea(shape: Shape): number {
 export function getShapeAtPoint(
   point: Point,
   shapes: Shape[],
-  options?: { allowBoundsFallback?: boolean; excludeScreenShapes?: boolean }
+  options?: {
+    allowBoundsFallback?: boolean;
+    excludeScreenShapes?: boolean;
+    excludeImageShapes?: boolean;
+  }
 ): Shape | null {
   const candidateShapes: Array<{ shape: Shape; hits: boolean; area: number }> =
     [];
   const allowBoundsFallback = options?.allowBoundsFallback ?? true;
   const excludeScreenShapes = options?.excludeScreenShapes ?? false;
+  const excludeImageShapes = options?.excludeImageShapes ?? false;
 
   // Collect all shapes whose bounds contain the point
   for (let i = shapes.length - 1; i >= 0; i--) {
     const shape = shapes[i];
     // Skip screen shapes if excludeScreenShapes is true (for eraser tool)
     if (excludeScreenShapes && shape.type === "screen") {
+      continue;
+    }
+    // Skip image shapes if excludeImageShapes is true — the eraser shouldn't
+    // delete uploaded images the way it erases drawn strokes.
+    if (excludeImageShapes && shape.type === "image") {
       continue;
     }
     if (isPointInShapeBounds(point, shape)) {

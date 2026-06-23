@@ -3,6 +3,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { Brain, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Streamdown } from "streamdown";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { cn } from "@/lib/utils";
 import type { MessageReasoning } from "@/hooks/use-chat-streaming";
@@ -52,7 +53,11 @@ function ReasoningPanelComponent({ reasoning, className }: ReasoningPanelProps) 
     }
   }, [reasoning.content, isExpanded, isStreaming]);
 
-  const seconds = !isStreaming ? Math.max(1, Math.round(elapsedMs / 1000)) : null;
+  // Only show a duration we actually measured this session. Persisted reasoning
+  // (loaded already-complete, elapsedMs === 0) shows "Thought process" instead of
+  // a bogus "Thought for 1s".
+  const seconds =
+    !isStreaming && elapsedMs > 0 ? Math.max(1, Math.round(elapsedMs / 1000)) : null;
   const headerLabel = isStreaming
     ? "Thinking…"
     : seconds !== null
@@ -96,9 +101,27 @@ function ReasoningPanelComponent({ reasoning, className }: ReasoningPanelProps) 
           >
             <div
               ref={bodyRef}
-              className="max-h-40 overflow-y-auto whitespace-pre-wrap border-l-2 border-border/40 pl-2.5 text-xs leading-relaxed text-muted-foreground/70"
+              className="max-h-40 overflow-y-auto border-l-2 border-border/40 pl-2.5 text-xs leading-relaxed text-muted-foreground/70"
             >
-              {reasoning.content}
+              <Streamdown
+                className={cn(
+                  "[&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+                  // Compact, muted markdown sized for the thinking panel.
+                  "[&_p]:mb-1.5 [&_p]:leading-relaxed",
+                  "[&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5",
+                  "[&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:space-y-0.5",
+                  "[&_li]:leading-snug",
+                  "[&_h1]:text-xs [&_h2]:text-xs [&_h3]:text-xs [&_h4]:text-xs",
+                  "[&_h1]:mb-1 [&_h2]:mb-1 [&_h3]:mb-1 [&_h4]:mb-1",
+                  "[&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_h4]:font-semibold",
+                  "[&_strong]:font-semibold [&_strong]:text-muted-foreground",
+                  "[&_code]:rounded [&_code]:bg-muted/60 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]",
+                  "[&_pre]:my-1.5 [&_pre]:rounded-md [&_pre]:bg-muted/60 [&_pre]:p-2 [&_pre]:text-[11px]",
+                  "[&_a]:underline [&_a]:underline-offset-2"
+                )}
+              >
+                {reasoning.content}
+              </Streamdown>
             </div>
           </motion.div>
         )}

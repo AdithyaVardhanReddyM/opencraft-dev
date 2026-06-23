@@ -138,7 +138,7 @@ const SHAPES_WITH_TEXT_ALIGN = ["text"];
 const SHAPES_WITH_TEXT_COLOR = ["text"];
 const SHAPES_WITH_FRAME_FILL = ["frame"];
 const SHAPES_WITH_FRAME_CORNER_TYPE = ["frame"];
-const SHAPES_WITH_DIMENSIONS = ["frame", "rect", "ellipse", "screen"];
+const SHAPES_WITH_DIMENSIONS = ["frame", "rect", "ellipse", "screen", "image"];
 
 /**
  * Convert stroke width preset to pixel value

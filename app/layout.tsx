@@ -4,7 +4,6 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { ClerkProvider } from "@clerk/nextjs";
-import { AgentProviderWrapper } from "@/components/AgentProviderWrapper";
 import { PendoInitializer } from "@/components/PendoInitializer";
 
 const geistSans = Geist({
@@ -70,7 +69,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <PendoInitializer />
-            <AgentProviderWrapper>{children}</AgentProviderWrapper>
+            {children}
             <Toaster />
           </ThemeProvider>
         </body>

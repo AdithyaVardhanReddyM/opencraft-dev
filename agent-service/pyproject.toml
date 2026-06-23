@@ -1,0 +1,39 @@
+[project]
+name = "agent-service"
+version = "0.1.0"
+description = "OpenCraft UI coding agent — Strands + Gemini, edits a Next.js app in an E2B sandbox."
+requires-python = ">=3.11"
+dependencies = [
+    "strands-agents[gemini]",
+    "e2b",
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
+    "pydantic>=2",
+    "pydantic-settings",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+# AgentCore deploy (Phase C). Install with: uv pip install -e '.[agentcore]'
+agentcore = [
+    "bedrock-agentcore",
+    "bedrock-agentcore-starter-toolkit",
+    "aws-opentelemetry-distro",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_service"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["src"]

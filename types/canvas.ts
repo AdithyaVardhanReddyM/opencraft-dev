@@ -162,6 +162,22 @@ export interface ScreenShape extends BaseShape {
   screenId: string; // Convex document ID reference
 }
 
+// A user-supplied image dropped/pasted onto the canvas. The pixels live in S3
+// (referenced by `s3Key`); only the key + name + geometry are persisted in the
+// canvas state, so the shape round-trips through autosave like any other shape.
+export interface ImageShape extends BaseShape {
+  type: "image";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  s3Key: string; // S3 object key; "" while the upload is in flight
+  name: string; // "image 1", "image 2", … — editable
+  naturalWidth: number;
+  naturalHeight: number;
+  status?: "uploading" | "ready" | "error";
+}
+
 export type Shape =
   | FrameShape
   | RectShape
@@ -171,7 +187,8 @@ export type Shape =
   | LineShape
   | TextShape
   | GeneratedUIShape
-  | ScreenShape;
+  | ScreenShape
+  | ImageShape;
 
 // Entity state (normalized data structure)
 export interface EntityState<T> {

@@ -15,11 +15,15 @@ import {
 } from "lucide-react";
 import type { Tool } from "@/types/canvas";
 import type { LucideIcon } from "lucide-react";
-import { Kbd } from "@/components/ui/kbd";
 
 interface ToolbarProps {
   currentTool: Tool;
   onToolSelect: (tool: Tool) => void;
+  /**
+   * When the AI sidebar is open (a screen is selected) the toolbar slides to the
+   * right so it sits just beside the sidebar instead of being covered by it.
+   */
+  sidebarOpen?: boolean;
 }
 
 interface ToolConfig {
@@ -51,18 +55,30 @@ const SCREEN_TOOL: ToolConfig = {
   special: true,
 };
 
-export function Toolbar({ currentTool, onToolSelect }: ToolbarProps) {
+export function Toolbar({
+  currentTool,
+  onToolSelect,
+  sidebarOpen = false,
+}: ToolbarProps) {
   const isScreenActive = currentTool === "screen";
 
+  // The AI sidebar is a full-height panel flush to the left edge, 340px wide;
+  // slide the toolbar past its right edge (+ a small gap) when it's open,
+  // otherwise hug the left.
+  const leftOffset = sidebarOpen ? 352 : 12;
+
   return (
-    <div className="pointer-events-auto fixed left-1/2 top-0 z-50 -translate-x-1/2 flex flex-col items-center">
-      {/* Notch container */}
+    <div
+      className="pointer-events-auto fixed top-1/2 z-50 -translate-y-1/2 flex flex-col items-center transition-[left] duration-300 ease-out"
+      style={{ left: leftOffset }}
+    >
+      {/* Floating vertical toolbar pill */}
       <div
-        className="relative flex items-center gap-1 bg-card px-3 pt-3 pb-3 backdrop-blur-2xl saturate-150"
+        className="relative flex flex-col items-center gap-1 rounded-xl bg-card px-2 py-2.5 backdrop-blur-2xl saturate-150"
         style={{
-          borderRadius: "0 0 16px 16px",
+          // Even glow on all four sides (zero x/y offset) + a soft ambient depth.
           boxShadow:
-            "0 8px 32px -4px oklch(0.5665 0.1947 256.1696 / 0.25), 0 12px 24px -8px oklch(0 0 0 / 0.4)",
+            "0 0 28px -2px oklch(0.5665 0.1947 256.1696 / 0.30), 0 0 14px -2px oklch(0 0 0 / 0.30)",
         }}
       >
         {/* Regular tools */}
@@ -95,24 +111,24 @@ export function Toolbar({ currentTool, onToolSelect }: ToolbarProps) {
           );
         })}
 
-        {/* Divider */}
-        <div className="mx-1 h-6 w-px bg-border/50" />
+        {/* Divider (horizontal in the vertical stack) */}
+        <div className="my-1 h-px w-6 bg-border/50" />
 
-        {/* AI Screen button - special styling */}
+        {/* AI Screen button - special styling, square to match the column */}
         <button
           onClick={() => onToolSelect(SCREEN_TOOL.id)}
           aria-label={SCREEN_TOOL.label}
           aria-pressed={isScreenActive}
           title={`${SCREEN_TOOL.label} (${SCREEN_TOOL.shortcut})`}
-          className={`group relative flex h-9 items-center gap-1.5 rounded-lg px-2.5 transition-all duration-300 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0 ${
+          className={`group relative flex h-9 w-9 items-center justify-center rounded-md transition-all duration-300 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0 ${
             isScreenActive
-              ? "bg-linear-to-r from-primary to-[#75D8FC] text-white shadow-lg shadow-primary/30"
-              : "bg-linear-to-r from-primary/15 to-[#75D8FC]/15 text-primary hover:from-primary/25 hover:to-[#75D8FC]/25 hover:shadow-md hover:shadow-primary/20"
+              ? "bg-linear-to-br from-primary to-[#75D8FC] text-white shadow-lg shadow-primary/30"
+              : "bg-linear-to-br from-primary/15 to-[#75D8FC]/15 text-primary hover:from-primary/25 hover:to-[#75D8FC]/25 hover:shadow-md hover:shadow-primary/20"
           }`}
         >
           {/* Animated glow ring when not active */}
           {!isScreenActive && (
-            <span className="absolute inset-0 rounded-lg bg-linear-to-r from-primary/40 to-[#75D8FC]/40 opacity-0 blur-sm transition-opacity duration-300 group-hover:opacity-100" />
+            <span className="absolute inset-0 rounded-md bg-linear-to-br from-primary/40 to-[#75D8FC]/40 opacity-0 blur-sm transition-opacity duration-300 group-hover:opacity-100" />
           )}
 
           {/* Monitor icon with animation */}
@@ -122,37 +138,21 @@ export function Toolbar({ currentTool, onToolSelect }: ToolbarProps) {
             } ${!isScreenActive ? "group-hover:scale-110" : ""}`}
           />
 
-          {/* Label */}
-          <span
-            className={`relative text-xs font-medium ${
-              isScreenActive ? "text-white" : "text-primary"
-            }`}
-          >
-            AI
-          </span>
-
           {/* Shortcut badge */}
           <span
-            className={`relative ml-0.5 rounded px-1 py-0.5 text-[9px] font-semibold ${
-              isScreenActive
-                ? "bg-white/20 text-white"
-                : "bg-primary/10 text-primary/80"
+            className={`pointer-events-none absolute bottom-0.5 right-0.5 text-[10px] font-semibold ${
+              isScreenActive ? "text-white/80" : "text-primary/80"
             }`}
           >
             {SCREEN_TOOL.shortcut}
           </span>
 
           {/* Subtle shimmer effect on hover */}
-          <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg">
+          <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
             <span className="absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
           </span>
         </button>
       </div>
-      {/* Helper text below notch */}
-      <p className="mt-2 text-[10px] text-muted-foreground/70">
-        Glide with <Kbd className="bg-white/8">Scroll</Kbd>, hold{" "}
-        <Kbd className="bg-white/8">Space</Kbd>, or use hand tool
-      </p>
     </div>
   );
 }

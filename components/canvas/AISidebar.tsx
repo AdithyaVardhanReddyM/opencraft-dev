@@ -10,6 +10,9 @@ import {
   ImageIcon,
   X,
   CheckIcon,
+  SquareTerminal,
+  Zap,
+  ChevronUp,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -37,23 +40,24 @@ import {
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
 import {
-  ModelSelector,
-  ModelSelectorContent,
-  ModelSelectorEmpty,
-  ModelSelectorGroup,
-  ModelSelectorInput,
-  ModelSelectorItem,
-  ModelSelectorList,
-  ModelSelectorLogo,
-  ModelSelectorName,
-  ModelSelectorTrigger,
-} from "@/components/ai-elements/model-selector";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { StreamingIndicator } from "@/components/canvas/StreamingIndicator";
 import { ReasoningPanel } from "@/components/canvas/ReasoningPanel";
-import { LiveReasoningPanel } from "@/components/canvas/LiveReasoningPanel";
-import { useChatStreaming, type ChatMessage } from "@/hooks/use-chat-streaming";
+import {
+  useChatStreaming,
+  type ChatMessage,
+  type PillAttachment,
+} from "@/hooks/use-chat-streaming";
 import { CodeExplorer } from "@/components/canvas/code-explorer";
 import { EditModeProvider } from "@/contexts/EditModeContext";
 import { EditModePanel } from "@/components/canvas/EditModePanel";
@@ -68,10 +72,8 @@ import {
   type ExtensionMetadataDisplay,
 } from "@/lib/extension-content";
 import {
-  AI_MODELS,
   DEFAULT_MODEL_ID,
   getModelById,
-  getProviders,
   modelSupportsVision,
 } from "@/lib/ai-models";
 import { CreditBar } from "@/components/canvas/CreditBar";
@@ -80,6 +82,13 @@ import { useGenerationStats, useImageUrls } from "@/lib/api/hooks";
 import { ensureUser } from "@/lib/api/mutations";
 
 type ChatInputStatus = "submitted" | "streaming" | "ready" | "error";
+
+/** A canvas image the user can reference from the chat via @-mention. */
+export interface CanvasImageRef {
+  id: string;
+  name: string;
+  s3Key: string;
+}
 
 /** Display-only chip for showing extension content in messages */
 function ExtensionChipDisplay({
@@ -122,6 +131,7 @@ export function AISidebar({
   isOpen,
   selectedScreenId,
   projectId,
+  canvasImages,
   sandboxId,
   sandboxUrl,
   cachedFiles,
@@ -137,6 +147,7 @@ export function AISidebar({
   onClose?: () => void;
   selectedScreenId?: string;
   projectId?: string;
+  canvasImages?: CanvasImageRef[];
   sandboxId?: string;
   sandboxUrl?: string;
   cachedFiles?: Record<string, string>;
@@ -241,11 +252,12 @@ export function AISidebar({
       message: PromptInputMessage,
       options: {
         modelId: string;
-        images: ImageAttachment[];
+        images: PillAttachment[];
+        thinking: boolean;
         extensionData?: CapturedElement;
       }
     ) => {
-      const { modelId, images, extensionData } = options;
+      const { modelId, images, thinking, extensionData } = options;
       if (!message.text.trim() && !extensionData && images.length === 0) return;
 
       // If extension data is present, format it for AI
@@ -269,14 +281,37 @@ export function AISidebar({
         });
       }
 
-      // Pass modelId and images to sendMessage
-      sendMessage(finalMessage, { modelId, images });
+      // Pass modelId, images, and the thinking toggle to sendMessage
+      sendMessage(finalMessage, { modelId, images, thinking });
     },
     [sendMessage, selectedScreenId]
   );
 
   // Map streaming status to chat input status
   const chatStatus: ChatInputStatus = status;
+
+  // Once the assistant's response text begins streaming, the live message itself
+  // is the progress indicator. Keep showing the step list only while the agent is
+  // still working *before* any text — otherwise the completed step block renders
+  // below the live response and reads as a second, duplicate assistant turn.
+  const isStreamingResponseText = useMemo(
+    () =>
+      messages.some(
+        (m) =>
+          m.role === "assistant" &&
+          m.isStreaming &&
+          m.content.trim().length > 0
+      ),
+    [messages]
+  );
+
+  // A live assistant message is already on screen (e.g. its reasoning is
+  // streaming). The step indicator then renders attached under it — no second
+  // avatar — so reasoning + steps read as one block.
+  const hasLiveAssistant = useMemo(
+    () => messages.some((m) => m.role === "assistant" && m.isStreaming),
+    [messages]
+  );
 
   // Extract the last used model from message history
   // Look for the most recent user message with a modelId
@@ -303,11 +338,7 @@ export function AISidebar({
 
   return (
     <motion.div
-      className="pointer-events-auto fixed left-3 z-60 flex flex-col"
-      style={{
-        top: "60px",
-        bottom: "12px",
-      }}
+      className="pointer-events-auto fixed inset-y-0 left-0 z-60 flex flex-col"
       initial={{ width: COLLAPSED_WIDTH, x: -10, opacity: 0 }}
       animate={{
         width: sidebarWidth,
@@ -320,7 +351,7 @@ export function AISidebar({
         opacity: { duration: 0.2 },
       }}
     >
-      <div className="flex flex-col h-full rounded-xl bg-background/95 backdrop-blur-xl shadow-2xl overflow-hidden scrollbar-thin">
+      <div className="flex flex-col h-full bg-background border-r border-border/60 shadow-xl overflow-hidden scrollbar-thin">
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
@@ -371,15 +402,15 @@ export function AISidebar({
                   {messages.map((msg) => (
                     <ChatMessageItem key={msg.id} message={msg} />
                   ))}
-                  {/* Live "thinking" stream — the model's readable reasoning,
-                      revealed with a typewriter effect as the run progresses. */}
-                  <LiveReasoningPanel active={isLoading} />
+                  {/* Reasoning now streams inline on the live assistant message
+                      (rendered by ChatMessageItem's ReasoningPanel). */}
                   {/* Show streaming indicator with step history when processing */}
                   <StreamingIndicator
                     statusText={statusText || "Processing..."}
                     steps={streamingSteps}
-                    isVisible={isLoading}
+                    isVisible={isLoading && !isStreamingResponseText}
                     activeDetail={currentActivity}
+                    attached={hasLiveAssistant}
                   />
                   {error?.canRetry && !isLoading && (
                     <ErrorRetryButton onRetry={retryLastMessage} />
@@ -393,6 +424,7 @@ export function AISidebar({
             <ChatInput
               onSubmit={handleSubmit}
               status={chatStatus}
+              canvasImages={canvasImages}
               initialImage={initialImage}
               initialPrompt={initialPrompt}
               initialModelId={initialModelId}
@@ -559,6 +591,11 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
     ? getDisplayContentFromMessage(message.content)
     : message.content;
 
+  // Assistant response body, trimmed. Whitespace-only content (e.g. a stray
+  // newline streamed before the real answer) must count as empty so it never
+  // renders a blank bubble (the one-line gap) or a stuck typewriter cursor.
+  const assistantContent = message.content.trim();
+
   // User message - right-aligned glassy bubble with primary tint
   if (isUser) {
     return (
@@ -579,7 +616,9 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
                 </div>
               )}
               {displayContent && displayContent !== "[Image attached]" && (
-                <span>{displayContent}</span>
+                <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                  {displayContent}
+                </span>
               )}
             </div>
           </div>
@@ -625,8 +664,15 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
           {message.reasoning && (
             <ReasoningPanel reasoning={message.reasoning} />
           )}
-          <MessageResponse>{message.content}</MessageResponse>
-          {isStreaming && (
+          {/* Only render the response body + typewriter cursor once there's
+              actual visible text. While the agent is still thinking / running
+              tools the content is empty (or whitespace-only) — rendering it then
+              leaves a stuck cursor and an empty block under the
+              "Thought for Ns" chip. */}
+          {assistantContent && (
+            <MessageResponse>{assistantContent}</MessageResponse>
+          )}
+          {isStreaming && assistantContent && (
             <span className="inline-block w-2 h-4 ml-0.5 bg-foreground/70 animate-pulse" />
           )}
         </div>
@@ -657,16 +703,10 @@ function ErrorRetryButton({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-/** Image attachment type for pending uploads */
-interface ImageAttachment {
-  id: string;
-  file: File;
-  previewUrl: string;
-}
-
 function ChatInput({
   onSubmit,
   status,
+  canvasImages,
   initialImage,
   initialPrompt,
   initialModelId,
@@ -680,11 +720,13 @@ function ChatInput({
     message: PromptInputMessage,
     options: {
       modelId: string;
-      images: ImageAttachment[];
+      images: PillAttachment[];
+      thinking: boolean;
       extensionData?: CapturedElement;
     }
   ) => void;
   status: ChatInputStatus;
+  canvasImages?: CanvasImageRef[];
   initialImage?: Blob;
   initialPrompt?: string;
   initialModelId?: string;
@@ -701,33 +743,55 @@ function ChatInput({
   const [selectedModel, setSelectedModel] = useState(
     lastUsedModelId || DEFAULT_MODEL_ID
   );
-  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
-  const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
+  // Build mode: "Deep Build" enables extended thinking, "Fast Build" disables it.
+  // Fast Build is the default (thinking off).
+  const [thinking, setThinking] = useState(false);
+  const [buildModeOpen, setBuildModeOpen] = useState(false);
+  const [attachments, setAttachments] = useState<PillAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const initialDataProcessedRef = useRef(false);
 
+  // @-mention autocomplete state. `mentionQuery` is null when the menu is closed;
+  // `mentionStartRef` records the index of the triggering "@" in the textarea.
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const mentionStartRef = useRef<number | null>(null);
+
+  // Resolve presigned URLs for every canvas image once, so both the mention
+  // dropdown thumbnails and the canvas-pill previews can render.
+  const canvasKeys = (canvasImages ?? []).map((c) => c.s3Key);
+  const { data: pillUrlMap } = useImageUrls(canvasKeys);
+
+  const mentionMatches = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    return (canvasImages ?? []).filter((img) =>
+      img.name.toLowerCase().includes(q)
+    );
+  }, [mentionQuery, canvasImages]);
+  const isMentionOpen = mentionQuery !== null && mentionMatches.length > 0;
+
   const selectedModelData = getModelById(selectedModel);
-  const providers = getProviders();
 
   // Track the previous lastUsedModelId to detect screen changes
   const prevLastUsedModelIdRef = useRef<string | undefined>(lastUsedModelId);
 
-  // Update selected model when lastUsedModelId changes (e.g., when switching screens)
-  // This should always update when the value changes, regardless of initialDataProcessedRef
+  // Update selected model when lastUsedModelId changes (e.g. switching screens).
+  // A guarded sync effect is appropriate here; the set-state-in-effect rule is
+  // scoped off for the same reason as the initial-data effect below.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    // Only update if lastUsedModelId actually changed (not just on mount)
     if (lastUsedModelId !== prevLastUsedModelIdRef.current) {
       prevLastUsedModelIdRef.current = lastUsedModelId;
-      if (lastUsedModelId) {
-        setSelectedModel(lastUsedModelId);
-      } else {
-        // Reset to default when switching to a screen with no history
-        setSelectedModel(DEFAULT_MODEL_ID);
-      }
+      setSelectedModel(lastUsedModelId || DEFAULT_MODEL_ID);
     }
   }, [lastUsedModelId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Handle initial data from frame generation
+  // Handle initial data from frame generation. A legitimate one-time sync of
+  // incoming generation props into local input state, guarded by a ref — an
+  // effect is the right tool here, so the set-state-in-effect rule is scoped off.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (initialDataProcessedRef.current) return;
     if (!initialImage && !initialPrompt && !initialModelId) return;
@@ -744,24 +808,26 @@ function ChatInput({
       setSelectedModel(initialModelId);
     }
 
-    // Convert blob to ImageAttachment
+    // Convert blob to an upload attachment
     if (initialImage) {
       const file = new File([initialImage], "frame-capture.png", {
         type: "image/png",
       });
-      const attachment: ImageAttachment = {
+      const attachment: PillAttachment = {
+        kind: "upload",
         id: nanoid(),
         file,
         previewUrl: URL.createObjectURL(initialImage),
       };
-      setPendingImages([attachment]);
+      setAttachments([attachment]);
     }
 
     // Notify parent that initial data has been consumed
     onInitialDataConsumed?.();
   }, [initialImage, initialPrompt, initialModelId, onInitialDataConsumed]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Auto-capitalize first character
+  // Auto-capitalize first character + detect an active @-mention at the caret.
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       let value = e.target.value;
@@ -770,9 +836,32 @@ function ChatInput({
         value = value.toUpperCase();
       }
       setInputValue(value);
+
+      // Open the mention menu when the caret is in an "@token" with no spaces.
+      const caret = e.target.selectionStart ?? value.length;
+      const match = /(?:^|\s)@([\w-]*)$/.exec(value.slice(0, caret));
+      if (match) {
+        mentionStartRef.current = caret - match[1].length - 1;
+        setMentionQuery(match[1]);
+        setMentionIndex(0);
+      } else {
+        mentionStartRef.current = null;
+        setMentionQuery(null);
+      }
     },
     []
   );
+
+  // Add files as "upload" pills.
+  const addImages = useCallback((files: File[]) => {
+    const newAttachments: PillAttachment[] = files.map((file) => ({
+      kind: "upload",
+      id: nanoid(),
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+    setAttachments((prev) => [...prev, ...newAttachments]);
+  }, []);
 
   // Handle paste to detect extension content or images
   const handlePaste = useCallback(
@@ -813,29 +902,89 @@ function ChatInput({
         }
       }
     },
-    []
+    [addImages]
   );
 
-  // Add images to pending list
-  const addImages = useCallback((files: File[]) => {
-    const newAttachments: ImageAttachment[] = files.map((file) => ({
-      id: nanoid(),
-      file,
-      previewUrl: URL.createObjectURL(file),
-    }));
-    setPendingImages((prev) => [...prev, ...newAttachments]);
-  }, []);
-
-  // Remove image from pending list
+  // Remove a pill; only "upload" pills hold a blob URL to revoke.
   const removeImage = useCallback((id: string) => {
-    setPendingImages((prev) => {
-      const found = prev.find((img) => img.id === id);
-      if (found) {
+    setAttachments((prev) => {
+      const found = prev.find((a) => a.id === id);
+      if (found?.kind === "upload") {
         URL.revokeObjectURL(found.previewUrl);
       }
-      return prev.filter((img) => img.id !== id);
+      return prev.filter((a) => a.id !== id);
     });
   }, []);
+
+  // Insert a canvas image as a pill (dedup by s3Key) and strip the "@query" token.
+  const selectMention = useCallback(
+    (img: CanvasImageRef) => {
+      setAttachments((prev) =>
+        prev.some((a) => a.kind === "canvas" && a.s3Key === img.s3Key)
+          ? prev
+          : [
+              ...prev,
+              {
+                kind: "canvas",
+                id: nanoid(),
+                name: img.name,
+                s3Key: img.s3Key,
+              },
+            ]
+      );
+      setInputValue((prev) => {
+        const start = mentionStartRef.current;
+        if (start === null) return prev;
+        const end = start + 1 + (mentionQuery?.length ?? 0);
+        return prev.slice(0, start) + prev.slice(end);
+      });
+      mentionStartRef.current = null;
+      setMentionQuery(null);
+    },
+    [mentionQuery]
+  );
+
+  // Textarea key handling. We override PromptInputTextarea's own onKeyDown, so we
+  // drive the mention menu here AND replicate its Enter-to-submit when closed.
+  const handleTextareaKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (isMentionOpen) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setMentionIndex((i) => (i + 1) % mentionMatches.length);
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setMentionIndex(
+            (i) => (i - 1 + mentionMatches.length) % mentionMatches.length
+          );
+          return;
+        }
+        if (e.key === "Enter" || e.key === "Tab") {
+          e.preventDefault();
+          const choice = mentionMatches[mentionIndex] ?? mentionMatches[0];
+          if (choice) selectMention(choice);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          mentionStartRef.current = null;
+          setMentionQuery(null);
+          return;
+        }
+      }
+      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+        e.preventDefault();
+        const form = e.currentTarget.form;
+        const submitButton = form?.querySelector(
+          'button[type="submit"]'
+        ) as HTMLButtonElement | null;
+        if (!submitButton?.disabled) form?.requestSubmit();
+      }
+    },
+    [isMentionOpen, mentionMatches, mentionIndex, selectMention]
+  );
 
   // Handle file input change
   const handleFileChange = useCallback(
@@ -863,16 +1012,21 @@ function ChatInput({
     (message: PromptInputMessage) => {
       onSubmit(message, {
         modelId: selectedModel,
-        images: pendingImages,
+        images: attachments,
+        thinking,
         extensionData: extensionContent || undefined,
       });
       setInputValue("");
       setExtensionContent(null);
-      // Clear images and revoke URLs
-      pendingImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
-      setPendingImages([]);
+      setMentionQuery(null);
+      mentionStartRef.current = null;
+      // Clear pills and revoke any upload blob URLs.
+      attachments.forEach((a) => {
+        if (a.kind === "upload") URL.revokeObjectURL(a.previewUrl);
+      });
+      setAttachments([]);
     },
-    [onSubmit, extensionContent, selectedModel, pendingImages]
+    [onSubmit, extensionContent, selectedModel, attachments, thinking]
   );
 
   // Handle drag and drop
@@ -898,10 +1052,10 @@ function ChatInput({
 
   // Check if model supports vision when images are attached
   const showVisionWarning =
-    pendingImages.length > 0 && !modelSupportsVision(selectedModel);
+    attachments.length > 0 && !modelSupportsVision(selectedModel);
 
   return (
-    <div className="p-3 pt-2">
+    <div className="relative p-3 pt-2">
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -911,6 +1065,46 @@ function ChatInput({
         className="hidden"
         onChange={handleFileChange}
       />
+
+      {/* @-mention autocomplete — pick a canvas image by name */}
+      {isMentionOpen && (
+        <div className="absolute bottom-full left-3 right-3 z-50 mb-1 max-h-56 overflow-y-auto rounded-lg border border-border/60 bg-popover p-1 shadow-lg">
+          {mentionMatches.map((img, i) => {
+            const url = pillUrlMap?.[img.s3Key];
+            return (
+              <button
+                key={img.id}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  selectMention(img);
+                }}
+                onMouseEnter={() => setMentionIndex(i)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                  i === mentionIndex
+                    ? "bg-accent text-accent-foreground"
+                    : "hover:bg-accent/50"
+                )}
+              >
+                <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
+                  {url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={url}
+                      alt={img.name}
+                      className="size-7 object-cover"
+                    />
+                  ) : (
+                    <ImageIcon className="size-4 text-muted-foreground" />
+                  )}
+                </span>
+                <span className="truncate">{img.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Credit bar and input container */}
       <div className="rounded-xl overflow-hidden border border-border/40 bg-white dark:bg-muted/40 shadow-sm transition-colors focus-within:border-border/60 focus-within:ring-[3px] focus-within:ring-primary/70 focus-within:ring-offset-0 focus-within:shadow-[0_0_24px_rgba(0,114,229,0.35)]">
@@ -937,14 +1131,20 @@ function ChatInput({
               </div>
             )}
 
-            {/* Image Attachments */}
-            {pendingImages.length > 0 && (
+            {/* Image / canvas-reference pills */}
+            {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 px-3 pt-3">
-                {pendingImages.map((img) => (
+                {attachments.map((att) => (
                   <ImageAttachmentChip
-                    key={img.id}
-                    attachment={img}
-                    onRemove={() => removeImage(img.id)}
+                    key={att.id}
+                    src={
+                      att.kind === "upload"
+                        ? att.previewUrl
+                        : pillUrlMap?.[att.s3Key]
+                    }
+                    label={att.kind === "upload" ? att.file.name : att.name}
+                    isCanvas={att.kind === "canvas"}
+                    onRemove={() => removeImage(att.id)}
                   />
                 ))}
               </div>
@@ -965,13 +1165,14 @@ function ChatInput({
                   ? "Generation limit reached"
                   : extensionContent
                   ? "Add instructions for replication..."
-                  : pendingImages.length > 0
+                  : attachments.length > 0
                   ? "Describe what you want to do with these images..."
-                  : "Ask AI anything..."
+                  : "Ask AI anything… (type @ to add a canvas image)"
               }
               className="min-h-[36px] max-h-[120px] text-sm placeholder:text-muted-foreground/50 bg-transparent border-none shadow-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
               value={inputValue}
               onChange={handleInputChange}
+              onKeyDown={handleTextareaKeyDown}
               onPaste={handlePaste}
               disabled={!canGenerate}
             />
@@ -991,66 +1192,63 @@ function ChatInput({
                 </PromptInputActionMenu>
               )}
 
-              {/* Model Selector */}
-              <ModelSelector
-                open={modelSelectorOpen}
-                onOpenChange={setModelSelectorOpen}
-              >
-                <ModelSelectorTrigger asChild>
-                  <PromptInputButton>
-                    {selectedModelData?.providerSlug && (
-                      <ModelSelectorLogo
-                        provider={selectedModelData.providerSlug}
-                      />
+              {/* Build mode selector — Deep Build (extended thinking on) vs
+                  Fast Build (thinking off). Replaces the old think + model
+                  buttons; there's only one model so it no longer needs a picker. */}
+              <DropdownMenu open={buildModeOpen} onOpenChange={setBuildModeOpen}>
+                <DropdownMenuTrigger asChild>
+                  <PromptInputButton
+                    size="sm"
+                    className="gap-1.5"
+                    aria-label="Build mode"
+                    title={
+                      thinking
+                        ? "Deep Build: extended thinking on"
+                        : "Fast Build: extended thinking off"
+                    }
+                  >
+                    {thinking ? (
+                      <SquareTerminal className="size-4" />
+                    ) : (
+                      <Zap className="size-4" />
                     )}
-                    <ModelSelectorName className="max-w-[80px] text-xs">
-                      {selectedModelData?.name || "Select model"}
-                    </ModelSelectorName>
+                    <span className="text-xs font-medium">
+                      {thinking ? "Deep Build" : "Fast Build"}
+                    </span>
+                    <ChevronUp
+                      className={cn(
+                        "size-3 opacity-60 transition-transform",
+                        buildModeOpen && "rotate-180"
+                      )}
+                    />
                   </PromptInputButton>
-                </ModelSelectorTrigger>
-                <ModelSelectorContent>
-                  <ModelSelectorInput
-                    placeholder="Search models..."
-                    className="focus-visible:ring-0"
-                  />
-                  <ModelSelectorList>
-                    <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
-                    {providers.map((provider) => (
-                      <ModelSelectorGroup heading={provider} key={provider}>
-                        {AI_MODELS.filter((m) => m.provider === provider).map(
-                          (model) => (
-                            <ModelSelectorItem
-                              key={model.id}
-                              value={model.id}
-                              onSelect={() => {
-                                pendo.track("ai_model_changed", {
-                                  previous_model_id: selectedModel,
-                                  new_model_id: model.id,
-                                  model_provider: model.provider,
-                                });
-                                setSelectedModel(model.id);
-                                setModelSelectorOpen(false);
-                              }}
-                            >
-                              <ModelSelectorLogo
-                                provider={model.providerSlug}
-                              />
-                              <ModelSelectorName>
-                                {model.name}
-                              </ModelSelectorName>
-                              {selectedModel === model.id ? (
-                                <CheckIcon className="ml-auto size-4" />
-                              ) : (
-                                <div className="ml-auto size-4" />
-                              )}
-                            </ModelSelectorItem>
-                          )
-                        )}
-                      </ModelSelectorGroup>
-                    ))}
-                  </ModelSelectorList>
-                </ModelSelectorContent>
-              </ModelSelector>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="top" className="w-44">
+                  <DropdownMenuItem
+                    onSelect={() => setThinking(true)}
+                    className={cn(
+                      "gap-2",
+                      thinking && "bg-primary/10 text-primary focus:text-primary"
+                    )}
+                  >
+                    <SquareTerminal className="size-4" />
+                    <span className="font-medium">Deep Build</span>
+                    {thinking && <CheckIcon className="ml-auto size-4" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => setThinking(false)}
+                    className={cn(
+                      "gap-2",
+                      !thinking &&
+                        "bg-primary/10 text-primary focus:text-primary"
+                    )}
+                  >
+                    <Zap className="size-4" />
+                    <span className="font-medium">Fast Build</span>
+                    {!thinking && <CheckIcon className="ml-auto size-4" />}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </PromptInputTools>
 
             <PromptInputSubmit
@@ -1066,66 +1264,74 @@ function ChatInput({
   );
 }
 
-/** Image attachment chip with preview and remove button */
+/** Pill for a pending upload or a referenced canvas image, with a hover preview. */
 function ImageAttachmentChip({
-  attachment,
+  src,
+  label,
+  isCanvas,
   onRemove,
 }: {
-  attachment: ImageAttachment;
+  src?: string | null;
+  label: string;
+  isCanvas?: boolean;
   onRemove: () => void;
 }) {
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-
   return (
-    <>
-      <div
-        className="group relative flex h-8 cursor-pointer select-none items-center gap-1.5 rounded-md border border-border px-1.5 font-medium text-sm transition-all hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50"
-        onClick={() => setIsPreviewOpen(true)}
-      >
-        <div className="relative size-5 shrink-0">
-          <div className="absolute inset-0 flex size-5 items-center justify-center overflow-hidden rounded bg-background transition-opacity group-hover:opacity-0">
-            <img
-              alt={attachment.file.name}
-              className="size-5 object-cover"
-              src={attachment.previewUrl}
-            />
-          </div>
-          <Button
-            aria-label="Remove image"
-            className="absolute inset-0 size-5 cursor-pointer rounded p-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 [&>svg]:size-2.5"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
-            }}
-            type="button"
-            variant="ghost"
-          >
-            <X className="size-2.5" />
-          </Button>
-        </div>
-        <span className="flex-1 truncate max-w-[100px] text-xs">
-          {attachment.file.name}
-        </span>
-      </div>
-
-      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-3xl p-2 bg-background/95 backdrop-blur-xl">
-          <DialogTitle className="sr-only">Image Preview</DialogTitle>
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center justify-center overflow-hidden rounded-lg max-h-[70vh]">
-              <img
-                alt={attachment.file.name}
-                className="max-h-[70vh] max-w-full object-contain"
-                src={attachment.previewUrl}
-              />
+    <HoverCard openDelay={120} closeDelay={60}>
+      <HoverCardTrigger asChild>
+        <div
+          className={cn(
+            "group relative flex h-8 cursor-default select-none items-center gap-1.5 rounded-md border px-1.5 font-medium text-sm transition-all",
+            isCanvas
+              ? "border-primary/40 bg-primary/5 hover:bg-primary/10"
+              : "border-border hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50"
+          )}
+        >
+          <div className="relative size-5 shrink-0">
+            <div className="absolute inset-0 flex size-5 items-center justify-center overflow-hidden rounded bg-background transition-opacity group-hover:opacity-0">
+              {src ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt={label} className="size-5 object-cover" src={src} />
+              ) : (
+                <ImageIcon className="size-3 text-muted-foreground" />
+              )}
             </div>
-            <p className="text-sm text-muted-foreground truncate max-w-full">
-              {attachment.file.name}
-            </p>
+            <Button
+              aria-label="Remove image"
+              className="absolute inset-0 size-5 cursor-pointer rounded p-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 [&>svg]:size-2.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              type="button"
+              variant="ghost"
+            >
+              <X className="size-2.5" />
+            </Button>
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+          <span className="flex-1 truncate max-w-[120px] text-xs">{label}</span>
+        </div>
+      </HoverCardTrigger>
+      <HoverCardContent side="top" className="w-auto max-w-xs overflow-hidden p-1">
+        {src ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              alt={label}
+              src={src}
+              className="max-h-64 max-w-[16rem] rounded object-contain"
+            />
+            <p className="truncate px-1 pt-1 text-xs text-muted-foreground">
+              {label}
+            </p>
+          </>
+        ) : (
+          <div className="flex h-24 w-40 items-center justify-center text-muted-foreground">
+            <ImageIcon className="size-6" />
+          </div>
+        )}
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 

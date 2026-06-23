@@ -30,6 +30,7 @@ function calculateBounds(shape: Shape): Bounds {
       };
     case "generatedui":
     case "screen":
+    case "image":
       return { x: shape.x, y: shape.y, w: shape.w, h: shape.h };
 
     case "text": {

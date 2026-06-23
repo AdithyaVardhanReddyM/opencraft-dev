@@ -23,6 +23,7 @@ import {
   createText,
   createGeneratedUI,
   createScreen,
+  createImage,
 } from "./shape-factories";
 import {
   createHistoryEntry,
@@ -30,6 +31,7 @@ import {
   undo as historyUndo,
   redo as historyRedo,
 } from "./history-manager";
+import { nanoid } from "nanoid";
 
 const emptyShapesState = createEntityState<Shape>();
 
@@ -128,6 +130,21 @@ type ShapesActionCore =
         h?: number;
         screenId: string;
         id?: string; // Optional: use specific shape ID (for Convex linking)
+      };
+    }
+  | {
+      type: "ADD_IMAGE";
+      payload: {
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+        s3Key: string;
+        name: string;
+        naturalWidth: number;
+        naturalHeight: number;
+        id?: string;
+        status?: "uploading" | "ready" | "error";
       };
     }
   | { type: "UPDATE_SHAPE"; payload: { id: string; patch: Partial<Shape> } }
@@ -324,6 +341,14 @@ export function shapesReducer(
       return applyStateChange(state, action, (current) => ({
         ...current,
         shapes: addEntity(current.shapes, screen),
+      }));
+    }
+
+    case "ADD_IMAGE": {
+      const image = createImage(action.payload);
+      return applyStateChange(state, action, (current) => ({
+        ...current,
+        shapes: addEntity(current.shapes, image),
       }));
     }
 
@@ -621,6 +646,7 @@ function getFullShapeBounds(
     case "ellipse":
     case "generatedui":
     case "screen":
+    case "image":
       return { x: shape.x, y: shape.y, w: shape.w, h: shape.h };
     case "text":
       return { x: shape.x, y: shape.y, w: shape.w ?? 100, h: shape.h ?? 20 };
@@ -654,7 +680,6 @@ function cloneShapeWithOffset(
   offsetY: number,
   getNextFrameNumber: () => number
 ): Shape {
-  const { nanoid } = require("nanoid");
   const newId = nanoid();
 
   switch (shape.type) {
@@ -722,6 +747,16 @@ function cloneShapeWithOffset(
         endY: shape.endY + offsetY,
       };
     case "screen":
+      return {
+        ...shape,
+        id: newId,
+        x: shape.x + offsetX,
+        y: shape.y + offsetY,
+      };
+    case "image":
+      // A cloned image intentionally shares the same s3Key (no re-upload). The
+      // delete path reference-counts s3Key so removing one copy doesn't break
+      // the other.
       return {
         ...shape,
         id: newId,

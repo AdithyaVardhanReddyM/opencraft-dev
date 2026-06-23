@@ -1,307 +1,87 @@
 /**
- * Streaming utilities for mapping AgentKit events to UI states.
- * Used by AISidebar to display real-time status during agent execution.
+ * Streaming utilities for the agent-service SSE vocabulary.
+ *
+ * The agent runs in the Python Strands service and streams these frame types
+ * over SSE (relayed by /api/chat): `sandbox`, `notice`, `text`, `tool`,
+ * `reasoning`, `result`, `error`. These helpers map a frame to the UI's status
+ * text and tool labels (consumed by use-chat-streaming + StreamingIndicator).
  */
 
 export type StreamingStatus = "ready" | "submitted" | "streaming" | "error";
 
-export type AgentKitEventType =
-  | "run.started"
-  | "run.completed"
-  | "stream.ended"
-  | "part.created"
-  | "text.delta"
-  | "part.completed"
-  | "tool_call.arguments.delta"
-  | "tool_call.output.delta"
+export type AgentFrameType =
+  | "sandbox"
+  | "notice"
+  | "text"
+  | "tool"
+  | "tool_detail"
   | "reasoning"
-  | "reasoning.delta";
+  | "result"
+  | "error";
 
-export interface AgentKitEvent {
-  event: string;
-  data?: Record<string, unknown>;
+export interface AgentFrame {
+  type: AgentFrameType | string;
+  text?: string; // text / reasoning deltas
+  name?: string; // tool
+  tool_use_id?: string; // tool
+  message?: string; // notice / error
+  // result/sandbox carry more fields; the hook reads those directly.
+  [k: string]: unknown;
 }
 
-export interface StreamingState {
-  status: StreamingStatus;
-  statusText: string;
-}
-
-// Tool name mappings for human-readable display
-const TOOL_DISPLAY_NAMES: Record<string, string> = {
-  terminal: "Executing command",
-  createOrUpdateFiles: "Writing code",
-  readFiles: "Reading files",
-  scrapeWebpage: "Inspecting webpage",
+// The agent-service tool names → human-readable labels. The `tool` frame carries
+// only the name + tool_use_id (no streamed args), so this is the finest detail
+// available for the live activity line.
+const TOOL_LABELS: Record<string, string> = {
+  create_files: "Writing files",
+  edit_file: "Editing file",
+  read_files: "Reading files",
+  search_project: "Searching project",
+  scrape_webpage: "Inspecting webpage",
+  terminal: "Running command",
+  finish: "Finalizing",
 };
 
-/**
- * Converts a tool name to a human-readable format.
- * Handles camelCase and snake_case conversion.
- */
-export function formatToolName(toolName: string): string {
-  // Check for known tool mappings first
-  if (TOOL_DISPLAY_NAMES[toolName]) {
-    return TOOL_DISPLAY_NAMES[toolName];
-  }
-
-  // Convert camelCase or snake_case to readable format
-  const readable = toolName
-    .replace(/_/g, " ")
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .toLowerCase();
-
-  // Capitalize first letter and truncate if needed
-  const formatted = readable.charAt(0).toUpperCase() + readable.slice(1);
-
-  // Ensure max 30 characters
-  if (formatted.length > 25) {
-    return formatted.substring(0, 22) + "...";
-  }
-
-  return formatted;
+export function toolLabel(name?: string): string {
+  if (!name) return "Working";
+  return TOOL_LABELS[name] ?? "Working";
 }
 
-/**
- * Gets human-readable status text for an AgentKit event.
- * Shows detailed progress for tool calls and agent operations.
- */
-export function getStatusTextForEvent(event: AgentKitEvent): string {
-  const eventType = event.event;
-  const data = event.data || {};
-
-  switch (eventType) {
-    case "run.started":
-      return "Getting started";
-
-    // Reasoning models emit these while "thinking" before any text/tool output.
-    // Surfacing "Thinking" here fills the otherwise-dead gap after run.started.
-    case "reasoning":
-    case "reasoning.delta":
-      return "Thinking";
-
-    case "text.delta":
+/** Human-readable status text for a streamed frame. */
+export function statusTextForFrame(frame: AgentFrame): string {
+  switch (frame.type) {
+    case "sandbox":
+      return "Starting sandbox";
+    case "notice":
+      return frame.message || "Working";
+    case "text":
       return "Writing the response";
-
-    case "tool_call.arguments.delta": {
-      const toolName = data.toolName as string | undefined;
-      if (toolName) {
-        return formatToolName(toolName);
-      }
-      return "Preparing action";
-    }
-
-    case "tool_call.output.delta": {
-      const toolName = data.toolName as string | undefined;
-      if (toolName === "terminal") {
-        return "Running in terminal";
-      }
-      if (toolName === "createOrUpdateFiles") {
-        return "Saving changes";
-      }
-      if (toolName === "readFiles") {
-        return "Scanning files";
-      }
-      if (toolName === "scrapeWebpage") {
-        return "Reading webpage";
-      }
-      return "Processing result";
-    }
-
-    case "part.created": {
-      const partType = data.type as string | undefined;
-      if (partType === "tool-call") {
-        const toolName = data.toolName as string | undefined;
-        if (toolName === "terminal") {
-          return "Opening terminal";
-        }
-        if (toolName === "createOrUpdateFiles") {
-          return "Preparing files";
-        }
-        if (toolName === "readFiles") {
-          return "Locating files";
-        }
-        if (toolName === "scrapeWebpage") {
-          return "Fetching webpage";
-        }
-        return "Invoking tool";
-      }
-      if (partType === "text") {
-        return "Drafting the UI";
-      }
-      return "Working";
-    }
-
-    case "part.completed": {
-      const partType = data.type as string | undefined;
-      if (partType === "tool-call") {
-        const toolName = data.toolName as string | undefined;
-        if (toolName === "terminal") {
-          return "Command finished";
-        }
-        if (toolName === "createOrUpdateFiles") {
-          return "Files saved";
-        }
-        if (toolName === "readFiles") {
-          return "Files read";
-        }
-        if (toolName === "scrapeWebpage") {
-          return "Webpage analyzed";
-        }
-        return "Tool finished";
-      }
-      if (partType === "text") {
-        return "Continuing";
-      }
-      return "Continuing";
-    }
-
-    case "run.completed":
-      return "Wrapping up";
-
-    case "stream.ended":
+    case "reasoning":
+      return "Thinking";
+    case "tool":
+      return toolLabel(frame.name);
+    case "result":
       return "Done";
-
-    // Network-level events
-    case "network.started":
-      return "Initializing";
-
-    case "network.completed":
-      return "Finished";
-
-    case "agent.started":
-      return "Reasoning";
-
-    case "agent.completed":
-      return "Ready";
-
+    case "error":
+      return "Error";
     default:
-      // Handle any unknown events gracefully
-      if (eventType.includes("tool")) {
-        return "Using tools";
-      }
-      if (eventType.includes("text")) {
-        return "Writing";
-      }
       return "Working";
   }
 }
 
-/**
- * Maps an AgentKit event to a StreamingStatus.
- * Returns the appropriate UI state based on the event type.
- */
-export function mapEventToStatus(event: AgentKitEvent): StreamingStatus {
-  const eventType = event.event;
-
-  switch (eventType) {
-    case "run.started":
-      return "streaming";
-
-    case "text.delta":
-    case "tool_call.arguments.delta":
-    case "tool_call.output.delta":
-    case "part.created":
-    case "part.completed":
-      return "streaming";
-
-    case "run.completed":
-      return "streaming"; // Still streaming until stream.ended
-
-    case "stream.ended":
-      return "ready";
-
-    default:
-      // Check for error in data
-      if (event.data?.error as string | undefined) {
-        return "error";
-      }
-      return "streaming";
+/** Parse one SSE frame ("event: ...\ndata: {json}") into its JSON payload. */
+export function parseSseFrame(raw: string): AgentFrame | null {
+  let event = "message";
+  const dataLines: string[] = [];
+  for (const line of raw.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
   }
-}
-
-/**
- * Gets the complete streaming state from an event.
- * Combines status and status text for UI rendering.
- */
-export function getStreamingState(event: AgentKitEvent): StreamingState {
-  return {
-    status: mapEventToStatus(event),
-    statusText: getStatusTextForEvent(event),
-  };
-}
-
-/** Minimal shape of a streaming tool-call part from @inngest/use-agent. */
-export interface ToolCallPartLike {
-  type?: string;
-  toolName?: string;
-  state?: string;
-  input?: unknown;
-}
-
-/** Truncate a string to a max length with an ellipsis. */
-function truncate(value: string, max: number): string {
-  return value.length > max ? value.slice(0, max - 1) + "…" : value;
-}
-
-/**
- * Builds a concrete, human-readable activity line from a live tool-call part.
- * Shows the actual file being written or command running instead of a static
- * label, so a long tool step reads as real progress. Tolerates partially
- * streamed input (state "input-streaming"), returning null until a usable
- * path/command is available.
- */
-export function getActivityForToolPart(
-  part: ToolCallPartLike | null | undefined
-): string | null {
-  if (!part || part.type !== "tool-call") return null;
-  const input = (part.input ?? {}) as Record<string, unknown>;
-
-  switch (part.toolName) {
-    case "createOrUpdateFiles": {
-      const files = Array.isArray(input.files) ? input.files : [];
-      const paths = files
-        .map((f) =>
-          f && typeof f === "object" && "path" in f
-            ? (f as { path?: unknown }).path
-            : undefined
-        )
-        .filter((p): p is string => typeof p === "string" && p.length > 0);
-      if (paths.length === 0) return null;
-      if (paths.length === 1) return `Writing ${truncate(paths[0], 48)}`;
-      // Show a couple of file names (basenames) plus a count for the rest.
-      const shown = paths.slice(0, 2).map((p) => p.split("/").pop() || p);
-      const extra = paths.length - shown.length;
-      return extra > 0
-        ? `Writing ${shown.join(", ")} (+${extra} more)`
-        : `Writing ${shown.join(", ")}`;
-    }
-
-    case "terminal": {
-      const command = input.command;
-      if (typeof command !== "string" || command.length === 0) return null;
-      return `Running: ${truncate(command, 56)}`;
-    }
-
-    case "readFiles": {
-      const files = Array.isArray(input.files) ? input.files : [];
-      const firstPath = files.find(
-        (p): p is string => typeof p === "string" && p.length > 0
-      );
-      if (!firstPath) return null;
-      const extra = files.length - 1;
-      return extra > 0
-        ? `Reading ${truncate(firstPath, 40)} (+${extra} more)`
-        : `Reading ${truncate(firstPath, 48)}`;
-    }
-
-    case "scrapeWebpage": {
-      const url = input.url;
-      if (typeof url !== "string" || url.length === 0) return null;
-      return `Inspecting ${truncate(url, 52)}`;
-    }
-
-    default:
-      return null;
+  if (dataLines.length === 0) return null;
+  try {
+    const obj = JSON.parse(dataLines.join("\n")) as Record<string, unknown>;
+    return { ...obj, type: (obj.type as string) ?? event } as AgentFrame;
+  } catch {
+    return null;
   }
 }

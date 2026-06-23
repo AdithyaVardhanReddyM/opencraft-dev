@@ -341,9 +341,11 @@ export function renderShapeToCanvas(
     case "frame":
       renderFrame(ctx, shape, offsetX, offsetY);
       break;
-    // Skip screen and generatedui shapes - they contain iframes
+    // Skip screen and generatedui shapes - they contain iframes; skip image
+    // shapes too - drawing them synchronously would require pre-loaded pixels.
     case "screen":
     case "generatedui":
+    case "image":
       break;
   }
 

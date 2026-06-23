@@ -95,16 +95,14 @@ export function Screen({
           so the glow can extend past the screen edge. */}
       {isGenerating && <div className="screen-beam-glow" aria-hidden />}
 
-      {/* Screen surface — a clean floating artboard, no browser chrome */}
+      {/* Screen surface — a clean flat artboard, no browser chrome */}
       <div
         className="relative h-full w-full overflow-hidden bg-white"
         style={{
-          // No blue ring here when selected — the canvas BoundingBox already
-          // draws the selection outline, so adding one produced a doubled line.
-          // Keep just the elevation shadow and a subtle hairline edge.
-          boxShadow: isSelected
-            ? "0 20px 48px -16px rgba(15, 23, 42, 0.30), 0 0 0 1px rgba(15, 23, 42, 0.06)"
-            : "0 1px 2px rgba(15, 23, 42, 0.04), 0 16px 40px -16px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(15, 23, 42, 0.06)",
+          // No drop shadow — just a subtle hairline edge so the artboard stays
+          // defined against the canvas. No blue ring when selected either: the
+          // canvas BoundingBox already draws the selection outline.
+          boxShadow: "0 0 0 1px rgba(15, 23, 42, 0.06)",
         }}
       >
         {showIframe && (

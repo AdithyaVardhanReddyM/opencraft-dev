@@ -1,17 +1,21 @@
 "use client";
 
-import { use, useState, useCallback, useEffect } from "react";
+import { use, useState, useCallback, useEffect, useRef } from "react";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { useAuth } from "@clerk/nextjs";
-import { useScreens } from "@/lib/api/hooks";
+import { useScreens, useScreenFiles } from "@/lib/api/hooks";
 import {
   createScreen,
   createFlowScreen,
   deleteScreen,
+  getUploadUrl,
+  deleteUploads,
 } from "@/lib/api/mutations";
-import { SCREEN_DEFAULTS } from "@/lib/canvas/shape-factories";
+import { SCREEN_DEFAULTS, IMAGE_DEFAULTS } from "@/lib/canvas/shape-factories";
+import { screenToWorld } from "@/lib/canvas/coordinate-utils";
+import { nanoid } from "nanoid";
 import { CanvasProvider, useCanvasContext } from "@/contexts/CanvasContext";
-import { BackButton } from "@/components/canvas/BackButton";
+import { CanvasMenu } from "@/components/canvas/CanvasMenu";
 import { CanvasActions } from "@/components/canvas/CanvasActions";
 import { useInfiniteCanvas } from "@/hooks/use-infinite-canvas";
 import { useCanvasCursor } from "@/hooks/use-canvas-cursor";
@@ -44,9 +48,11 @@ import { Arrow } from "@/components/canvas/shapes/Arrow";
 import { Stroke } from "@/components/canvas/shapes/Stroke";
 import { Text } from "@/components/canvas/shapes/Text";
 import { Screen } from "@/components/canvas/shapes/Screen";
+import { Image } from "@/components/canvas/shapes/Image";
 import { DeleteScreenModal } from "@/components/canvas/DeleteScreenModal";
 import { ScreenToolbar } from "@/components/canvas/ScreenToolbar";
-import type { ScreenShape, Shape } from "@/types/canvas";
+import { ImageMenu } from "@/components/canvas/ImageMenu";
+import type { ScreenShape, Shape, ImageShape, Point } from "@/types/canvas";
 
 // Import preview components
 import { FramePreview } from "@/components/canvas/shapes/FramePreview";
@@ -109,6 +115,47 @@ function CanvasContent({ projectId }: { projectId: string }) {
 
   // Get selected shapes as array
   const selectedShapesList = shapes.filter((s) => selectedShapes[s.id]);
+
+  // Latest shapes + mouse-position getter held in refs, so the paste listener and
+  // image helpers stay stable instead of re-binding on every shapes/viewport tick.
+  const shapesRef = useRef(shapes);
+  shapesRef.current = shapes;
+  const mouseWorldGetterRef = useRef(getMouseWorldPosition);
+  mouseWorldGetterRef.current = getMouseWorldPosition;
+
+  // The single image currently selected (drives the floating image menu).
+  const selectedImageShape = selectedShapesList.find(
+    (s): s is ImageShape => s.type === "image"
+  );
+
+  // Images available to reference from the AI chat (@-mention). Only fully
+  // uploaded ("ready") images with a real S3 key are referenceable.
+  const canvasImages = shapes
+    .filter(
+      (s): s is ImageShape =>
+        s.type === "image" && s.status !== "uploading" && !!s.s3Key
+    )
+    .map((s) => ({ id: s.id, name: s.name, s3Key: s.s3Key }));
+
+  // Remove an image shape and best-effort delete its S3 object — but only when no
+  // other shape still references the same key (clones intentionally share s3Key).
+  const deleteImageShape = useCallback(
+    (shapeId: string) => {
+      const current = shapesRef.current;
+      const target = current.find((s) => s.id === shapeId);
+      dispatchShapes({ type: "REMOVE_SHAPE", payload: shapeId });
+      if (target?.type === "image" && target.s3Key) {
+        const stillReferenced = current.some(
+          (s) =>
+            s.id !== shapeId && s.type === "image" && s.s3Key === target.s3Key
+        );
+        if (!stillReferenced) {
+          void deleteUploads([target.s3Key]).catch(() => {});
+        }
+      }
+    },
+    [dispatchShapes]
+  );
 
   // Lookup of shape id -> shape, used to resolve bound flow connectors at render.
   const shapesById = new Map(shapes.map((s) => [s.id, s]));
@@ -189,12 +236,12 @@ function CanvasContent({ projectId }: { projectId: string }) {
             }
             break;
           case "width":
-            if (["frame", "rect", "ellipse", "screen"].includes(shape.type)) {
+            if (["frame", "rect", "ellipse", "screen", "image"].includes(shape.type)) {
               patch.w = value;
             }
             break;
           case "height":
-            if (["frame", "rect", "ellipse", "screen"].includes(shape.type)) {
+            if (["frame", "rect", "ellipse", "screen", "image"].includes(shape.type)) {
               patch.h = value;
             }
             break;
@@ -219,8 +266,8 @@ function CanvasContent({ projectId }: { projectId: string }) {
     [setDefaultProperty]
   );
 
-  // Sidebar states
-  const [isLayersSidebarOpen, setIsLayersSidebarOpen] = useState(true);
+  // Sidebar states — layers panel starts collapsed.
+  const [isLayersSidebarOpen, setIsLayersSidebarOpen] = useState(false);
 
   // True while the agent is generating code for the currently-selected screen.
   // Drives the animated border beam on that screen shape.
@@ -302,6 +349,10 @@ function CanvasContent({ projectId }: { projectId: string }) {
     ? screenDataMap.get(selectedScreenShape.id)?._id
     : undefined;
   const isAISidebarOpen = !!selectedScreenShape;
+
+  // The Code tab's content cache: lazily fetched only for the selected screen,
+  // so the heavy source tree no longer rides on the polled screens list.
+  const { data: selectedScreenFiles } = useScreenFiles(selectedScreenId);
 
   // Handle screen tool click - create screen record and add to canvas
   useEffect(() => {
@@ -385,6 +436,17 @@ function CanvasContent({ projectId }: { projectId: string }) {
             });
             setDeleteModalOpen(true);
           }
+        } else {
+          // No screen selected — handle image deletes here (with S3 cleanup) so
+          // the generic DELETE_SELECTED in the canvas hook doesn't run instead.
+          const selectedImages = selectedIds
+            .map((id) => shapes.find((s) => s.id === id))
+            .filter((s): s is ImageShape => s?.type === "image");
+          if (selectedImages.length > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            selectedImages.forEach((img) => deleteImageShape(img.id));
+          }
         }
       }
     };
@@ -392,7 +454,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
     // Use capture phase to intercept before the canvas hook
     document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
-  }, [selectedShapes, shapes, screenDataMap]);
+  }, [selectedShapes, shapes, screenDataMap, deleteImageShape]);
 
   // Handle delete confirmation
   const handleDeleteConfirm = useCallback(async () => {
@@ -654,6 +716,166 @@ function CanvasContent({ projectId }: { projectId: string }) {
     [projectId, dispatchShapes]
   );
 
+  // ---- Canvas images: paste / drop / upload --------------------------------
+
+  // Upload image files to S3 and drop them on the canvas as image shapes. The
+  // shape appears immediately (optimistic placeholder) and the S3 key is patched
+  // in once the upload completes.
+  const addImageFiles = useCallback(
+    async (files: File[], worldPos: Point) => {
+      const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+      if (imageFiles.length === 0) return;
+
+      // Sequential naming: max existing "image N" + 1.
+      let nextNum =
+        shapesRef.current.reduce((max, s) => {
+          if (s.type !== "image") return max;
+          const m = /^image (\d+)$/.exec(s.name);
+          return m ? Math.max(max, parseInt(m[1], 10)) : max;
+        }, 0) + 1;
+
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        if (file.size > 15 * 1024 * 1024) {
+          toast.error("Image is too large (max 15MB)");
+          continue;
+        }
+
+        // Read natural dimensions, then aspect-fit into the default box.
+        let naturalWidth: number = IMAGE_DEFAULTS.maxWidth;
+        let naturalHeight: number = IMAGE_DEFAULTS.maxHeight;
+        try {
+          const bitmap = await createImageBitmap(file);
+          naturalWidth = bitmap.width;
+          naturalHeight = bitmap.height;
+          bitmap.close();
+        } catch {
+          /* keep fallback dimensions */
+        }
+        const fit = Math.min(
+          IMAGE_DEFAULTS.maxWidth / naturalWidth,
+          IMAGE_DEFAULTS.maxHeight / naturalHeight,
+          1
+        );
+        const w = Math.max(
+          IMAGE_DEFAULTS.minWidth,
+          Math.round(naturalWidth * fit)
+        );
+        const h = Math.max(
+          IMAGE_DEFAULTS.minHeight,
+          Math.round(naturalHeight * fit)
+        );
+
+        const id = nanoid();
+        const nudge = i * 24;
+        const x = worldPos.x - w / 2 + nudge;
+        const y = worldPos.y - h / 2 + nudge;
+        const name = `image ${nextNum++}`;
+
+        // Optimistic placeholder shape while the upload is in flight.
+        dispatchShapes({
+          type: "ADD_IMAGE",
+          payload: {
+            id,
+            x,
+            y,
+            w,
+            h,
+            s3Key: "",
+            name,
+            naturalWidth,
+            naturalHeight,
+            status: "uploading",
+          },
+        });
+        dispatchShapes({ type: "CLEAR_SELECTION" });
+        dispatchShapes({ type: "SELECT_SHAPE", payload: id });
+
+        // Upload, then fill in the key without a second history entry so a single
+        // undo removes the whole image.
+        try {
+          const contentType = file.type || "application/octet-stream";
+          const { key, uploadUrl } = await getUploadUrl(contentType);
+          const putRes = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": contentType },
+            body: file,
+          });
+          if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+          dispatchShapes({
+            type: "UPDATE_SHAPE",
+            payload: { id, patch: { s3Key: key, status: "ready" } },
+            meta: { skipHistory: true },
+          });
+        } catch (error) {
+          console.error("Image upload failed:", error);
+          toast.error("Failed to upload image");
+          dispatchShapes({
+            type: "UPDATE_SHAPE",
+            payload: { id, patch: { status: "error" } },
+            meta: { skipHistory: true },
+          });
+        }
+      }
+    },
+    [dispatchShapes]
+  );
+
+  const handleCanvasDragOver = useCallback((e: React.DragEvent) => {
+    if (Array.from(e.dataTransfer.types).includes("Files")) {
+      e.preventDefault();
+    }
+  }, []);
+
+  const handleCanvasDrop = useCallback(
+    (e: React.DragEvent) => {
+      const files = Array.from(e.dataTransfer.files).filter((f) =>
+        f.type.startsWith("image/")
+      );
+      if (files.length === 0) return;
+      e.preventDefault();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const worldPos = screenToWorld(
+        { x: e.clientX - rect.left, y: e.clientY - rect.top },
+        viewport.translate,
+        viewport.scale
+      );
+      void addImageFiles(files, worldPos);
+    },
+    [addImageFiles, viewport.translate, viewport.scale]
+  );
+
+  // Paste image files anywhere on the canvas. Ignored while typing in an input so
+  // the AI sidebar's own paste handler still wins there.
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const files: File[] = [];
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+      if (files.length > 0) {
+        e.preventDefault();
+        void addImageFiles(files, mouseWorldGetterRef.current());
+      }
+    };
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [addImageFiles]);
+
   const draftShape = getDraftShape();
   const freeDrawPoints = getFreeDrawPoints();
   const selectionBox = getSelectionBox();
@@ -694,6 +916,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
         }}
         selectedScreenId={selectedScreenId}
         projectId={projectId}
+        canvasImages={canvasImages}
         sandboxId={
           selectedScreenShape
             ? screenDataMap.get(selectedScreenShape.id)?.sandboxId
@@ -704,12 +927,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
             ? screenDataMap.get(selectedScreenShape.id)?.sandboxUrl
             : undefined
         }
-        cachedFiles={
-          selectedScreenShape
-            ? (screensData?.find((s) => s.shapeId === selectedScreenShape.id)
-                ?.files as Record<string, string> | undefined)
-            : undefined
-        }
+        cachedFiles={selectedScreenFiles ?? undefined}
         initialImage={generationContext?.image}
         initialPrompt={
           generationContext
@@ -729,7 +947,11 @@ function CanvasContent({ projectId }: { projectId: string }) {
       />
 
       {/* Toolbar */}
-      <Toolbar currentTool={activeTool} onToolSelect={selectTool} />
+      <Toolbar
+        currentTool={activeTool}
+        onToolSelect={selectTool}
+        sidebarOpen={isAISidebarOpen}
+      />
 
       {/* Zoom Bar */}
       <ZoomBar
@@ -765,9 +987,17 @@ function CanvasContent({ projectId }: { projectId: string }) {
         screenDataMap={screenDataMap}
       />
 
-      {/* Back to Dashboard + Properties Bar */}
-      <div className="absolute top-3 left-3 z-50 flex items-center gap-2">
-        <BackButton />
+      {/* Logo / project menu — hidden while the full-height AI sidebar is open
+          (the sidebar occupies the top-left where this would sit). */}
+      {!isAISidebarOpen && (
+        <div className="absolute top-3 left-3 z-50 flex items-center gap-2">
+          <CanvasMenu />
+        </div>
+      )}
+
+      {/* Top Right Actions — properties bar sits just left of Remix/Share */}
+      <div className="absolute top-3 right-3 z-50 flex items-center gap-2">
+        <SaveIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
         <ShapePropertiesBar
           currentTool={activeTool}
           selectedShapes={selectedShapesList}
@@ -775,11 +1005,6 @@ function CanvasContent({ projectId }: { projectId: string }) {
           onPropertyChange={handlePropertyChange}
           onDefaultChange={handleDefaultChange}
         />
-      </div>
-
-      {/* Top Right Actions */}
-      <div className="absolute top-3 right-3 z-50 flex items-center gap-2">
-        <SaveIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
         <CanvasActions />
         <LayersSidebarToggle
           isOpen={isLayersSidebarOpen}
@@ -795,6 +1020,8 @@ function CanvasContent({ projectId }: { projectId: string }) {
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
         onDoubleClick={onDoubleClick}
+        onDrop={handleCanvasDrop}
+        onDragOver={handleCanvasDragOver}
         className={`h-full w-full ${cursorClass} relative overflow-hidden`}
         style={{
           touchAction: "none",
@@ -861,6 +1088,9 @@ function CanvasContent({ projectId }: { projectId: string }) {
                   />
                 </div>
               );
+            }
+            if (shape.type === "image") {
+              return <Image key={shape.id} shape={shape} />;
             }
             if (shape.type === "screen") {
               const isSelected = !!selectedShapes[shape.id];
@@ -975,6 +1205,21 @@ function CanvasContent({ projectId }: { projectId: string }) {
               onResize={handleToolbarResize}
               onRefresh={handleToolbarRefresh}
               onCreateFlow={handleCreateFlow}
+            />
+          )}
+
+          {/* Image menu - "image N" label + ⋮ (rename / delete) above a selected image */}
+          {selectedImageShape && (
+            <ImageMenu
+              shape={selectedImageShape}
+              viewport={viewport}
+              onRename={(name) =>
+                dispatchShapes({
+                  type: "UPDATE_SHAPE",
+                  payload: { id: selectedImageShape.id, patch: { name } },
+                })
+              }
+              onDelete={() => deleteImageShape(selectedImageShape.id)}
             />
           )}
         </div>

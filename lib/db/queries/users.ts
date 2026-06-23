@@ -7,6 +7,14 @@ import type { GenerationStats, UserDoc } from "../types";
 
 export const DEFAULT_GENERATION_LIMIT = 10;
 
+/**
+ * Per-user generation limit toggle. Disabled in dev mode so message counts
+ * aren't capped. Flip back to `true` (or wire to an env var) to re-enable the
+ * cap — `canGenerate` and `getGenerationStats` both honor this flag, so the
+ * server block and the client credit-bar UI come back together.
+ */
+export const GENERATION_LIMIT_ENABLED = false;
+
 async function findByClerkId(clerkId: string) {
   const [row] = await db
     .select()
@@ -45,20 +53,21 @@ export async function getGenerationStats(
   clerkId: string
 ): Promise<GenerationStats> {
   const user = await findByClerkId(clerkId);
-  if (!user) {
+  const used = user?.generationsUsed ?? 0;
+  const limit = user?.generationsLimit ?? DEFAULT_GENERATION_LIMIT;
+  // Limit disabled (dev): always report full remaining so the credit bar never
+  // hits "exhausted" and the composer stays enabled.
+  if (!GENERATION_LIMIT_ENABLED) {
     return {
-      generationsUsed: 0,
-      generationsLimit: DEFAULT_GENERATION_LIMIT,
-      generationsRemaining: DEFAULT_GENERATION_LIMIT,
+      generationsUsed: used,
+      generationsLimit: limit,
+      generationsRemaining: limit,
     };
   }
   return {
-    generationsUsed: user.generationsUsed,
-    generationsLimit: user.generationsLimit,
-    generationsRemaining: Math.max(
-      0,
-      user.generationsLimit - user.generationsUsed
-    ),
+    generationsUsed: used,
+    generationsLimit: limit,
+    generationsRemaining: Math.max(0, limit - used),
   };
 }
 
@@ -70,6 +79,10 @@ export interface CanGenerateResult {
 
 /** Whether the user has remaining generations (new users may generate). */
 export async function canGenerate(clerkId: string): Promise<CanGenerateResult> {
+  // Limit disabled (dev): never block a generation.
+  if (!GENERATION_LIMIT_ENABLED) {
+    return { canGenerate: true };
+  }
   const user = await findByClerkId(clerkId);
   if (!user) {
     return { canGenerate: true, remaining: DEFAULT_GENERATION_LIMIT };

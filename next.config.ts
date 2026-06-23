@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // `pg` is a native Node module; keep it out of the bundler so it loads at
-  // runtime in route handlers / Inngest functions.
+  // runtime in the Node route handlers.
   serverExternalPackages: ["pg"],
   images: {
     remotePatterns: [

@@ -542,6 +542,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         shape.type === "frame" ||
         shape.type === "rect" ||
         shape.type === "ellipse" ||
+        shape.type === "image" ||
         shape.type === "generatedui"
       ) {
         dispatchInteractionUpdate({
@@ -846,6 +847,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
                   shape.type === "rect" ||
                   shape.type === "ellipse" ||
                   shape.type === "generatedui" ||
+                  shape.type === "image" ||
                   shape.type === "screen"
                 ) {
                   initialShapePositionsRef.current[id] = {
@@ -888,6 +890,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
           const hitShape = getShapeAtPoint(world, shapesList, {
             allowBoundsFallback: false,
             excludeScreenShapes: true, // Eraser cannot erase screen shapes
+            excludeImageShapes: true, // …nor uploaded images
           });
           if (hitShape) {
             dispatchInteractionUpdate({
@@ -960,6 +963,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
       const hitShape = getShapeAtPoint(world, shapesList, {
         allowBoundsFallback: false,
         excludeScreenShapes: true, // Eraser cannot erase screen shapes
+        excludeImageShapes: true, // …nor uploaded images
       });
       if (hitShape && !erasedShapesRef.current.has(hitShape.id)) {
         dispatchInteractionUpdate({
@@ -987,6 +991,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
             shape.type === "rect" ||
             shape.type === "ellipse" ||
             shape.type === "generatedui" ||
+            shape.type === "image" ||
             shape.type === "text" ||
             shape.type === "screen"
           ) {
@@ -1372,6 +1377,7 @@ function intersectsSelectionBox(
     case "ellipse":
     case "generatedui":
     case "screen":
+    case "image":
       shapeMinX = shape.x;
       shapeMaxX = shape.x + shape.w;
       shapeMinY = shape.y;
@@ -1455,6 +1461,7 @@ function getShapeBounds(shape: Shape): Rect | null {
     case "ellipse":
     case "generatedui":
     case "screen":
+    case "image":
       return {
         x: shape.x,
         y: shape.y,

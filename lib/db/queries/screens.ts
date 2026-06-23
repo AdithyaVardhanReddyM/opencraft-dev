@@ -101,6 +101,11 @@ export interface ScreenPatch {
   title?: string;
   theme?: string;
   route?: string;
+  // Repo-map state the agent returns each turn (snake_case columns file_meta /
+  // recent_edits). Without these in the allow-list buildPatch silently drops
+  // them and the next turn's repo-map goes stale.
+  fileMeta?: unknown;
+  recentEdits?: string[];
 }
 
 function buildPatch(input: ScreenPatch) {
@@ -112,6 +117,8 @@ function buildPatch(input: ScreenPatch) {
     "title",
     "theme",
     "route",
+    "fileMeta",
+    "recentEdits",
   ] as const) {
     if (input[key] !== undefined) patch[key] = input[key];
   }
@@ -164,7 +171,17 @@ export async function getScreenByShapeId(
   return toDoc(screen) as ScreenDoc;
 }
 
-/** All screens for a project (empty if not found / not owner). */
+/**
+ * All screens for a project (empty if not found / not owner). Returns a LIGHT
+ * row — every column the canvas reads EXCEPT the heavy `files` / `file_meta` /
+ * `recent_edits` jsonb (the full generated source tree, up to MBs per screen).
+ * This list is polled on an interval, so a bare `select()` made every poll drag
+ * the whole tree across the wire for every screen — the same anti-pattern
+ * already removed from the message ownership check. The selected screen's
+ * `files` is fetched on demand via getScreenFiles(); the agent's generation
+ * context reads the full row separately through internalGetScreen(), so it is
+ * unaffected by this trim.
+ */
 export async function getScreensByProject(
   userId: string,
   projectId: string
@@ -178,10 +195,47 @@ export async function getScreensByProject(
   if (!project || project.userId !== userId) return [];
 
   const rows = await db
-    .select()
+    .select({
+      id: screens.id,
+      shapeId: screens.shapeId,
+      projectId: screens.projectId,
+      title: screens.title,
+      sandboxUrl: screens.sandboxUrl,
+      sandboxId: screens.sandboxId,
+      theme: screens.theme,
+      parentScreenId: screens.parentScreenId,
+      route: screens.route,
+      createdAt: screens.createdAt,
+      updatedAt: screens.updatedAt,
+    })
     .from(screens)
     .where(eq(screens.projectId, projectId));
   return toDocs(rows) as ScreenDoc[];
+}
+
+/**
+ * Just the `files` blob for one screen (ownership-checked), or null. Heavy, so
+ * it is fetched on demand for the selected screen — keeping it out of the polled
+ * getScreensByProject() list. Mirrors that function's two-step ownership check.
+ */
+export async function getScreenFiles(
+  userId: string,
+  screenId: string
+): Promise<Record<string, string> | null> {
+  if (!isUuid(screenId)) return null;
+  const [screen] = await db
+    .select({ projectId: screens.projectId, files: screens.files })
+    .from(screens)
+    .where(eq(screens.id, screenId))
+    .limit(1);
+  if (!screen) return null;
+  const [project] = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, screen.projectId))
+    .limit(1);
+  if (!project || project.userId !== userId) return null;
+  return (screen.files as Record<string, string> | null) ?? null;
 }
 
 // ---- Internal (server-to-server; used by the Inngest workflow) -------------

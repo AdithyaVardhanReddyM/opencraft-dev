@@ -43,11 +43,14 @@ type CreateProjectFormData = z.infer<typeof createProjectSchema>;
 interface CreateProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called with the new project's id after a successful create. */
+  onCreated?: (projectId: string) => void;
 }
 
 export function CreateProjectDialog({
   open,
   onOpenChange,
+  onCreated,
 }: CreateProjectDialogProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -67,8 +70,8 @@ export function CreateProjectDialog({
       try {
         setError(null);
 
-        // Create project with Convex mutation
-        await createProject({
+        // Create project and capture its id for the optional onCreated callback
+        const newProjectId = await createProject({
           name: data.name,
           description: data.description || undefined,
         });
@@ -86,6 +89,7 @@ export function CreateProjectDialog({
         // Reset form and close dialog on success
         form.reset();
         onOpenChange(false);
+        onCreated?.(newProjectId);
       } catch (err) {
         // Handle error - keep dialog open and show error message
         const errorMessage =

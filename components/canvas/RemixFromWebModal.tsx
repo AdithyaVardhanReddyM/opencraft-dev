@@ -52,7 +52,7 @@ export function RemixFromWebModal({
             className="gap-2"
             onClick={() =>
               window.open(
-                "https://chromewebstore.google.com/detail/mkialdnmpchidkoemocgcfcgpejmacfn?utm_source=item-share-cb",
+                "https://chromewebstore.google.com/detail/opencraft/mkialdnmpchidkoemocgcfcgpejmacfn",
                 "_blank"
               )
             }

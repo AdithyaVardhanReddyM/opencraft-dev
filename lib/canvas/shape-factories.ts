@@ -10,6 +10,7 @@ import type {
   TextShape,
   GeneratedUIShape,
   ScreenShape,
+  ImageShape,
   Point,
 } from "@/types/canvas";
 import { measureTextDimensions, TEXT_PLACEHOLDER } from "./text-utils";
@@ -310,5 +311,48 @@ export function createScreen(params: {
     stroke: "transparent",
     strokeWidth: 0,
     fill: params.fill ?? null,
+  };
+}
+
+// Image shape sizing: a freshly added image is aspect-fit into this box.
+export const IMAGE_DEFAULTS = {
+  maxWidth: 480,
+  maxHeight: 480,
+  minWidth: 40,
+  minHeight: 40,
+} as const;
+
+/**
+ * Create an image shape for a user-supplied image uploaded to S3. `s3Key` may be
+ * empty while the upload is in flight (the shape renders a placeholder until the
+ * key is filled in and `status` flips to "ready").
+ */
+export function createImage(params: {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  s3Key: string;
+  name: string;
+  naturalWidth: number;
+  naturalHeight: number;
+  id?: string;
+  status?: "uploading" | "ready" | "error";
+}): ImageShape {
+  return {
+    id: params.id ?? nanoid(),
+    type: "image",
+    x: params.x,
+    y: params.y,
+    w: params.w,
+    h: params.h,
+    s3Key: params.s3Key,
+    name: params.name,
+    naturalWidth: params.naturalWidth,
+    naturalHeight: params.naturalHeight,
+    status: params.status ?? "ready",
+    stroke: "transparent",
+    strokeWidth: 0,
+    fill: null,
   };
 }

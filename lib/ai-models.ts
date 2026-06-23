@@ -4,48 +4,29 @@
  */
 
 export interface AIModel {
-  id: string; // OpenRouter model ID
+  id: string; // UI model id (mapped to a Gemini model id by the agent-service)
   name: string; // Display name
-  provider: string; // Provider name (e.g., "OpenAI")
-  providerSlug: string; // For logo lookup (e.g., "openai")
+  provider: string; // Provider name (e.g., "Google")
+  providerSlug: string; // For logo lookup (e.g., "google")
   supportsVision: boolean; // Whether model can process images
 }
 
 /**
- * Available AI models via OpenRouter
- * Models are grouped by provider for the selector UI
+ * Available models. The agent-service maps these UI ids to a Google Gemini model
+ * id (see agent-service config.py MODEL_ID_MAP). Gemini 3.1 Pro is the only model.
  */
 export const AI_MODELS: AIModel[] = [
-  // Google
   {
-    id: "google/gemini-3.5-flash",
-    name: "Gemini 3.5 Flash",
+    id: "google/gemini-3.1-pro-preview",
+    name: "Gemini 3.1 Pro",
     provider: "Google",
     providerSlug: "google",
     supportsVision: true,
   },
-
-  // Moonshot AI
-  {
-    id: "moonshotai/kimi-k2.7-code",
-    name: "Kimi K2.7 Code",
-    provider: "Moonshot AI",
-    providerSlug: "moonshotai",
-    supportsVision: true,
-  },
-
-  // MiniMax
-  {
-    id: "minimax/minimax-m3",
-    name: "MiniMax M3",
-    provider: "MiniMax",
-    providerSlug: "minimax",
-    supportsVision: true,
-  },
 ];
 
-/** Default model ID - Moonshot AI Kimi K2.7 Code */
-export const DEFAULT_MODEL_ID = "moonshotai/kimi-k2.7-code";
+/** Default model ID - Google Gemini 3.1 Pro (preview, via the agent-service) */
+export const DEFAULT_MODEL_ID = "google/gemini-3.1-pro-preview";
 
 /**
  * Get a model by its ID

@@ -44,9 +44,14 @@ export function GenerateButton({
   // proportional to the frame as you zoom — just like the "Frame N" label,
   // which lives inside the scaled transform container. The anchor sits at the
   // frame's top-right corner and the button hangs above it, right-aligned.
+  // Portaled to <body>, so this z-index competes in the root stacking context
+  // against the canvas chrome (layers z-40, toolbar/top buttons z-50, AI sidebar
+  // z-60). Keep it BELOW all of them (z-30) so it never covers the toolbar or
+  // sidebars — but still above the canvas content (z-auto) so it stays visible
+  // and clickable over its frame.
   const buttonContent = (
     <div
-      className="fixed z-50 pointer-events-auto"
+      className="fixed z-30 pointer-events-auto"
       style={{
         left: frameRightScreenX,
         top: frameTopScreenY,
