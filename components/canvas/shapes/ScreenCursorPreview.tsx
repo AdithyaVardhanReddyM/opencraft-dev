@@ -1,6 +1,6 @@
 "use client";
 
-import { Monitor } from "lucide-react";
+import { Component } from "lucide-react";
 import { SCREEN_DEFAULTS } from "@/lib/canvas/shape-factories";
 
 interface ScreenCursorPreviewProps {
@@ -42,8 +42,8 @@ export function ScreenCursorPreview({
         }}
       >
         <div className="flex flex-col items-center gap-1.5 text-primary/70">
-          <Monitor className="w-5 h-5" />
-          <span className="text-xs font-medium">Screen</span>
+          <Component className="w-5 h-5" />
+          <span className="text-xs font-medium">Component</span>
         </div>
       </div>
     </div>

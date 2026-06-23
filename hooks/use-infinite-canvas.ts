@@ -289,12 +289,10 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         }
       }
 
-      // Delete/Backspace handling
+      // Delete/Backspace handling — reuse isTypingElement so a contentEditable
+      // (the chat's MentionInput) is excluded, not just INPUT/TEXTAREA.
       if (e.key === "Delete" || e.key === "Backspace") {
-        const isInput =
-          target.tagName === "INPUT" || target.tagName === "TEXTAREA";
-
-        if (!isInput && Object.keys(selectedShapes).length > 0) {
+        if (!isTypingElement && Object.keys(selectedShapes).length > 0) {
           e.preventDefault();
           dispatchShapes({ type: "DELETE_SELECTED" });
         }

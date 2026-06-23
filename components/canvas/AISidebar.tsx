@@ -8,7 +8,6 @@ import {
   Copy,
   Check,
   ImageIcon,
-  X,
   CheckIcon,
   SquareTerminal,
   Zap,
@@ -36,7 +35,6 @@ import {
   PromptInputFooter,
   type PromptInputMessage,
   PromptInputSubmit,
-  PromptInputTextarea,
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
 import {
@@ -46,11 +44,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
 import { StreamingIndicator } from "@/components/canvas/StreamingIndicator";
 import { ReasoningPanel } from "@/components/canvas/ReasoningPanel";
 import {
@@ -62,6 +55,10 @@ import { CodeExplorer } from "@/components/canvas/code-explorer";
 import { EditModeProvider } from "@/contexts/EditModeContext";
 import { EditModePanel } from "@/components/canvas/EditModePanel";
 import { ExtensionChip } from "@/components/canvas/ExtensionChip";
+import {
+  MentionInput,
+  type MentionInputHandle,
+} from "@/components/canvas/MentionInput";
 import {
   isExtensionContentFormat,
   parseExtensionContent,
@@ -77,7 +74,6 @@ import {
   modelSupportsVision,
 } from "@/lib/ai-models";
 import { CreditBar } from "@/components/canvas/CreditBar";
-import { nanoid } from "nanoid";
 import { useGenerationStats, useImageUrls } from "@/lib/api/hooks";
 import { ensureUser } from "@/lib/api/mutations";
 
@@ -736,7 +732,6 @@ function ChatInput({
   generationsLimit: number;
   canGenerate: boolean;
 }) {
-  const [inputValue, setInputValue] = useState("");
   const [extensionContent, setExtensionContent] =
     useState<CapturedElement | null>(null);
   // Initialize with lastUsedModelId if available, otherwise use default
@@ -747,29 +742,27 @@ function ChatInput({
   // Fast Build is the default (thinking off).
   const [thinking, setThinking] = useState(false);
   const [buildModeOpen, setBuildModeOpen] = useState(false);
-  const [attachments, setAttachments] = useState<PillAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const initialDataProcessedRef = useRef(false);
 
-  // @-mention autocomplete state. `mentionQuery` is null when the menu is closed;
-  // `mentionStartRef` records the index of the triggering "@" in the textarea.
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [mentionIndex, setMentionIndex] = useState(0);
-  const mentionStartRef = useRef<number | null>(null);
+  // The token-field editor owns the text + inline image pills; we read its
+  // content (text + attachments) imperatively at submit time.
+  const mentionRef = useRef<MentionInputHandle>(null);
+  const [attachmentCount, setAttachmentCount] = useState(0);
+  const handleMentionChange = useCallback(
+    ({ attachmentCount: n }: { attachmentCount: number }) =>
+      setAttachmentCount(n),
+    []
+  );
 
-  // Resolve presigned URLs for every canvas image once, so both the mention
-  // dropdown thumbnails and the canvas-pill previews can render.
+  // Resolve presigned URLs for every canvas image once so the mention dropdown
+  // thumbnails and the pill hover previews can render.
   const canvasKeys = (canvasImages ?? []).map((c) => c.s3Key);
   const { data: pillUrlMap } = useImageUrls(canvasKeys);
-
-  const mentionMatches = useMemo(() => {
-    if (mentionQuery === null) return [];
-    const q = mentionQuery.toLowerCase();
-    return (canvasImages ?? []).filter((img) =>
-      img.name.toLowerCase().includes(q)
-    );
-  }, [mentionQuery, canvasImages]);
-  const isMentionOpen = mentionQuery !== null && mentionMatches.length > 0;
+  const resolveUrl = useCallback(
+    (s3Key: string) => pillUrlMap?.[s3Key],
+    [pillUrlMap]
+  );
 
   const selectedModelData = getModelById(selectedModel);
 
@@ -798,9 +791,9 @@ function ChatInput({
 
     initialDataProcessedRef.current = true;
 
-    // Set initial prompt
+    // Seed the initial prompt text into the editor
     if (initialPrompt) {
-      setInputValue(initialPrompt);
+      mentionRef.current?.insertText(initialPrompt);
     }
 
     // Set initial model (initialModelId takes precedence over lastUsedModelId)
@@ -808,18 +801,12 @@ function ChatInput({
       setSelectedModel(initialModelId);
     }
 
-    // Convert blob to an upload attachment
+    // Convert blob to an upload pill
     if (initialImage) {
       const file = new File([initialImage], "frame-capture.png", {
         type: "image/png",
       });
-      const attachment: PillAttachment = {
-        kind: "upload",
-        id: nanoid(),
-        file,
-        previewUrl: URL.createObjectURL(initialImage),
-      };
-      setAttachments([attachment]);
+      mentionRef.current?.addUploads([file]);
     }
 
     // Notify parent that initial data has been consumed
@@ -827,176 +814,34 @@ function ChatInput({
   }, [initialImage, initialPrompt, initialModelId, onInitialDataConsumed]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Auto-capitalize first character + detect an active @-mention at the caret.
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      let value = e.target.value;
-      // Capitalize first character if it's a letter
-      if (value.length === 1 && /[a-z]/.test(value)) {
-        value = value.toUpperCase();
-      }
-      setInputValue(value);
-
-      // Open the mention menu when the caret is in an "@token" with no spaces.
-      const caret = e.target.selectionStart ?? value.length;
-      const match = /(?:^|\s)@([\w-]*)$/.exec(value.slice(0, caret));
-      if (match) {
-        mentionStartRef.current = caret - match[1].length - 1;
-        setMentionQuery(match[1]);
-        setMentionIndex(0);
-      } else {
-        mentionStartRef.current = null;
-        setMentionQuery(null);
-      }
-    },
-    []
-  );
-
-  // Add files as "upload" pills.
-  const addImages = useCallback((files: File[]) => {
-    const newAttachments: PillAttachment[] = files.map((file) => ({
-      kind: "upload",
-      id: nanoid(),
-      file,
-      previewUrl: URL.createObjectURL(file),
-    }));
-    setAttachments((prev) => [...prev, ...newAttachments]);
-  }, []);
-
-  // Handle paste to detect extension content or images
-  const handlePaste = useCallback(
-    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-      const pastedText = e.clipboardData.getData("text");
-
-      // Check if it's extension content
-      if (isExtensionContentFormat(pastedText)) {
-        e.preventDefault();
-        const parsed = parseExtensionContent(pastedText);
-        if (parsed.isExtensionContent && parsed.data) {
-          setExtensionContent(parsed.data);
-          pendo.track("extension_content_pasted", {
-            element_tag_name: parsed.data.data?.metadata?.tagName || "",
-            element_width: parsed.data.data?.metadata?.dimensions?.width || 0,
-            element_height: parsed.data.data?.metadata?.dimensions?.height || 0,
-            has_user_prompt: e.currentTarget.value.trim().length > 0,
-          });
-        }
-        return;
-      }
-
-      // Check for pasted images
-      const items = e.clipboardData?.items;
-      if (items) {
-        const imageFiles: File[] = [];
-        for (const item of items) {
-          if (item.type.startsWith("image/")) {
-            const file = item.getAsFile();
-            if (file) {
-              imageFiles.push(file);
-            }
-          }
-        }
-        if (imageFiles.length > 0) {
-          e.preventDefault();
-          addImages(imageFiles);
-        }
-      }
-    },
-    [addImages]
-  );
-
-  // Remove a pill; only "upload" pills hold a blob URL to revoke.
-  const removeImage = useCallback((id: string) => {
-    setAttachments((prev) => {
-      const found = prev.find((a) => a.id === id);
-      if (found?.kind === "upload") {
-        URL.revokeObjectURL(found.previewUrl);
-      }
-      return prev.filter((a) => a.id !== id);
-    });
-  }, []);
-
-  // Insert a canvas image as a pill (dedup by s3Key) and strip the "@query" token.
-  const selectMention = useCallback(
-    (img: CanvasImageRef) => {
-      setAttachments((prev) =>
-        prev.some((a) => a.kind === "canvas" && a.s3Key === img.s3Key)
-          ? prev
-          : [
-              ...prev,
-              {
-                kind: "canvas",
-                id: nanoid(),
-                name: img.name,
-                s3Key: img.s3Key,
-              },
-            ]
-      );
-      setInputValue((prev) => {
-        const start = mentionStartRef.current;
-        if (start === null) return prev;
-        const end = start + 1 + (mentionQuery?.length ?? 0);
-        return prev.slice(0, start) + prev.slice(end);
+  // Claim a paste that carries browser-extension content → an ExtensionChip.
+  // Returned to MentionInput's onExtensionPaste; true means "handled".
+  const handleExtensionPaste = useCallback((pastedText: string) => {
+    if (!isExtensionContentFormat(pastedText)) return false;
+    const parsed = parseExtensionContent(pastedText);
+    if (parsed.isExtensionContent && parsed.data) {
+      setExtensionContent(parsed.data);
+      pendo.track("extension_content_pasted", {
+        element_tag_name: parsed.data.data?.metadata?.tagName || "",
+        element_width: parsed.data.data?.metadata?.dimensions?.width || 0,
+        element_height: parsed.data.data?.metadata?.dimensions?.height || 0,
+        has_user_prompt: false,
       });
-      mentionStartRef.current = null;
-      setMentionQuery(null);
-    },
-    [mentionQuery]
-  );
-
-  // Textarea key handling. We override PromptInputTextarea's own onKeyDown, so we
-  // drive the mention menu here AND replicate its Enter-to-submit when closed.
-  const handleTextareaKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (isMentionOpen) {
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          setMentionIndex((i) => (i + 1) % mentionMatches.length);
-          return;
-        }
-        if (e.key === "ArrowUp") {
-          e.preventDefault();
-          setMentionIndex(
-            (i) => (i - 1 + mentionMatches.length) % mentionMatches.length
-          );
-          return;
-        }
-        if (e.key === "Enter" || e.key === "Tab") {
-          e.preventDefault();
-          const choice = mentionMatches[mentionIndex] ?? mentionMatches[0];
-          if (choice) selectMention(choice);
-          return;
-        }
-        if (e.key === "Escape") {
-          e.preventDefault();
-          mentionStartRef.current = null;
-          setMentionQuery(null);
-          return;
-        }
-      }
-      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-        e.preventDefault();
-        const form = e.currentTarget.form;
-        const submitButton = form?.querySelector(
-          'button[type="submit"]'
-        ) as HTMLButtonElement | null;
-        if (!submitButton?.disabled) form?.requestSubmit();
-      }
-    },
-    [isMentionOpen, mentionMatches, mentionIndex, selectMention]
-  );
+    }
+    return true;
+  }, []);
 
   // Handle file input change
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (files && files.length > 0) {
-        addImages(Array.from(files));
+        mentionRef.current?.addUploads(Array.from(files));
       }
       // Reset input to allow selecting same file again
       e.target.value = "";
     },
-    [addImages]
+    []
   );
 
   // Open file picker
@@ -1008,43 +853,39 @@ function ChatInput({
     setExtensionContent(null);
   }, []);
 
-  const handleSubmit = useCallback(
-    (message: PromptInputMessage) => {
-      onSubmit(message, {
-        modelId: selectedModel,
-        images: attachments,
-        thinking,
-        extensionData: extensionContent || undefined,
-      });
-      setInputValue("");
-      setExtensionContent(null);
-      setMentionQuery(null);
-      mentionStartRef.current = null;
-      // Clear pills and revoke any upload blob URLs.
-      attachments.forEach((a) => {
-        if (a.kind === "upload") URL.revokeObjectURL(a.previewUrl);
-      });
-      setAttachments([]);
-    },
-    [onSubmit, extensionContent, selectedModel, attachments, thinking]
-  );
+  const handleSubmit = useCallback(() => {
+    // Don't touch the input if the send would be dropped (mid-generation /
+    // limit reached) — sendMessage no-ops while a run is in flight, and clearing
+    // here would lose the user's unsent text + pills.
+    if (!canGenerate || status === "submitted" || status === "streaming") return;
+    const { text, attachments } = mentionRef.current?.serialize() ?? {
+      text: "",
+      attachments: [],
+    };
+    if (!text.trim() && !extensionContent && attachments.length === 0) return;
+    onSubmit({ text } as PromptInputMessage, {
+      modelId: selectedModel,
+      images: attachments,
+      thinking,
+      extensionData: extensionContent || undefined,
+    });
+    mentionRef.current?.clear();
+    setExtensionContent(null);
+  }, [onSubmit, extensionContent, selectedModel, thinking, canGenerate, status]);
 
   // Handle drag and drop
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      const files = e.dataTransfer.files;
-      if (files && files.length > 0) {
-        const imageFiles = Array.from(files).filter((f) =>
-          f.type.startsWith("image/")
-        );
-        if (imageFiles.length > 0) {
-          addImages(imageFiles);
-        }
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const imageFiles = Array.from(files).filter((f) =>
+        f.type.startsWith("image/")
+      );
+      if (imageFiles.length > 0) {
+        mentionRef.current?.addUploads(imageFiles);
       }
-    },
-    [addImages]
-  );
+    }
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -1052,7 +893,7 @@ function ChatInput({
 
   // Check if model supports vision when images are attached
   const showVisionWarning =
-    attachments.length > 0 && !modelSupportsVision(selectedModel);
+    attachmentCount > 0 && !modelSupportsVision(selectedModel);
 
   return (
     <div className="relative p-3 pt-2">
@@ -1065,46 +906,6 @@ function ChatInput({
         className="hidden"
         onChange={handleFileChange}
       />
-
-      {/* @-mention autocomplete — pick a canvas image by name */}
-      {isMentionOpen && (
-        <div className="absolute bottom-full left-3 right-3 z-50 mb-1 max-h-56 overflow-y-auto rounded-lg border border-border/60 bg-popover p-1 shadow-lg">
-          {mentionMatches.map((img, i) => {
-            const url = pillUrlMap?.[img.s3Key];
-            return (
-              <button
-                key={img.id}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  selectMention(img);
-                }}
-                onMouseEnter={() => setMentionIndex(i)}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
-                  i === mentionIndex
-                    ? "bg-accent text-accent-foreground"
-                    : "hover:bg-accent/50"
-                )}
-              >
-                <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
-                  {url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={url}
-                      alt={img.name}
-                      className="size-7 object-cover"
-                    />
-                  ) : (
-                    <ImageIcon className="size-4 text-muted-foreground" />
-                  )}
-                </span>
-                <span className="truncate">{img.name}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
 
       {/* Credit bar and input container */}
       <div className="rounded-xl overflow-hidden border border-border/40 bg-white dark:bg-muted/40 shadow-sm transition-colors focus-within:border-border/60 focus-within:ring-[3px] focus-within:ring-primary/70 focus-within:ring-offset-0 focus-within:shadow-[0_0_24px_rgba(0,114,229,0.35)]">
@@ -1123,7 +924,7 @@ function ChatInput({
           <PromptInputBody>
             {/* Extension Chip */}
             {extensionContent && (
-              <div className="px-3 pt-3">
+              <div className="w-full px-3 pt-3">
                 <ExtensionChip
                   content={extensionContent}
                   onRemove={handleRemoveExtensionContent}
@@ -1131,51 +932,34 @@ function ChatInput({
               </div>
             )}
 
-            {/* Image / canvas-reference pills */}
-            {attachments.length > 0 && (
-              <div className="flex flex-wrap gap-2 px-3 pt-3">
-                {attachments.map((att) => (
-                  <ImageAttachmentChip
-                    key={att.id}
-                    src={
-                      att.kind === "upload"
-                        ? att.previewUrl
-                        : pillUrlMap?.[att.s3Key]
-                    }
-                    label={att.kind === "upload" ? att.file.name : att.name}
-                    isCanvas={att.kind === "canvas"}
-                    onRemove={() => removeImage(att.id)}
-                  />
-                ))}
-              </div>
-            )}
-
             {/* Vision warning */}
             {showVisionWarning && (
-              <div className="px-3 pt-2">
+              <div className="w-full px-3 pt-2">
                 <p className="text-xs text-amber-500">
                   ⚠️ {selectedModelData?.name} may not process images
                 </p>
               </div>
             )}
 
-            <PromptInputTextarea
-              placeholder={
-                !canGenerate
-                  ? "Generation limit reached"
-                  : extensionContent
-                  ? "Add instructions for replication..."
-                  : attachments.length > 0
-                  ? "Describe what you want to do with these images..."
-                  : "Ask AI anything… (type @ to add a canvas image)"
-              }
-              className="min-h-[36px] max-h-[120px] text-sm placeholder:text-muted-foreground/50 bg-transparent border-none shadow-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
-              value={inputValue}
-              onChange={handleInputChange}
-              onKeyDown={handleTextareaKeyDown}
-              onPaste={handlePaste}
-              disabled={!canGenerate}
-            />
+            {/* Token-field editor: free text with inline image pills (@ to
+                reference a canvas image; paste/drop to attach an upload). */}
+            <div className="w-full px-3 py-2.5">
+              <MentionInput
+                ref={mentionRef}
+                disabled={!canGenerate}
+                suggestions={canvasImages ?? []}
+                resolveUrl={resolveUrl}
+                onExtensionPaste={handleExtensionPaste}
+                onChange={handleMentionChange}
+                placeholder={
+                  !canGenerate
+                    ? "Generation limit reached"
+                    : extensionContent
+                    ? "Add instructions for replication..."
+                    : "Ask AI anything… (type @ to add a canvas image)"
+                }
+              />
+            </div>
           </PromptInputBody>
           <PromptInputFooter className="justify-between px-2 pb-2">
             <PromptInputTools>
@@ -1255,83 +1039,16 @@ function ChatInput({
               status={status}
               size="icon-sm"
               className="h-8 w-8 rounded-lg"
-              disabled={!canGenerate}
+              disabled={
+                !canGenerate ||
+                status === "submitted" ||
+                status === "streaming"
+              }
             />
           </PromptInputFooter>
         </PromptInput>
       </div>
     </div>
-  );
-}
-
-/** Pill for a pending upload or a referenced canvas image, with a hover preview. */
-function ImageAttachmentChip({
-  src,
-  label,
-  isCanvas,
-  onRemove,
-}: {
-  src?: string | null;
-  label: string;
-  isCanvas?: boolean;
-  onRemove: () => void;
-}) {
-  return (
-    <HoverCard openDelay={120} closeDelay={60}>
-      <HoverCardTrigger asChild>
-        <div
-          className={cn(
-            "group relative flex h-8 cursor-default select-none items-center gap-1.5 rounded-md border px-1.5 font-medium text-sm transition-all",
-            isCanvas
-              ? "border-primary/40 bg-primary/5 hover:bg-primary/10"
-              : "border-border hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50"
-          )}
-        >
-          <div className="relative size-5 shrink-0">
-            <div className="absolute inset-0 flex size-5 items-center justify-center overflow-hidden rounded bg-background transition-opacity group-hover:opacity-0">
-              {src ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img alt={label} className="size-5 object-cover" src={src} />
-              ) : (
-                <ImageIcon className="size-3 text-muted-foreground" />
-              )}
-            </div>
-            <Button
-              aria-label="Remove image"
-              className="absolute inset-0 size-5 cursor-pointer rounded p-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 [&>svg]:size-2.5"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove();
-              }}
-              type="button"
-              variant="ghost"
-            >
-              <X className="size-2.5" />
-            </Button>
-          </div>
-          <span className="flex-1 truncate max-w-[120px] text-xs">{label}</span>
-        </div>
-      </HoverCardTrigger>
-      <HoverCardContent side="top" className="w-auto max-w-xs overflow-hidden p-1">
-        {src ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              alt={label}
-              src={src}
-              className="max-h-64 max-w-[16rem] rounded object-contain"
-            />
-            <p className="truncate px-1 pt-1 text-xs text-muted-foreground">
-              {label}
-            </p>
-          </>
-        ) : (
-          <div className="flex h-24 w-40 items-center justify-center text-muted-foreground">
-            <ImageIcon className="size-6" />
-          </div>
-        )}
-      </HoverCardContent>
-    </HoverCard>
   );
 }
 

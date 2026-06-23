@@ -35,7 +35,7 @@ export function DeleteScreenModal({
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
               <AlertTriangle className="h-5 w-5 text-destructive" />
             </div>
-            <AlertDialogTitle>Delete Screen?</AlertDialogTitle>
+            <AlertDialogTitle>Delete component?</AlertDialogTitle>
           </div>
           <AlertDialogDescription className="pt-2">
             Are you sure you want to delete{" "}
@@ -60,7 +60,7 @@ export function DeleteScreenModal({
             disabled={isDeleting}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {isDeleting ? "Deleting..." : "Delete Screen"}
+            {isDeleting ? "Deleting..." : "Delete component"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

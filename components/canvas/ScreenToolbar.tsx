@@ -547,12 +547,12 @@ export function ScreenToolbar({
           <button
             className="flex h-8 w-8 items-center justify-center rounded-md text-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
             onClick={onDelete}
-            aria-label="Delete screen"
+            aria-label="Delete component"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Delete screen</TooltipContent>
+        <TooltipContent>Delete component</TooltipContent>
       </Tooltip>
     </div>
   );

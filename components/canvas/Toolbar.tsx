@@ -11,7 +11,7 @@ import {
   ArrowRight,
   Minus,
   Frame,
-  Monitor,
+  Component,
 } from "lucide-react";
 import type { Tool } from "@/types/canvas";
 import type { LucideIcon } from "lucide-react";
@@ -49,8 +49,8 @@ const TOOLS: ToolConfig[] = [
 
 const SCREEN_TOOL: ToolConfig = {
   id: "screen",
-  icon: Monitor,
-  label: "AI Screen",
+  icon: Component,
+  label: "Component",
   shortcut: "W",
   special: true,
 };
@@ -131,8 +131,8 @@ export function Toolbar({
             <span className="absolute inset-0 rounded-md bg-linear-to-br from-primary/40 to-[#75D8FC]/40 opacity-0 blur-sm transition-opacity duration-300 group-hover:opacity-100" />
           )}
 
-          {/* Monitor icon with animation */}
-          <Monitor
+          {/* Component icon with animation */}
+          <Component
             className={`relative h-4 w-4 transition-transform duration-300 ${
               isScreenActive ? "text-white" : "text-primary"
             } ${!isScreenActive ? "group-hover:scale-110" : ""}`}

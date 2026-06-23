@@ -412,9 +412,14 @@ function CanvasContent({ projectId }: { projectId: string }) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Delete" || e.key === "Backspace") {
         const target = e.target as HTMLElement;
-        const isInput =
-          target.tagName === "INPUT" || target.tagName === "TEXTAREA";
-        if (isInput) return;
+        // Skip when typing in a field — INPUT/TEXTAREA *or* a contentEditable
+        // (the chat's MentionInput is a contentEditable <div>, so a tagName-only
+        // check let Backspace/Delete fall through to screen deletion).
+        const isTyping =
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable;
+        if (isTyping) return;
 
         // Check if any selected shape is a screen
         const selectedIds = Object.keys(selectedShapes);
@@ -432,7 +437,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
             setScreenToDelete({
               shapeId: screenShape.id,
               screenId: screenData?._id ?? null,
-              title: screenData?.title || "Screen",
+              title: screenData?.title || "Component",
             });
             setDeleteModalOpen(true);
           }
@@ -504,7 +509,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
     setScreenToDelete({
       shapeId: selectedScreenShape.id,
       screenId: screenData?._id ?? null,
-      title: screenData?.title || "Screen",
+      title: screenData?.title || "Component",
     });
     setDeleteModalOpen(true);
   }, [selectedScreenShape, screenDataMap]);
