@@ -67,6 +67,8 @@ export interface SendMessageOptions {
   modelId?: string;
   images?: PillAttachment[];
   thinking?: boolean;
+  /** Design system chosen in the composer, encoded as "<id>" or "<id>:dark". */
+  designSystem?: string;
 }
 
 export interface UseChatStreamingReturn {
@@ -609,7 +611,7 @@ export function useChatStreaming({
   const sendMessage = useCallback(
     async (content: string, options?: SendMessageOptions) => {
       const trimmedContent = content.trim();
-      const { modelId, images = [], thinking } = options || {};
+      const { modelId, images = [], thinking, designSystem } = options || {};
       const hasUploads = images.some((i) => i.kind === "upload");
 
       if (!trimmedContent && images.length === 0) return;
@@ -708,6 +710,7 @@ export function useChatStreaming({
             thinking: thinking ?? false,
             imageUrls: imageAgentUrls.length > 0 ? imageAgentUrls : undefined,
             imageIds: imageStorageIds.length > 0 ? imageStorageIds : undefined,
+            designSystem,
           }),
           signal: ac.signal,
         });

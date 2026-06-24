@@ -13,6 +13,7 @@ helpers below are written defensively so small SDK differences degrade safely.
 from __future__ import annotations
 
 import inspect
+import re
 from typing import Any
 
 from e2b import AsyncSandbox
@@ -87,6 +88,75 @@ async def run_command(
             getattr(e, "stdout", "") or "",
             getattr(e, "stderr", "") or str(e),
         )
+
+
+# ---- design-system (theme) install ----------------------------------------
+#
+# Mirrors app/api/sandbox/theme/route.ts so a freshly-created sandbox can be
+# themed BEFORE the agent generates. A screen's theme is encoded as "<id>"
+# (light) or "<id>:dark"; the preset CSS ships both :root and .dark blocks, so
+# dark is activated purely by toggling the <html> class in the layout.
+
+_TWEAKCN_URL = "https://tweakcn.com/r/themes/{id}.json"
+_LAYOUT_PATHS = ("app/layout.tsx", "src/app/layout.tsx")
+
+
+def _parse_screen_theme(value: str | None) -> tuple[str, bool]:
+    """'<id>' -> (id, False); '<id>:dark' -> (id, True)."""
+    if not value:
+        return ("default", False)
+    parts = value.split(":")
+    return (parts[0] or "default", len(parts) > 1 and parts[1] == "dark")
+
+
+def apply_html_dark_class(layout: str, dark: bool) -> str:
+    """Add/remove the `dark` class on the <html> tag of a layout.tsx string."""
+
+    def repl(m: re.Match[str]) -> str:
+        attrs = m.group(1)
+        str_match = re.search(
+            r"""\sclassName\s*=\s*("([^"]*)"|'([^']*)')""", attrs
+        )
+        if str_match:
+            existing = (str_match.group(2) or str_match.group(3) or "").split()
+            classes = [c for c in existing if c != "dark"]
+            if dark:
+                classes.append("dark")
+            joined = " ".join(classes)
+            replacement = f' className="{joined}"' if joined else ""
+            return f"<html{attrs.replace(str_match.group(0), replacement)}>"
+        # className as an expression ({...}) — leave untouched (avoid dup attr).
+        if re.search(r"\sclassName\s*=\s*\{", attrs):
+            return m.group(0)
+        return f'<html{attrs} className="dark">' if dark else m.group(0)
+
+    return re.sub(r"<html([^>]*)>", repl, layout, count=1)
+
+
+async def apply_theme(sandbox: AsyncSandbox, theme_value: str | None) -> None:
+    """Install a design-system preset into a sandbox. Best-effort, never raises.
+
+    Runs the shadcn add command for the preset (skipped for 'default'), then
+    toggles the <html> dark class in the layout for the chosen mode.
+    """
+    theme_id, dark = _parse_screen_theme(theme_value)
+
+    if theme_id and theme_id != "default":
+        url = _TWEAKCN_URL.format(id=theme_id)
+        await run_command(sandbox, f"npx shadcn@latest add {url} --yes", timeout=120)
+
+    for path in _LAYOUT_PATHS:
+        try:
+            content = await sandbox.files.read(path)
+        except Exception:  # noqa: BLE001 — try the next candidate path
+            continue
+        updated = apply_html_dark_class(content, dark)
+        if updated != content:
+            await sandbox.files.write(path, updated)
+        break
+
+
+# ---- misc ------------------------------------------------------------------
 
 
 def _sandbox_id(sb: AsyncSandbox) -> str:

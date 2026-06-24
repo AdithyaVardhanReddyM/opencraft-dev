@@ -23,7 +23,7 @@ from ..context.assembler import build_image_blocks, build_turn
 from ..context.file_meta import changed_paths, derive_route_from_changes, merge_changes
 from ..models import build_model
 from ..tools import DEFAULT_TOOLS
-from ..tools.sandbox import get_or_create_sandbox, host_url
+from ..tools.sandbox import apply_theme, get_or_create_sandbox, host_url
 from .finish import finish
 from .stream import enriched_tool_label, normalize_event
 
@@ -61,6 +61,17 @@ async def run_turn(
     yield {"type": "sandbox", "sandboxId": sandbox_id, "sandboxUrl": sandbox_url}
     if context_lost:
         yield {"type": "notice", "message": "Previous sandbox expired; created a fresh one."}
+
+    # On a fresh/lost sandbox, install the screen's chosen design system (if any)
+    # BEFORE the agent generates, so it builds against the right tokens. The CSS
+    # ships both light/dark; mode just toggles the layout's <html> class.
+    # Best-effort — theming must never block the run.
+    is_new_sandbox = context_lost or not screen.get("sandbox_id")
+    if is_new_sandbox and screen.get("theme"):
+        try:
+            await apply_theme(sandbox, screen.get("theme"))
+        except Exception:  # noqa: BLE001
+            pass
 
     # On a fresh/lost sandbox the old files map is stale (template default).
     if context_lost or not screen.get("sandbox_id"):

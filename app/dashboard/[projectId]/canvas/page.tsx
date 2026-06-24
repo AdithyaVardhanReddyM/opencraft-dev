@@ -20,6 +20,7 @@ import { CanvasDocBridge } from "@/components/canvas/CanvasDocBridge";
 import { PresenceCursors } from "@/components/canvas/PresenceCursors";
 import { PresenceAvatars } from "@/components/canvas/PresenceAvatars";
 import { CanvasMenu } from "@/components/canvas/CanvasMenu";
+import { DesignSystemsButton } from "@/components/canvas/design-systems/DesignSystemsButton";
 import { CanvasActions } from "@/components/canvas/CanvasActions";
 import { useInfiniteCanvas } from "@/hooks/use-infinite-canvas";
 import { useCanvasCursor } from "@/hooks/use-canvas-cursor";
@@ -1060,6 +1061,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
       {!isAISidebarOpen && (
         <div className="absolute top-3 left-3 z-50 flex items-center gap-2">
           <CanvasMenu />
+          <DesignSystemsButton />
         </div>
       )}
 

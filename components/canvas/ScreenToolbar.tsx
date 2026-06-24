@@ -34,6 +34,11 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ThemeSelector } from "@/components/canvas/ThemeSelector";
+import {
+  parseScreenTheme,
+  formatScreenTheme,
+  type ThemeMode,
+} from "@/lib/canvas/theme-utils";
 
 interface ScreenToolbarProps {
   shape: ScreenShape;
@@ -87,18 +92,25 @@ export function ScreenToolbar({
     autoResume: true,
   });
 
-  // Handle theme change - apply to sandbox and persist
+  // Handle theme change - apply to sandbox and persist. `mode` toggles the
+  // sandbox's dark class; `themeId` is omitted on a mode-only flip so the API
+  // skips the (slow) preset reinstall and just re-toggles the layout.
   const handleThemeChange = useCallback(
-    async (themeId: string) => {
+    async (themeId: string, mode: ThemeMode) => {
       if (!screenData?.sandboxId || !screenData?._id) return;
 
-      // Call API to apply theme to sandbox
+      const current = parseScreenTheme(screenData.theme);
+      const themeChanged = themeId !== current.id;
+      const nextTheme = formatScreenTheme(themeId, mode);
+
+      // Call API to apply theme/mode to sandbox
       const response = await fetch("/api/sandbox/theme", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sandboxId: screenData.sandboxId,
-          themeId,
+          mode,
+          ...(themeChanged ? { themeId } : {}),
         }),
       });
 
@@ -106,17 +118,17 @@ export function ScreenToolbar({
         throw new Error("Failed to apply theme");
       }
 
-      // Persist theme
+      // Persist theme + mode (encoded in the theme value)
       await updateScreen({
         screenId: screenData._id,
         projectId: screenData.projectId,
-        theme: themeId,
+        theme: nextTheme,
       });
 
       pendo.track("theme_changed", {
         screen_id: String(screenData._id),
         previous_theme: screenData.theme || "default",
-        new_theme: themeId,
+        new_theme: nextTheme,
         sandbox_id: screenData.sandboxId || "",
       });
 

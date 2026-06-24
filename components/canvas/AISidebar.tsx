@@ -56,6 +56,11 @@ import { EditModeProvider } from "@/contexts/EditModeContext";
 import { EditModePanel } from "@/components/canvas/EditModePanel";
 import { ExtensionChip } from "@/components/canvas/ExtensionChip";
 import {
+  DesignSystemPicker,
+  type DesignSystemValue,
+} from "@/components/canvas/design-systems/DesignSystemPicker";
+import { formatScreenTheme } from "@/lib/canvas/theme-utils";
+import {
   MentionInput,
   type MentionInputHandle,
 } from "@/components/canvas/MentionInput";
@@ -251,9 +256,10 @@ export function AISidebar({
         images: PillAttachment[];
         thinking: boolean;
         extensionData?: CapturedElement;
+        designSystem?: string;
       }
     ) => {
-      const { modelId, images, thinking, extensionData } = options;
+      const { modelId, images, thinking, extensionData, designSystem } = options;
       if (!message.text.trim() && !extensionData && images.length === 0) return;
 
       // If extension data is present, format it for AI
@@ -277,8 +283,8 @@ export function AISidebar({
         });
       }
 
-      // Pass modelId, images, and the thinking toggle to sendMessage
-      sendMessage(finalMessage, { modelId, images, thinking });
+      // Pass modelId, images, thinking, and the chosen design system to sendMessage
+      sendMessage(finalMessage, { modelId, images, thinking, designSystem });
     },
     [sendMessage, selectedScreenId]
   );
@@ -719,6 +725,7 @@ function ChatInput({
       images: PillAttachment[];
       thinking: boolean;
       extensionData?: CapturedElement;
+      designSystem?: string;
     }
   ) => void;
   status: ChatInputStatus;
@@ -742,6 +749,10 @@ function ChatInput({
   // Fast Build is the default (thinking off).
   const [thinking, setThinking] = useState(false);
   const [buildModeOpen, setBuildModeOpen] = useState(false);
+  // Design system chosen for this screen, applied to a freshly-created sandbox.
+  const [designSystem, setDesignSystem] = useState<DesignSystemValue | null>(
+    null
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const initialDataProcessedRef = useRef(false);
 
@@ -868,10 +879,21 @@ function ChatInput({
       images: attachments,
       thinking,
       extensionData: extensionContent || undefined,
+      designSystem: designSystem
+        ? formatScreenTheme(designSystem.id, designSystem.mode)
+        : undefined,
     });
     mentionRef.current?.clear();
     setExtensionContent(null);
-  }, [onSubmit, extensionContent, selectedModel, thinking, canGenerate, status]);
+  }, [
+    onSubmit,
+    extensionContent,
+    selectedModel,
+    thinking,
+    designSystem,
+    canGenerate,
+    status,
+  ]);
 
   // Handle drag and drop
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -1033,6 +1055,13 @@ function ChatInput({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              {/* Design system picker — themes the new sandbox from the start */}
+              <DesignSystemPicker
+                value={designSystem}
+                onChange={setDesignSystem}
+                disabled={!canGenerate}
+              />
             </PromptInputTools>
 
             <PromptInputSubmit

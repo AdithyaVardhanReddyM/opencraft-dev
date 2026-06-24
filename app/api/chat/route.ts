@@ -31,6 +31,10 @@ const bodySchema = z.object({
   thinking: z.boolean().optional(),
   imageUrls: z.array(z.string()).optional(),
   imageIds: z.array(z.string()).optional(),
+  // Design system chosen in the composer before the sandbox exists, encoded as
+  // "<id>" or "<id>:dark". Persisted as the screen's theme and forwarded so the
+  // agent-service themes a freshly-created sandbox before it generates.
+  designSystem: z.string().optional(),
 });
 
 const SSE_HEADERS = {
@@ -68,6 +72,7 @@ function toScreenPayload(s: ScreenDoc) {
     route: s.route,
     title: s.title,
     parent_screen_id: s.parentScreenId,
+    theme: s.theme,
   };
 }
 
@@ -100,7 +105,8 @@ export async function POST(req: NextRequest) {
   } catch {
     return json(400, { error: "Invalid request" });
   }
-  const { screenId, message, modelId, thinking, imageUrls, imageIds } = body;
+  const { screenId, message, modelId, thinking, imageUrls, imageIds, designSystem } =
+    body;
 
   // Generation limit → SSE error frame so the client's single streaming path
   // renders it (the composer already flipped to "streaming"). No user msg, no run.
@@ -111,6 +117,14 @@ export async function POST(req: NextRequest) {
 
   const screen = await internalGetScreen(screenId);
   if (!screen) return json(404, { error: "Screen not found" });
+
+  // A design system chosen in the composer becomes the screen's theme: persist
+  // it and hand it to the agent (in the screen payload) so a freshly-created
+  // sandbox is themed before generation.
+  if (designSystem && designSystem !== screen.theme) {
+    screen.theme = designSystem;
+    void internalUpdateScreen(screenId, { theme: designSystem }).catch(() => {});
+  }
 
   // Load prior history BEFORE inserting the new turn (the new message is sent
   // separately as `message`; including it in history would duplicate it). Use the

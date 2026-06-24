@@ -267,3 +267,24 @@ export function getThemeCommand(themeId: string): string {
   const theme = getThemeById(themeId);
   return theme?.command || "";
 }
+
+export type ThemeMode = "light" | "dark";
+
+/**
+ * A screen's `theme` column stores both the preset id and the light/dark mode,
+ * encoded as `"<id>"` for light (backward-compatible with existing rows) and
+ * `"<id>:dark"` for dark. The preset's CSS already ships both `:root` and
+ * `.dark` blocks; mode just controls the `dark` class on the sandbox <html>.
+ */
+export function parseScreenTheme(value?: string | null): {
+  id: string;
+  mode: ThemeMode;
+} {
+  if (!value) return { id: "default", mode: "light" };
+  const [id, modePart] = value.split(":");
+  return { id: id || "default", mode: modePart === "dark" ? "dark" : "light" };
+}
+
+export function formatScreenTheme(id: string, mode: ThemeMode): string {
+  return mode === "dark" ? `${id}:dark` : id;
+}
