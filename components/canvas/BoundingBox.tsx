@@ -22,6 +22,7 @@ function calculateBounds(shape: Shape): Bounds {
     case "frame":
     case "rect":
     case "ellipse":
+    case "stickynote":
       return {
         x: shape.x - 4,
         y: shape.y - 4,

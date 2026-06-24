@@ -37,6 +37,7 @@ export type Tool =
   | "arrow"
   | "line"
   | "text"
+  | "stickynote"
   | "eraser"
   | "screen";
 
@@ -142,6 +143,26 @@ export interface TextShape extends BaseShape {
   h?: number;
 }
 
+// A sticky note: a fixed-size, colored "paper" card that carries centered text.
+// Structurally a filled rectangle (x/y/w/h) with text, so it reuses the rect
+// geometry/resize/hit-testing paths and the text shape's inline-editing pattern
+// (toggled via the shared ShapesState.editingTextId). The text color rides on
+// BaseShape.stroke (strokeWidth is 0, fill is null) so it plugs into the existing
+// textColor control without a separate field.
+export interface StickyNoteShape extends BaseShape {
+  type: "stickynote";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text: string;
+  backgroundColor: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  textAlign: "left" | "center" | "right";
+}
+
 export interface GeneratedUIShape extends BaseShape {
   type: "generatedui";
   x: number;
@@ -186,6 +207,7 @@ export type Shape =
   | ArrowShape
   | LineShape
   | TextShape
+  | StickyNoteShape
   | GeneratedUIShape
   | ScreenShape
   | ImageShape;

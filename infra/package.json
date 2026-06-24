@@ -1,0 +1,22 @@
+{
+  "name": "opencraft-infra",
+  "version": "0.1.0",
+  "private": true,
+  "bin": { "opencraft-infra": "bin/app.ts" },
+  "scripts": {
+    "synth": "cdk synth",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy",
+    "destroy": "cdk destroy"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "aws-cdk": "^2.1000.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.205.0",
+    "constructs": "^10.4.2"
+  }
+}

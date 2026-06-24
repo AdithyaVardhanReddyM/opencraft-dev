@@ -1,10 +1,12 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { db } from "../index";
-import { projects, screens } from "../schema";
+import { screens } from "../schema";
 import { toDoc, toDocs } from "../serialize";
 import { ApiError } from "../../server/errors";
 import { isUuid } from "../../server/uuid";
+import { getProjectRole, ROLE_RANK } from "./members";
+import type { ProjectRole } from "../../server/realtime-token";
 import type { ScreenDoc } from "../types";
 
 async function getScreenRow(screenId: string) {
@@ -17,30 +19,39 @@ async function getScreenRow(screenId: string) {
   return row ?? null;
 }
 
-/** Throw unless the user owns the project the screen belongs to. */
-async function assertScreenOwner(userId: string, screenId: string) {
+/** Effective role on a project, or null. Owner = projects.userId, else member. */
+async function projectRole(
+  userId: string,
+  projectId: string
+): Promise<ProjectRole | null> {
+  return getProjectRole(userId, projectId);
+}
+
+/** Throw unless the user has at least `minRole` on the screen's project. */
+async function assertScreenRole(
+  userId: string,
+  screenId: string,
+  minRole: ProjectRole
+) {
   const screen = await getScreenRow(screenId);
   if (!screen) throw new ApiError(404, "Screen not found");
-  const [project] = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, screen.projectId))
-    .limit(1);
-  if (!project || project.userId !== userId) {
+  const role = await projectRole(userId, screen.projectId);
+  if (!role) throw new ApiError(404, "Screen not found");
+  if (ROLE_RANK[role] < ROLE_RANK[minRole]) {
     throw new ApiError(403, "Not authorized to access this screen");
   }
   return screen;
 }
 
-async function assertProjectOwner(userId: string, projectId: string) {
+async function assertProjectRole(
+  userId: string,
+  projectId: string,
+  minRole: ProjectRole
+) {
   if (!isUuid(projectId)) throw new ApiError(404, "Project not found");
-  const [project] = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-  if (!project) throw new ApiError(404, "Project not found");
-  if (project.userId !== userId) {
+  const role = await projectRole(userId, projectId);
+  if (!role) throw new ApiError(404, "Project not found");
+  if (ROLE_RANK[role] < ROLE_RANK[minRole]) {
     throw new ApiError(403, "Not authorized to access this project");
   }
 }
@@ -51,7 +62,7 @@ export async function createScreen(
   shapeId: string,
   projectId: string
 ): Promise<string> {
-  await assertProjectOwner(userId, projectId);
+  await assertProjectRole(userId, projectId, "editor");
   const now = Date.now();
   const [row] = await db
     .insert(screens)
@@ -70,7 +81,7 @@ export async function createFlowScreen(
   projectId: string,
   parentScreenId: string
 ): Promise<string> {
-  await assertProjectOwner(userId, projectId);
+  await assertProjectRole(userId, projectId, "editor");
 
   const parent = await getScreenRow(parentScreenId);
   if (!parent) throw new ApiError(404, "Parent screen not found");
@@ -131,7 +142,7 @@ export async function updateScreen(
   screenId: string,
   input: ScreenPatch
 ): Promise<{ success: boolean }> {
-  await assertScreenOwner(userId, screenId);
+  await assertScreenRole(userId, screenId, "editor");
   await db
     .update(screens)
     .set(buildPatch(input))
@@ -144,7 +155,7 @@ export async function deleteScreen(
   userId: string,
   screenId: string
 ): Promise<{ success: boolean }> {
-  await assertScreenOwner(userId, screenId);
+  await assertScreenRole(userId, screenId, "editor");
   await db.delete(screens).where(eq(screens.id, screenId));
   return { success: true };
 }
@@ -161,12 +172,7 @@ export async function getScreenByShapeId(
     .limit(1);
   if (!screen) return null;
 
-  const [project] = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, screen.projectId))
-    .limit(1);
-  if (!project || project.userId !== userId) return null;
+  if (!(await projectRole(userId, screen.projectId))) return null;
 
   return toDoc(screen) as ScreenDoc;
 }
@@ -187,12 +193,7 @@ export async function getScreensByProject(
   projectId: string
 ): Promise<ScreenDoc[]> {
   if (!isUuid(projectId)) return [];
-  const [project] = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-  if (!project || project.userId !== userId) return [];
+  if (!(await projectRole(userId, projectId))) return [];
 
   const rows = await db
     .select({
@@ -229,12 +230,7 @@ export async function getScreenFiles(
     .where(eq(screens.id, screenId))
     .limit(1);
   if (!screen) return null;
-  const [project] = await db
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, screen.projectId))
-    .limit(1);
-  if (!project || project.userId !== userId) return null;
+  if (!(await projectRole(userId, screen.projectId))) return null;
   return (screen.files as Record<string, string> | null) ?? null;
 }
 

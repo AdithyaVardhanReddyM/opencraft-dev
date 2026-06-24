@@ -38,6 +38,7 @@ const TOOL_HOTKEYS: Record<string, Tool> = {
   a: "arrow",
   d: "freedraw",
   t: "text",
+  n: "stickynote",
   e: "eraser",
 };
 
@@ -541,7 +542,8 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         shape.type === "rect" ||
         shape.type === "ellipse" ||
         shape.type === "image" ||
-        shape.type === "generatedui"
+        shape.type === "generatedui" ||
+        shape.type === "stickynote"
       ) {
         dispatchInteractionUpdate({
           type: "UPDATE_SHAPE",
@@ -846,7 +848,8 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
                   shape.type === "ellipse" ||
                   shape.type === "generatedui" ||
                   shape.type === "image" ||
-                  shape.type === "screen"
+                  shape.type === "screen" ||
+                  shape.type === "stickynote"
                 ) {
                   initialShapePositionsRef.current[id] = {
                     x: shape.x,
@@ -905,6 +908,14 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
             payload: { x: world.x, y: world.y },
           });
           dispatchShapes({ type: "SET_TOOL", payload: "select" });
+        } else if (currentTool === "stickynote") {
+          // Drop a fixed-size note centered on the cursor (the factory offsets
+          // by half its size) and enter edit mode immediately, like text.
+          dispatchShapes({
+            type: "ADD_STICKYNOTE",
+            payload: { x: world.x, y: world.y },
+          });
+          dispatchShapes({ type: "SET_TOOL", payload: "select" });
         } else if (currentTool === "screen") {
           // Screen tool - dispatch custom event for canvas page to handle
           // (needs Convex integration to create screen record first)
@@ -947,8 +958,8 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     // Track mouse position for paste location
     mouseWorldPosRef.current = world;
 
-    // Trigger re-render for screen tool preview
-    if (currentTool === "screen") {
+    // Trigger re-render so the cursor-following ghost preview tracks the mouse.
+    if (currentTool === "screen" || currentTool === "stickynote") {
       requestRender();
     }
 
@@ -991,7 +1002,8 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
             shape.type === "generatedui" ||
             shape.type === "image" ||
             shape.type === "text" ||
-            shape.type === "screen"
+            shape.type === "screen" ||
+            shape.type === "stickynote"
           ) {
             if (
               typeof initialPos.x === "number" &&
@@ -1220,7 +1232,7 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     const world = screenToWorld(local, viewport.translate, viewport.scale);
     const hitShape = getShapeAtPoint(world, shapesList);
 
-    if (hitShape?.type === "text") {
+    if (hitShape?.type === "text" || hitShape?.type === "stickynote") {
       dispatchShapes({ type: "SET_EDITING_TEXT", payload: hitShape.id });
     }
   };
@@ -1376,6 +1388,7 @@ function intersectsSelectionBox(
     case "generatedui":
     case "screen":
     case "image":
+    case "stickynote":
       shapeMinX = shape.x;
       shapeMaxX = shape.x + shape.w;
       shapeMinY = shape.y;
@@ -1460,6 +1473,7 @@ function getShapeBounds(shape: Shape): Rect | null {
     case "generatedui":
     case "screen":
     case "image":
+    case "stickynote":
       return {
         x: shape.x,
         y: shape.y,

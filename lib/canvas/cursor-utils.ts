@@ -9,7 +9,8 @@ export type CursorClass =
   | "cursor-text"
   | "cursor-move"
   | "cursor-grab"
-  | "cursor-grabbing";
+  | "cursor-grabbing"
+  | "cursor-none";
 
 // Tool to cursor mapping
 export const TOOL_CURSOR_MAP: Record<Tool, CursorClass> = {
@@ -22,6 +23,8 @@ export const TOOL_CURSOR_MAP: Record<Tool, CursorClass> = {
   arrow: "cursor-crosshair",
   line: "cursor-crosshair",
   text: "cursor-text",
+  // Hidden native cursor — the ghost note preview follows the cursor instead.
+  stickynote: "cursor-none",
   eraser: "cursor-eraser",
   screen: "cursor-crosshair",
 };

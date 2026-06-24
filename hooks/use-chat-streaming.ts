@@ -16,6 +16,7 @@ import {
   parseSseFrame,
   type AgentFrame,
 } from "@/lib/streaming-utils";
+import { useCollabOptional } from "@/contexts/CollabContext";
 
 /** The model's live "thinking" stream for a message. */
 export interface MessageReasoning {
@@ -115,6 +116,34 @@ interface LiveAssistant {
 }
 
 /**
+ * Chat-stream frames mirrored to collaborators over the realtime channel. The
+ * generating client publishes these; peers viewing the same screen reconstruct
+ * the live thread from them. Snapshot-based (not per-token) to bound volume.
+ */
+type ChatBroadcast =
+  | {
+      kind: "chat";
+      screenId: string;
+      phase: "start";
+      prompt: string;
+      modelId?: string;
+      imageIds?: string[];
+    }
+  | {
+      kind: "chat";
+      screenId: string;
+      phase: "state";
+      content: string;
+      reasoning: string;
+      reasoningActive: boolean;
+      steps: { id: string; text: string; status: "pending" | "complete" }[];
+      statusText: string;
+    }
+  | { kind: "chat"; screenId: string; phase: "end" };
+
+const STATE_BROADCAST_MS = 120;
+
+/**
  * Chat with real-time streaming against the Strands agent-service. Sends the
  * turn to /api/chat (which proxies the service's SSE), renders the live
  * text/tool/reasoning frames, and reconciles with the persisted thread (written
@@ -133,11 +162,22 @@ export function useChatStreaming({
     originalMessage?: string;
   } | null>(null);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
+  // True while a *collaborator* (not us) is generating on this screen — we mirror
+  // their stream into the same display state so the thread shows it live.
+  const [isRemoteStreaming, setIsRemoteStreaming] = useState(false);
 
   // The optimistic user bubble + the live assistant message, shown only while a
   // run is in flight (the persisted rows take over once SWR catches up).
   const [optimisticUser, setOptimisticUser] = useState<ChatMessage | null>(null);
   const [liveAssistant, setLiveAssistant] = useState<LiveAssistant | null>(null);
+
+  // Realtime collaboration channel (null when realtime is off → pure local chat).
+  const collab = useCollabOptional();
+  const broadcastRef = useRef(collab?.broadcast);
+  broadcastRef.current = collab?.broadcast;
+
+  // "In flight" = a run is streaming, whether ours or a mirrored collaborator's.
+  const inFlight = isWaitingForResponse || isRemoteStreaming;
 
   const prevScreenIdRef = useRef<string | undefined>(screenId);
   const lastOptionsRef = useRef<SendMessageOptions | undefined>(undefined);
@@ -147,12 +187,24 @@ export function useChatStreaming({
   const baselineCountRef = useRef<number>(0);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Refs so the broadcast throttler + the subscription read fresh values without
+  // re-subscribing on every render.
+  const screenIdRef = useRef(screenId);
+  screenIdRef.current = screenId;
+  const isWaitingRef = useRef(isWaitingForResponse);
+  isWaitingRef.current = isWaitingForResponse;
+  const stateBroadcastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastStateBroadcast = useRef(0);
+  const remoteEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Persisted history. While waiting we poll so the assistant message written by
   // the service callback appears (also our robust completion signal if a
   // serverless timeout cuts the live stream).
   const { data: convexMessages, mutate: mutateMessages } = useMessages(screenId, {
-    refreshInterval: isWaitingForResponse ? 1500 : 0,
+    refreshInterval: inFlight ? 1500 : 0,
   });
+  const convexLenRef = useRef(0);
+  convexLenRef.current = convexMessages?.length ?? 0;
 
   // Persisted messages → display format.
   const convexFormattedMessages: ChatMessage[] = useMemo(
@@ -184,7 +236,7 @@ export function useChatStreaming({
 
   // Merge persisted history with the in-flight optimistic/live messages.
   const messages = useMemo(() => {
-    if (!isWaitingForResponse) return convexFormattedMessages;
+    if (!inFlight) return convexFormattedMessages;
     const extra: ChatMessage[] = [];
     // Show the optimistic user bubble only until SWR has fetched the persisted
     // user row (count grew past the baseline), to avoid a duplicate.
@@ -209,15 +261,16 @@ export function useChatStreaming({
     return [...convexFormattedMessages, ...extra];
   }, [
     convexFormattedMessages,
-    isWaitingForResponse,
+    inFlight,
     optimisticUser,
     liveAssistant,
     convexMessages?.length,
   ]);
 
   // Detect completion: a new assistant message landed in the persisted thread.
+  // Works for both our own run and a mirrored collaborator's.
   useEffect(() => {
-    if (!convexMessages || !isWaitingForResponse) return;
+    if (!convexMessages || !inFlight) return;
     const currentCount = convexMessages.length;
     const lastMessage = convexMessages[currentCount - 1];
     if (
@@ -225,6 +278,7 @@ export function useChatStreaming({
       lastMessage?.role === "assistant"
     ) {
       setIsWaitingForResponse(false);
+      setIsRemoteStreaming(false);
       setStreamingSteps([]);
       setStatusText("");
       setCurrentActivity("");
@@ -236,10 +290,10 @@ export function useChatStreaming({
       if (screenId) void refreshScreenFiles(screenId);
       void refreshStats();
     }
-  }, [convexMessages, isWaitingForResponse, projectId, screenId]);
+  }, [convexMessages, inFlight, projectId, screenId]);
 
-  const isLoading = isWaitingForResponse;
-  const status: StreamingStatus = isWaitingForResponse ? "streaming" : "ready";
+  const isLoading = inFlight;
+  const status: StreamingStatus = inFlight ? "streaming" : "ready";
 
   // Show the history loader only when a screen is selected but its thread isn't
   // cached yet (a genuine cold load). Derived — NOT effect-managed — on purpose:
@@ -264,12 +318,163 @@ export function useChatStreaming({
       setLiveAssistant(null);
       setOptimisticUser(null);
       setIsWaitingForResponse(false);
+      setIsRemoteStreaming(false);
+      if (remoteEndTimer.current) {
+        clearTimeout(remoteEndTimer.current);
+        remoteEndTimer.current = null;
+      }
       prevScreenIdRef.current = screenId;
     }
   }, [screenId]);
 
   // Abort on unmount.
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // ---- Multiplayer chat mirroring -----------------------------------------
+  // Latest streaming snapshot, kept in a ref so the throttled broadcaster always
+  // sends current content even when its timer was scheduled in an earlier render.
+  const latestStreamRef = useRef<{
+    content: string;
+    reasoning: string;
+    reasoningActive: boolean;
+    steps: { id: string; text: string; status: "pending" | "complete" }[];
+    statusText: string;
+  }>({ content: "", reasoning: "", reasoningActive: false, steps: [], statusText: "" });
+  latestStreamRef.current = {
+    content: liveAssistant?.content ?? "",
+    reasoning: liveAssistant?.reasoning ?? "",
+    reasoningActive: liveAssistant?.reasoningActive ?? false,
+    steps: streamingSteps.map((s) => ({
+      id: s.id,
+      text: s.text,
+      status: s.status,
+    })),
+    statusText,
+  };
+
+  const flushStateBroadcast = useCallback(() => {
+    stateBroadcastTimer.current = null;
+    lastStateBroadcast.current = Date.now();
+    const sid = screenIdRef.current;
+    if (!sid) return;
+    const s = latestStreamRef.current;
+    broadcastRef.current?.({
+      kind: "chat",
+      screenId: sid,
+      phase: "state",
+      content: s.content,
+      reasoning: s.reasoning,
+      reasoningActive: s.reasoningActive,
+      steps: s.steps,
+      statusText: s.statusText,
+    } satisfies ChatBroadcast);
+  }, []);
+
+  // While WE generate, mirror our streaming snapshot to peers (throttled). No
+  // cleanup-cancel here so the trailing broadcast isn't starved by rapid renders.
+  useEffect(() => {
+    if (!isWaitingForResponse) return;
+    const since = Date.now() - lastStateBroadcast.current;
+    if (since >= STATE_BROADCAST_MS) {
+      flushStateBroadcast();
+    } else if (!stateBroadcastTimer.current) {
+      stateBroadcastTimer.current = setTimeout(
+        flushStateBroadcast,
+        STATE_BROADCAST_MS - since
+      );
+    }
+  }, [
+    isWaitingForResponse,
+    liveAssistant,
+    streamingSteps,
+    statusText,
+    flushStateBroadcast,
+  ]);
+
+  // Stop the broadcaster when our run ends; clear timers on unmount.
+  useEffect(() => {
+    if (isWaitingForResponse) return;
+    if (stateBroadcastTimer.current) {
+      clearTimeout(stateBroadcastTimer.current);
+      stateBroadcastTimer.current = null;
+    }
+  }, [isWaitingForResponse]);
+  useEffect(
+    () => () => {
+      if (stateBroadcastTimer.current) clearTimeout(stateBroadcastTimer.current);
+      if (remoteEndTimer.current) clearTimeout(remoteEndTimer.current);
+    },
+    []
+  );
+
+  // Receive peers' mirrored chat stream for the currently-open screen and render
+  // it into the same display state. Ignored while we're generating locally.
+  const subscribeFn = collab?.subscribe;
+  useEffect(() => {
+    if (!subscribeFn) return;
+    return subscribeFn((payload) => {
+      const m = payload as ChatBroadcast | null;
+      if (!m || m.kind !== "chat" || m.screenId !== screenIdRef.current) return;
+      if (isWaitingRef.current) return; // our own run takes precedence
+
+      if (m.phase === "start") {
+        if (remoteEndTimer.current) clearTimeout(remoteEndTimer.current);
+        baselineCountRef.current = convexLenRef.current;
+        setError(null);
+        setIsRemoteStreaming(true);
+        setOptimisticUser({
+          id: "remote-user",
+          role: "user",
+          content: m.prompt,
+          timestamp: new Date(),
+          imageIds: m.imageIds,
+          modelId: m.modelId,
+        });
+        setLiveAssistant(null);
+        setStreamingSteps([
+          {
+            id: "remote-initial",
+            text: "Starting...",
+            status: "pending",
+            timestamp: new Date(),
+          },
+        ]);
+        setStatusText("Starting...");
+        if (projectId) void refreshScreens(projectId);
+      } else if (m.phase === "state") {
+        setIsRemoteStreaming(true);
+        setLiveAssistant({
+          content: m.content,
+          reasoning: m.reasoning,
+          reasoningActive: m.reasoningActive,
+        });
+        setStreamingSteps(
+          m.steps.map((s) => ({
+            id: s.id,
+            text: s.text,
+            status: s.status,
+            timestamp: new Date(),
+          }))
+        );
+        setStatusText(m.statusText);
+      } else if (m.phase === "end") {
+        // The persisted assistant message (via the agent callback) is the real
+        // terminal signal — the completion effect clears us when it lands. Refetch
+        // now, and keep a fallback in case the callback never persists.
+        void mutateMessages();
+        if (projectId) void refreshScreens(projectId);
+        if (screenIdRef.current) void refreshScreenFiles(screenIdRef.current);
+        if (remoteEndTimer.current) clearTimeout(remoteEndTimer.current);
+        remoteEndTimer.current = setTimeout(() => {
+          setIsRemoteStreaming(false);
+          setLiveAssistant(null);
+          setOptimisticUser(null);
+          setStreamingSteps([]);
+          setStatusText("");
+        }, 20000);
+      }
+    });
+  }, [subscribeFn, projectId, mutateMessages]);
 
   // Advance the streaming-step list for a frame: complete the prior pending step
   // and start a new one labeled `text` (tagged with the tool-use id so a later
@@ -408,7 +613,7 @@ export function useChatStreaming({
       const hasUploads = images.some((i) => i.kind === "upload");
 
       if (!trimmedContent && images.length === 0) return;
-      if (isWaitingForResponse) return;
+      if (isWaitingForResponse || isRemoteStreaming) return;
       if (!screenId || !projectId) {
         setError({
           message: "Please select a screen to chat with AI",
@@ -482,6 +687,16 @@ export function useChatStreaming({
         });
         setStatusText("Starting...");
 
+        // Mirror the run to collaborators viewing this screen.
+        broadcastRef.current?.({
+          kind: "chat",
+          screenId,
+          phase: "start",
+          prompt: displayContent,
+          modelId,
+          imageIds: imageStorageIds.length > 0 ? imageStorageIds : undefined,
+        } satisfies ChatBroadcast);
+
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -533,6 +748,7 @@ export function useChatStreaming({
         // the live stream before the assistant row landed). The SWR poll keeps
         // running and the completion effect will resolve it — head-start refetch.
         void mutateMessages();
+        broadcastRef.current?.({ kind: "chat", screenId, phase: "end" });
       } catch (err) {
         if ((err as Error)?.name === "AbortError") return; // intentional cancel
         setError({
@@ -547,10 +763,12 @@ export function useChatStreaming({
         setStreamingSteps([]);
         setLiveAssistant(null);
         setOptimisticUser(null);
+        broadcastRef.current?.({ kind: "chat", screenId, phase: "end" });
       }
     },
     [
       isWaitingForResponse,
+      isRemoteStreaming,
       screenId,
       projectId,
       convexMessages?.length,

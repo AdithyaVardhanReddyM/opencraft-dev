@@ -4,6 +4,8 @@ export { ColorPicker } from "./ColorPicker";
 export { CornerTypeControl } from "./CornerTypeControl";
 export { ArrowTypeControl } from "./ArrowTypeControl";
 export { FontFamilyControl } from "./FontFamilyControl";
+export { FontSizeControl } from "./FontSizeControl";
 export { TextAlignControl } from "./TextAlignControl";
 export { FrameFillPicker } from "./FrameFillPicker";
+export { StickyNoteColorPicker } from "./StickyNoteColorPicker";
 export { DimensionsControl } from "./DimensionsControl";

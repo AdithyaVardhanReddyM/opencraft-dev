@@ -28,6 +28,8 @@ export interface UseAutosaveOptions {
   localDebounceMs?: number;
   cloudDebounceMs?: number;
   maxRetries?: number;
+  /** When false (viewer role), persist locally but never push to the cloud. */
+  canEdit?: boolean;
 }
 
 export interface UseAutosaveReturn {
@@ -47,6 +49,7 @@ export function useAutosave(
     localDebounceMs = DEBOUNCE_CONFIG.localSaveMs,
     cloudDebounceMs = DEBOUNCE_CONFIG.cloudSyncMs,
     maxRetries = RETRY_CONFIG.maxRetries,
+    canEdit = true,
   } = options;
 
   const { viewport, dispatchViewport, shapes, dispatchShapes } =
@@ -103,6 +106,12 @@ export function useAutosave(
 
   // Sync to cloud with retry logic
   const syncToCloud = useCallback(async () => {
+    // Viewers have read-only access — saving would 403. Local persistence still
+    // runs so their view survives a refresh; it just never reaches the cloud.
+    if (!canEdit) {
+      setIsDirty(false);
+      return;
+    }
     if (isOffline) {
       pendingCloudSyncRef.current = true;
       return;
@@ -164,7 +173,7 @@ export function useAutosave(
     } finally {
       setIsSyncing(false);
     }
-  }, [viewport, shapes, projectId, isOffline, maxRetries]);
+  }, [viewport, shapes, projectId, isOffline, maxRetries, canEdit]);
 
   // Save to localStorage (debounced)
   const saveToLocal = useCallback(() => {

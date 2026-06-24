@@ -87,7 +87,7 @@ export function SaveIndicator({ status, lastSavedAt }: SaveIndicatorProps) {
           {config.icon}
         </div>
       </TooltipTrigger>
-      <TooltipContent side="left" sideOffset={8}>
+      <TooltipContent side="top" sideOffset={8}>
         {config.tooltip}
       </TooltipContent>
     </Tooltip>

@@ -607,6 +607,10 @@ html[data-scroll-behavior="smooth"] {
   cursor: grabbing;
 }
 
+.cursor-none {
+  cursor: none;
+}
+
 [data-slot="input-group"][data-variant="plain"] {
   border-width: 0;
   box-shadow: none;

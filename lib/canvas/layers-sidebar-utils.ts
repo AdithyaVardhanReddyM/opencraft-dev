@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Pencil,
   Type,
+  StickyNote,
   Layout,
   Shapes,
   Monitor,
@@ -25,6 +26,7 @@ const SHAPE_ICON_MAP: Record<Shape["type"], LucideIcon> = {
   arrow: ArrowRight,
   freedraw: Pencil,
   text: Type,
+  stickynote: StickyNote,
   generatedui: Layout,
   screen: Monitor,
   image: ImageIcon,
@@ -61,6 +63,11 @@ export function getShapeName(shape: Shape, screenTitle?: string): string {
       const suffix = shape.text.length > 20 ? "..." : "";
       return preview ? `Text: "${preview}${suffix}"` : "Text";
     }
+    case "stickynote": {
+      const preview = shape.text.slice(0, 20);
+      const suffix = shape.text.length > 20 ? "..." : "";
+      return preview ? `Note: "${preview}${suffix}"` : "Sticky note";
+    }
     case "generatedui":
       return "Generated UI";
     case "screen":
@@ -83,6 +90,7 @@ export function getShapeCenter(shape: Shape): Point {
     case "generatedui":
     case "screen":
     case "image":
+    case "stickynote":
       return {
         x: shape.x + shape.w / 2,
         y: shape.y + shape.h / 2,
@@ -130,6 +138,7 @@ export function getShapeBounds(shape: Shape): {
     case "generatedui":
     case "screen":
     case "image":
+    case "stickynote":
       return { x: shape.x, y: shape.y, w: shape.w, h: shape.h };
     case "line":
     case "arrow": {

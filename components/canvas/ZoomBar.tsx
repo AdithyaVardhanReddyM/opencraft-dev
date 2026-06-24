@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Minus, Plus, Maximize2 } from "lucide-react";
 import {
   Tooltip,
@@ -17,6 +18,7 @@ interface ZoomBarProps {
   onZoomToFit: () => void;
   minScale?: number;
   maxScale?: number;
+  leftSlot?: ReactNode;
 }
 
 export function ZoomBar({
@@ -27,6 +29,7 @@ export function ZoomBar({
   onZoomToFit,
   minScale = 0.1,
   maxScale = 8.0,
+  leftSlot,
 }: ZoomBarProps) {
   const percentage = Math.round(scale * 100);
   const isAtMin = scale <= minScale;
@@ -34,7 +37,8 @@ export function ZoomBar({
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="pointer-events-auto fixed bottom-4 right-27 z-50">
+      <div className="pointer-events-auto fixed bottom-4 right-27 z-50 flex items-center gap-2">
+        {leftSlot && <div className="flex items-center">{leftSlot}</div>}
         <div
           className="flex items-center gap-0.5 rounded-lg bg-card/90 p-1 backdrop-blur-2xl saturate-150"
           style={{

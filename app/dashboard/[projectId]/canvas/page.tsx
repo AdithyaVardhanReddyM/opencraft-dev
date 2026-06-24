@@ -15,11 +15,16 @@ import { SCREEN_DEFAULTS, IMAGE_DEFAULTS } from "@/lib/canvas/shape-factories";
 import { screenToWorld } from "@/lib/canvas/coordinate-utils";
 import { nanoid } from "nanoid";
 import { CanvasProvider, useCanvasContext } from "@/contexts/CanvasContext";
+import { CollabProvider, useCollab } from "@/contexts/CollabContext";
+import { CanvasDocBridge } from "@/components/canvas/CanvasDocBridge";
+import { PresenceCursors } from "@/components/canvas/PresenceCursors";
+import { PresenceAvatars } from "@/components/canvas/PresenceAvatars";
 import { CanvasMenu } from "@/components/canvas/CanvasMenu";
 import { CanvasActions } from "@/components/canvas/CanvasActions";
 import { useInfiniteCanvas } from "@/hooks/use-infinite-canvas";
 import { useCanvasCursor } from "@/hooks/use-canvas-cursor";
 import { useAutosave } from "@/hooks/use-autosave";
+import { useJoinInvite } from "@/hooks/use-join-invite";
 import { Toolbar } from "@/components/canvas/Toolbar";
 import { ZoomBar } from "@/components/canvas/ZoomBar";
 import { HistoryPill } from "@/components/canvas/HistoryPill";
@@ -47,6 +52,7 @@ import { Line } from "@/components/canvas/shapes/Line";
 import { Arrow } from "@/components/canvas/shapes/Arrow";
 import { Stroke } from "@/components/canvas/shapes/Stroke";
 import { Text } from "@/components/canvas/shapes/Text";
+import { StickyNote } from "@/components/canvas/shapes/StickyNote";
 import { Screen } from "@/components/canvas/shapes/Screen";
 import { Image } from "@/components/canvas/shapes/Image";
 import { DeleteScreenModal } from "@/components/canvas/DeleteScreenModal";
@@ -62,14 +68,17 @@ import { LinePreview } from "@/components/canvas/shapes/LinePreview";
 import { ArrowPreview } from "@/components/canvas/shapes/ArrowPreview";
 import { FreeDrawStrokePreview } from "@/components/canvas/shapes/StrokePreview";
 import { ScreenCursorPreview } from "@/components/canvas/shapes/ScreenCursorPreview";
+import { StickyNoteCursorPreview } from "@/components/canvas/shapes/StickyNoteCursorPreview";
 import { ShapePropertiesBar } from "@/components/canvas/ShapePropertiesBar";
 import {
   strokeWidthToPixels,
   cornerTypeToRadius,
   fontFamilyPresetToCSS,
+  presetToFontSize,
   type StrokeWidthPreset,
   type CornerType,
   type FontFamilyPreset,
+  type FontSizePreset,
   type TextAlignOption,
 } from "@/lib/canvas/properties-utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -77,8 +86,14 @@ import { resolveBoundArrow } from "@/lib/canvas/arrow-utils";
 import { joinSandboxUrl } from "@/lib/sandbox-url";
 
 function CanvasContent({ projectId }: { projectId: string }) {
-  // Autosave hook
-  const { saveStatus, lastSavedAt, isLoading } = useAutosave(projectId);
+  // Redeem a ?invite=… share-link token into project membership (once).
+  useJoinInvite(projectId);
+  // Live collaboration: presence (cursors + selection) + edit permission.
+  const { setCursor, setSelection, canEdit } = useCollab();
+  // Autosave hook — viewers persist locally only (no cloud writes).
+  const { saveStatus, lastSavedAt, isLoading } = useAutosave(projectId, {
+    canEdit,
+  });
   const {
     viewport,
     shapes,
@@ -112,6 +127,33 @@ function CanvasContent({ projectId }: { projectId: string }) {
     setDefaultProperty,
   } = useCanvasContext();
   const { cursorClass } = useCanvasCursor();
+
+  // ---- Live collaboration: presence (cursors + selection) ------------------
+  const lastCursorPublish = useRef(0);
+
+  // Broadcast our pointer in WORLD coords (throttled) so peers see it correctly
+  // regardless of their own pan/zoom.
+  const handlePresencePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      const now = Date.now();
+      if (now - lastCursorPublish.current < 40) return;
+      lastCursorPublish.current = now;
+      const rect = e.currentTarget.getBoundingClientRect();
+      setCursor(
+        screenToWorld(
+          { x: e.clientX - rect.left, y: e.clientY - rect.top },
+          viewport.translate,
+          viewport.scale
+        )
+      );
+    },
+    [setCursor, viewport.translate, viewport.scale]
+  );
+
+  // Mirror our selection into awareness so peers can highlight what we picked.
+  useEffect(() => {
+    setSelection(Object.keys(selectedShapes));
+  }, [selectedShapes, setSelection]);
 
   // Get selected shapes as array
   const selectedShapesList = shapes.filter((s) => selectedShapes[s.id]);
@@ -209,20 +251,30 @@ function CanvasContent({ projectId }: { projectId: string }) {
             }
             break;
           case "fontFamily":
-            if (shape.type === "text") {
+            if (shape.type === "text" || shape.type === "stickynote") {
               patch.fontFamily = fontFamilyPresetToCSS(
                 value as FontFamilyPreset
               );
             }
             break;
+          case "fontSize":
+            if (shape.type === "stickynote") {
+              patch.fontSize = presetToFontSize(value as FontSizePreset);
+            }
+            break;
           case "textAlign":
-            if (shape.type === "text") {
+            if (shape.type === "text" || shape.type === "stickynote") {
               patch.textAlign = value as TextAlignOption;
             }
             break;
           case "textColor":
-            if (shape.type === "text") {
+            if (shape.type === "text" || shape.type === "stickynote") {
               patch.stroke = value;
+            }
+            break;
+          case "stickyBackground":
+            if (shape.type === "stickynote") {
+              patch.backgroundColor = value;
             }
             break;
           case "frameFill":
@@ -236,12 +288,20 @@ function CanvasContent({ projectId }: { projectId: string }) {
             }
             break;
           case "width":
-            if (["frame", "rect", "ellipse", "screen", "image"].includes(shape.type)) {
+            if (
+              ["frame", "rect", "ellipse", "screen", "image", "stickynote"].includes(
+                shape.type
+              )
+            ) {
               patch.w = value;
             }
             break;
           case "height":
-            if (["frame", "rect", "ellipse", "screen", "image"].includes(shape.type)) {
+            if (
+              ["frame", "rect", "ellipse", "screen", "image", "stickynote"].includes(
+                shape.type
+              )
+            ) {
               patch.h = value;
             }
             break;
@@ -967,6 +1027,9 @@ function CanvasContent({ projectId }: { projectId: string }) {
         onZoomToFit={zoomToFit}
         minScale={viewport.minScale}
         maxScale={viewport.maxScale}
+        leftSlot={
+          <SaveIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+        }
       />
 
       {/* History Pill */}
@@ -1002,7 +1065,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
 
       {/* Top Right Actions — properties bar sits just left of Remix/Share */}
       <div className="absolute top-3 right-3 z-50 flex items-center gap-2">
-        <SaveIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+        <PresenceAvatars />
         <ShapePropertiesBar
           currentTool={activeTool}
           selectedShapes={selectedShapesList}
@@ -1010,7 +1073,7 @@ function CanvasContent({ projectId }: { projectId: string }) {
           onPropertyChange={handlePropertyChange}
           onDefaultChange={handleDefaultChange}
         />
-        <CanvasActions />
+        <CanvasActions projectId={projectId} />
         <LayersSidebarToggle
           isOpen={isLayersSidebarOpen}
           onToggle={() => setIsLayersSidebarOpen(!isLayersSidebarOpen)}
@@ -1021,9 +1084,13 @@ function CanvasContent({ projectId }: { projectId: string }) {
       <div
         ref={attachCanvasRef}
         onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
+        onPointerMove={(e) => {
+          onPointerMove(e);
+          handlePresencePointerMove(e);
+        }}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
+        onPointerLeave={() => setCursor(null)}
         onDoubleClick={onDoubleClick}
         onDrop={handleCanvasDrop}
         onDragOver={handleCanvasDragOver}
@@ -1072,6 +1139,9 @@ function CanvasContent({ projectId }: { projectId: string }) {
             }
             if (shape.type === "text") {
               return <Text key={shape.id} shape={shape} />;
+            }
+            if (shape.type === "stickynote") {
+              return <StickyNote key={shape.id} shape={shape} />;
             }
             if (shape.type === "generatedui") {
               return (
@@ -1169,6 +1239,14 @@ function CanvasContent({ projectId }: { projectId: string }) {
             />
           )}
 
+          {/* Render sticky-note ghost preview when the note tool is active */}
+          {activeTool === "stickynote" && (
+            <StickyNoteCursorPreview
+              worldX={getMouseWorldPosition().x}
+              worldY={getMouseWorldPosition().y}
+            />
+          )}
+
           {/* Render selection box */}
           {selectionBox && (
             <SelectionBox
@@ -1230,6 +1308,9 @@ function CanvasContent({ projectId }: { projectId: string }) {
         </div>
       </div>
 
+      {/* Live collaborators' cursors (screen-space overlay) */}
+      <PresenceCursors viewport={viewport} />
+
       {/* Generate buttons for frames with contained shapes - outside canvas container */}
       {framesWithShapes.map(({ frame, containedShapes }) => (
         <GenerateButton
@@ -1253,9 +1334,12 @@ export default function CanvasPage({ params }: CanvasPageProps) {
 
   return (
     <CanvasProvider>
-      <TooltipProvider delayDuration={300}>
-        <CanvasContent projectId={projectId} />
-      </TooltipProvider>
+      <CollabProvider projectId={projectId}>
+        <CanvasDocBridge />
+        <TooltipProvider delayDuration={300}>
+          <CanvasContent projectId={projectId} />
+        </TooltipProvider>
+      </CollabProvider>
     </CanvasProvider>
   );
 }

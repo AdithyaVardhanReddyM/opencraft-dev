@@ -28,6 +28,9 @@ import {
 
 export const messageRole = pgEnum("message_role", ["user", "assistant"]);
 
+// Collaboration roles, ordered least→most privileged in code (see lib/server/api.ts).
+export const projectRole = pgEnum("project_role", ["viewer", "editor", "owner"]);
+
 // User generation tracking.
 export const users = pgTable(
   "users",
@@ -67,6 +70,26 @@ export const projects = pgTable(
     tool: text("tool"),
   },
   (t) => [index("projects_by_user_id").on(t.userId)]
+);
+
+// Collaboration membership: which Clerk users may access a project (besides the
+// implicit owner, projects.userId). The owner row may or may not be present —
+// access checks treat projects.userId as owner regardless (see requireProjectAccess).
+export const projectMembers = pgTable(
+  "project_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(), // Clerk user ID
+    role: projectRole("role").notNull().default("editor"),
+    createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("project_members_unique").on(t.projectId, t.userId),
+    index("project_members_by_user_id").on(t.userId),
+  ]
 );
 
 // Screen shapes for AI-generated web content.

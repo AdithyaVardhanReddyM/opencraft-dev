@@ -5,6 +5,7 @@ import type {
   Shape,
   RectShape,
   TextShape,
+  StickyNoteShape,
   FrameShape,
   ScreenShape,
   ArrowShape,
@@ -17,12 +18,14 @@ import {
   type ArrowType,
   type ControlType,
   type FontFamilyPreset,
+  type FontSizePreset,
   type TextAlignOption,
   getControlsForTool,
   getControlsForShapes,
   pixelsToStrokeWidth,
   radiusToCornerType,
   cssFontFamilyToPreset,
+  fontSizeToPreset,
   frameRadiusToCornerType,
 } from "@/lib/canvas/properties-utils";
 import {
@@ -32,8 +35,10 @@ import {
   CornerTypeControl,
   ArrowTypeControl,
   FontFamilyControl,
+  FontSizeControl,
   TextAlignControl,
   FrameFillPicker,
+  StickyNoteColorPicker,
   DimensionsControl,
 } from "./property-controls";
 
@@ -88,6 +93,10 @@ export function ShapePropertiesBar({
     ? getFontFamilyFromShapes(selectedShapes)
     : "sans";
 
+  const fontSizeValue = hasSelection
+    ? getFontSizeFromShapes(selectedShapes)
+    : "m";
+
   const textAlignValue = hasSelection
     ? getTextAlignFromShapes(selectedShapes)
     : "left";
@@ -95,6 +104,10 @@ export function ShapePropertiesBar({
   const textColorValue = hasSelection
     ? getTextColorFromShapes(selectedShapes)
     : "#000000";
+
+  const stickyBackgroundValue = hasSelection
+    ? getStickyBackgroundFromShapes(selectedShapes)
+    : "#FFE27A";
 
   const frameFillValue = hasSelection
     ? getFrameFillFromShapes(selectedShapes)
@@ -155,6 +168,12 @@ export function ShapePropertiesBar({
     }
   };
 
+  const handleFontSizeChange = (value: FontSizePreset) => {
+    if (hasSelection) {
+      onPropertyChange("fontSize", value);
+    }
+  };
+
   const handleTextAlignChange = (value: TextAlignOption) => {
     if (hasSelection) {
       onPropertyChange("textAlign", value);
@@ -164,6 +183,12 @@ export function ShapePropertiesBar({
   const handleTextColorChange = (value: string) => {
     if (hasSelection) {
       onPropertyChange("textColor", value);
+    }
+  };
+
+  const handleStickyBackgroundChange = (value: string) => {
+    if (hasSelection) {
+      onPropertyChange("stickyBackground", value);
     }
   };
 
@@ -249,6 +274,16 @@ export function ShapePropertiesBar({
         />
       )}
 
+      {controls.includes("fontSize") && (
+        <>
+          <Separator />
+          <FontSizeControl
+            value={fontSizeValue}
+            onChange={handleFontSizeChange}
+          />
+        </>
+      )}
+
       {controls.includes("textAlign") && (
         <>
           <Separator />
@@ -265,6 +300,16 @@ export function ShapePropertiesBar({
           <ColorPicker
             value={textColorValue}
             onChange={handleTextColorChange}
+          />
+        </>
+      )}
+
+      {controls.includes("stickyBackground") && (
+        <>
+          <Separator />
+          <StickyNoteColorPicker
+            value={stickyBackgroundValue}
+            onChange={handleStickyBackgroundChange}
           />
         </>
       )}
@@ -363,9 +408,15 @@ function getArrowTypeFromShapes(shapes: Shape[]): ArrowType | "mixed" {
   return types.every((t) => t === first) ? first : "mixed";
 }
 
+// Text-styling controls (font family, alignment, color) are shared by the text
+// shape and the sticky note, so these extractors accept both.
+type TextStyledShape = TextShape | StickyNoteShape;
+const isTextStyled = (s: Shape): s is TextStyledShape =>
+  s.type === "text" || s.type === "stickynote";
+
 function getFontFamilyFromShapes(shapes: Shape[]): FontFamilyPreset | "mixed" {
   const fonts = shapes
-    .filter((s): s is TextShape => s.type === "text")
+    .filter(isTextStyled)
     .map((s) => cssFontFamilyToPreset(s.fontFamily));
 
   if (fonts.length === 0) return "sans";
@@ -373,10 +424,18 @@ function getFontFamilyFromShapes(shapes: Shape[]): FontFamilyPreset | "mixed" {
   return fonts.every((f) => f === first) ? first : "mixed";
 }
 
+function getFontSizeFromShapes(shapes: Shape[]): FontSizePreset | "mixed" {
+  const sizes = shapes
+    .filter((s): s is StickyNoteShape => s.type === "stickynote")
+    .map((s) => fontSizeToPreset(s.fontSize));
+
+  if (sizes.length === 0) return "m";
+  const first = sizes[0];
+  return sizes.every((s) => s === first) ? first : "mixed";
+}
+
 function getTextAlignFromShapes(shapes: Shape[]): TextAlignOption | "mixed" {
-  const aligns = shapes
-    .filter((s): s is TextShape => s.type === "text")
-    .map((s) => s.textAlign);
+  const aligns = shapes.filter(isTextStyled).map((s) => s.textAlign);
 
   if (aligns.length === 0) return "left";
   const first = aligns[0];
@@ -384,11 +443,19 @@ function getTextAlignFromShapes(shapes: Shape[]): TextAlignOption | "mixed" {
 }
 
 function getTextColorFromShapes(shapes: Shape[]): string | "mixed" {
-  const colors = shapes
-    .filter((s): s is TextShape => s.type === "text")
-    .map((s) => s.stroke);
+  const colors = shapes.filter(isTextStyled).map((s) => s.stroke);
 
   if (colors.length === 0) return "#000000";
+  const first = colors[0];
+  return colors.every((c) => c === first) ? first : "mixed";
+}
+
+function getStickyBackgroundFromShapes(shapes: Shape[]): string | "mixed" {
+  const colors = shapes
+    .filter((s): s is StickyNoteShape => s.type === "stickynote")
+    .map((s) => s.backgroundColor);
+
+  if (colors.length === 0) return "#FFE27A";
   const first = colors[0];
   return colors.every((c) => c === first) ? first : "mixed";
 }
@@ -424,11 +491,13 @@ function getDimensionsFromShapes(shapes: Shape[]): {
       | FrameShape
       | RectShape
       | ScreenShape
+      | StickyNoteShape
       | (Shape & { type: "ellipse"; w: number; h: number }) =>
       s.type === "frame" ||
       s.type === "rect" ||
       s.type === "ellipse" ||
-      s.type === "screen"
+      s.type === "screen" ||
+      s.type === "stickynote"
   );
 
   if (dimensionShapes.length === 0) return { width: 0, height: 0 };

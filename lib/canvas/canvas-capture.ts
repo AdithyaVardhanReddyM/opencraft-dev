@@ -309,6 +309,73 @@ function renderFrame(
 }
 
 /**
+ * Render a sticky note (rounded colored card + centered, wrapped text) so notes
+ * appear in frame captures the same way they do on the canvas.
+ */
+function renderStickyNote(
+  ctx: CanvasRenderingContext2D,
+  shape: Shape & { type: "stickynote" },
+  offsetX: number,
+  offsetY: number
+): void {
+  const x = shape.x - offsetX;
+  const y = shape.y - offsetY;
+  const radius = 10;
+  const padding = 18;
+
+  // Paper
+  ctx.beginPath();
+  ctx.roundRect(x, y, shape.w, shape.h, radius);
+  ctx.fillStyle = shape.backgroundColor;
+  ctx.fill();
+
+  const text = shape.text?.trim();
+  if (!text) return;
+
+  // Wrap text to the note's inner width.
+  ctx.font = `${shape.fontWeight} ${shape.fontSize}px ${shape.fontFamily}`;
+  ctx.fillStyle = shape.stroke;
+  ctx.textBaseline = "middle";
+  ctx.textAlign =
+    shape.textAlign === "center"
+      ? "center"
+      : shape.textAlign === "right"
+        ? "right"
+        : "left";
+
+  const innerWidth = Math.max(shape.w - padding * 2, 1);
+  const lineHeight = shape.fontSize * 1.35;
+  const lines: string[] = [];
+  for (const paragraph of text.split("\n")) {
+    let current = "";
+    for (const word of paragraph.split(/\s+/)) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (ctx.measureText(candidate).width > innerWidth && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    }
+    lines.push(current);
+  }
+
+  const textX =
+    shape.textAlign === "center"
+      ? x + shape.w / 2
+      : shape.textAlign === "right"
+        ? x + shape.w - padding
+        : x + padding;
+  const blockHeight = lines.length * lineHeight;
+  let lineY = y + shape.h / 2 - blockHeight / 2 + lineHeight / 2;
+
+  for (const line of lines) {
+    ctx.fillText(line, textX, lineY);
+    lineY += lineHeight;
+  }
+}
+
+/**
  * Render a shape to a canvas context
  */
 export function renderShapeToCanvas(
@@ -337,6 +404,9 @@ export function renderShapeToCanvas(
       break;
     case "text":
       renderText(ctx, shape, offsetX, offsetY);
+      break;
+    case "stickynote":
+      renderStickyNote(ctx, shape, offsetX, offsetY);
       break;
     case "frame":
       renderFrame(ctx, shape, offsetX, offsetY);

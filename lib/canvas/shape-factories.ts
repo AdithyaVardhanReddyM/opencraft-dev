@@ -8,6 +8,7 @@ import type {
   ArrowBinding,
   LineShape,
   TextShape,
+  StickyNoteShape,
   GeneratedUIShape,
   ScreenShape,
   ImageShape,
@@ -244,6 +245,61 @@ export function createText(params: {
   shape.h = height;
 
   return shape;
+}
+
+// Sticky note defaults. A note is dropped at a fixed size and its text color is
+// carried in `stroke` (so it reuses the text-color control); `backgroundColor`
+// matches STICKY_NOTE_PALETTE[0] (classic yellow) in properties-utils.
+export const STICKY_NOTE_DEFAULTS = {
+  width: 160,
+  height: 160,
+  fontSize: 14, // small preset (FONT_SIZE_MAP.s)
+  fontWeight: 400,
+  backgroundColor: "#FFE27A",
+  textColor: "#1f2937",
+  fontFamily: "Inter, sans-serif",
+} as const;
+
+/**
+ * Create a sticky note shape. `x`/`y` are the drop point (the cursor's world
+ * position); the note is centered on it, so the stored top-left is the point
+ * minus half the note size.
+ */
+export function createStickyNote(params: {
+  x: number;
+  y: number;
+  id?: string;
+  text?: string;
+  w?: number;
+  h?: number;
+  backgroundColor?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  fontWeight?: number;
+  textAlign?: "left" | "center" | "right";
+  stroke?: string;
+}): StickyNoteShape {
+  const w = params.w ?? STICKY_NOTE_DEFAULTS.width;
+  const h = params.h ?? STICKY_NOTE_DEFAULTS.height;
+
+  return {
+    id: params.id ?? nanoid(),
+    type: "stickynote",
+    x: params.x - w / 2,
+    y: params.y - h / 2,
+    w,
+    h,
+    text: params.text ?? "",
+    backgroundColor:
+      params.backgroundColor ?? STICKY_NOTE_DEFAULTS.backgroundColor,
+    fontFamily: params.fontFamily ?? STICKY_NOTE_DEFAULTS.fontFamily,
+    fontSize: params.fontSize ?? STICKY_NOTE_DEFAULTS.fontSize,
+    fontWeight: params.fontWeight ?? STICKY_NOTE_DEFAULTS.fontWeight,
+    textAlign: params.textAlign ?? "center",
+    stroke: params.stroke ?? STICKY_NOTE_DEFAULTS.textColor,
+    strokeWidth: 0,
+    fill: null,
+  };
 }
 
 /**

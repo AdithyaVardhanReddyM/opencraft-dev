@@ -7,6 +7,7 @@ import {
   Circle,
   Pencil,
   Type,
+  StickyNote,
   Eraser,
   ArrowRight,
   Minus,
@@ -44,6 +45,7 @@ const TOOLS: ToolConfig[] = [
   { id: "arrow", icon: ArrowRight, label: "Arrow", shortcut: "A" },
   { id: "freedraw", icon: Pencil, label: "Draw", shortcut: "D" },
   { id: "text", icon: Type, label: "Text", shortcut: "T" },
+  { id: "stickynote", icon: StickyNote, label: "Sticky note", shortcut: "N" },
   { id: "eraser", icon: Eraser, label: "Eraser", shortcut: "E" },
 ];
 

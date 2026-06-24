@@ -20,14 +20,19 @@ export type ControlType =
   | "cornerType"
   | "arrowType"
   | "fontFamily"
+  | "fontSize"
   | "textAlign"
   | "textColor"
+  | "stickyBackground"
   | "frameFill"
   | "frameCornerType"
   | "dimensions";
 
 // Font family options
 export type FontFamilyPreset = "sans" | "playful" | "mono";
+
+// Font size presets (used by the sticky note "size" control)
+export type FontSizePreset = "s" | "m" | "l";
 
 // Text alignment options
 export type TextAlignOption = "left" | "center" | "right";
@@ -44,6 +49,13 @@ export const STROKE_WIDTH_MAP: Record<StrokeWidthPreset, number> = {
   thin: 1,
   normal: 2,
   thick: 4,
+} as const;
+
+// Font size preset to pixel mapping (sticky note "size" control)
+export const FONT_SIZE_MAP: Record<FontSizePreset, number> = {
+  s: 14,
+  m: 18,
+  l: 26,
 } as const;
 
 // Corner radius mapping
@@ -64,6 +76,19 @@ export const COLOR_PALETTE = [
   "#60a5fa", // Blue 400
   "#a78bfa", // Violet 400
   "#f472b6", // Pink 400
+] as const;
+
+// Sticky note paper colors — warm, opaque pastels that read like real sticky
+// notes on the dark canvas. Index 0 (classic yellow) is the default.
+export const STICKY_NOTE_PALETTE = [
+  "#FFE27A", // Classic yellow
+  "#FFC58A", // Peach
+  "#FF9FA3", // Coral / pink
+  "#F4A8E0", // Bubblegum
+  "#C3A9FF", // Lavender
+  "#A0E5C8", // Mint
+  "#8FD3FF", // Sky blue
+  "#D7DBE0", // Slate gray
 ] as const;
 
 // Frame fill color palette - subtle tints that work well on dark canvas
@@ -115,9 +140,11 @@ const TOOLS_WITH_COLOR: Tool[] = [
 ];
 const TOOLS_WITH_CORNER_TYPE: Tool[] = ["rect"];
 const TOOLS_WITH_ARROW_TYPE: Tool[] = ["arrow"];
-const TOOLS_WITH_FONT_FAMILY: Tool[] = ["text"];
-const TOOLS_WITH_TEXT_ALIGN: Tool[] = ["text"];
-const TOOLS_WITH_TEXT_COLOR: Tool[] = ["text"];
+const TOOLS_WITH_FONT_FAMILY: Tool[] = ["text", "stickynote"];
+const TOOLS_WITH_FONT_SIZE: Tool[] = ["stickynote"];
+const TOOLS_WITH_TEXT_ALIGN: Tool[] = ["text", "stickynote"];
+const TOOLS_WITH_TEXT_COLOR: Tool[] = ["text", "stickynote"];
+const TOOLS_WITH_STICKY_BACKGROUND: Tool[] = ["stickynote"];
 const TOOLS_WITH_FRAME_FILL: Tool[] = ["frame"];
 const TOOLS_WITH_FRAME_CORNER_TYPE: Tool[] = ["frame"];
 
@@ -133,12 +160,21 @@ const SHAPES_WITH_STROKE_WIDTH = ["rect", "ellipse"];
 const SHAPES_WITH_COLOR = ["rect", "ellipse", "line", "arrow", "freedraw"];
 const SHAPES_WITH_CORNER_TYPE = ["rect"];
 const SHAPES_WITH_ARROW_TYPE = ["arrow"];
-const SHAPES_WITH_FONT_FAMILY = ["text"];
-const SHAPES_WITH_TEXT_ALIGN = ["text"];
-const SHAPES_WITH_TEXT_COLOR = ["text"];
+const SHAPES_WITH_FONT_FAMILY = ["text", "stickynote"];
+const SHAPES_WITH_FONT_SIZE = ["stickynote"];
+const SHAPES_WITH_TEXT_ALIGN = ["text", "stickynote"];
+const SHAPES_WITH_TEXT_COLOR = ["text", "stickynote"];
+const SHAPES_WITH_STICKY_BACKGROUND = ["stickynote"];
 const SHAPES_WITH_FRAME_FILL = ["frame"];
 const SHAPES_WITH_FRAME_CORNER_TYPE = ["frame"];
-const SHAPES_WITH_DIMENSIONS = ["frame", "rect", "ellipse", "screen", "image"];
+const SHAPES_WITH_DIMENSIONS = [
+  "frame",
+  "rect",
+  "ellipse",
+  "screen",
+  "image",
+  "stickynote",
+];
 
 /**
  * Convert stroke width preset to pixel value
@@ -155,6 +191,22 @@ export function pixelsToStrokeWidth(pixels: number): StrokeWidthPreset {
   if (pixels <= 1) return "thin";
   if (pixels <= 2) return "normal";
   return "thick";
+}
+
+/**
+ * Convert a font size preset to its pixel value
+ */
+export function presetToFontSize(preset: FontSizePreset): number {
+  return FONT_SIZE_MAP[preset];
+}
+
+/**
+ * Convert a pixel font size to the closest matching preset
+ */
+export function fontSizeToPreset(px: number): FontSizePreset {
+  if (px <= FONT_SIZE_MAP.s) return "s";
+  if (px <= FONT_SIZE_MAP.m) return "m";
+  return "l";
 }
 
 /**
@@ -224,11 +276,17 @@ export function getControlsForTool(tool: Tool): ControlType[] {
   if (TOOLS_WITH_FONT_FAMILY.includes(tool)) {
     controls.push("fontFamily");
   }
+  if (TOOLS_WITH_FONT_SIZE.includes(tool)) {
+    controls.push("fontSize");
+  }
   if (TOOLS_WITH_TEXT_ALIGN.includes(tool)) {
     controls.push("textAlign");
   }
   if (TOOLS_WITH_TEXT_COLOR.includes(tool)) {
     controls.push("textColor");
+  }
+  if (TOOLS_WITH_STICKY_BACKGROUND.includes(tool)) {
+    controls.push("stickyBackground");
   }
   if (TOOLS_WITH_FRAME_CORNER_TYPE.includes(tool)) {
     controls.push("frameCornerType");
@@ -268,11 +326,17 @@ export function getControlsForShapes(shapes: Shape[]): ControlType[] {
   const allSupportFontFamily = shapes.every((s) =>
     SHAPES_WITH_FONT_FAMILY.includes(s.type)
   );
+  const allSupportFontSize = shapes.every((s) =>
+    SHAPES_WITH_FONT_SIZE.includes(s.type)
+  );
   const allSupportTextAlign = shapes.every((s) =>
     SHAPES_WITH_TEXT_ALIGN.includes(s.type)
   );
   const allSupportTextColor = shapes.every((s) =>
     SHAPES_WITH_TEXT_COLOR.includes(s.type)
+  );
+  const allSupportStickyBackground = shapes.every((s) =>
+    SHAPES_WITH_STICKY_BACKGROUND.includes(s.type)
   );
   const allSupportFrameFill = shapes.every((s) =>
     SHAPES_WITH_FRAME_FILL.includes(s.type)
@@ -290,8 +354,10 @@ export function getControlsForShapes(shapes: Shape[]): ControlType[] {
   if (allSupportCornerType) controls.push("cornerType");
   if (allSupportArrowType) controls.push("arrowType");
   if (allSupportFontFamily) controls.push("fontFamily");
+  if (allSupportFontSize) controls.push("fontSize");
   if (allSupportTextAlign) controls.push("textAlign");
   if (allSupportTextColor) controls.push("textColor");
+  if (allSupportStickyBackground) controls.push("stickyBackground");
   if (allSupportFrameCornerType) controls.push("frameCornerType");
   if (allSupportFrameFill) controls.push("frameFill");
   if (allSupportDimensions) controls.push("dimensions");
@@ -319,10 +385,14 @@ export function shapeSupportsProperty(
       return SHAPES_WITH_ARROW_TYPE.includes(shape.type);
     case "fontFamily":
       return SHAPES_WITH_FONT_FAMILY.includes(shape.type);
+    case "fontSize":
+      return SHAPES_WITH_FONT_SIZE.includes(shape.type);
     case "textAlign":
       return SHAPES_WITH_TEXT_ALIGN.includes(shape.type);
     case "textColor":
       return SHAPES_WITH_TEXT_COLOR.includes(shape.type);
+    case "stickyBackground":
+      return SHAPES_WITH_STICKY_BACKGROUND.includes(shape.type);
     case "frameFill":
       return SHAPES_WITH_FRAME_FILL.includes(shape.type);
     case "frameCornerType":

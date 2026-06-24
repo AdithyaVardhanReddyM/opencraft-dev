@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { RemixFromWebModal } from "./RemixFromWebModal";
 import { ShareCanvasModal } from "./ShareCanvasModal";
 
-export function CanvasActions() {
+export function CanvasActions({ projectId }: { projectId: string }) {
   const [isRemixModalOpen, setIsRemixModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
@@ -47,6 +47,7 @@ export function CanvasActions() {
       <ShareCanvasModal
         open={isShareModalOpen}
         onOpenChange={setIsShareModalOpen}
+        projectId={projectId}
       />
     </div>
   );

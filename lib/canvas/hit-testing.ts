@@ -78,6 +78,7 @@ export function isPointInShape(point: Point, shape: Shape): boolean {
     case "generatedui":
     case "screen":
     case "image":
+    case "stickynote":
       return (
         point.x >= shape.x &&
         point.x <= shape.x + shape.w &&
@@ -184,6 +185,7 @@ function isPointInShapeBounds(point: Point, shape: Shape): boolean {
     case "generatedui":
     case "screen":
     case "image":
+    case "stickynote":
       return (
         point.x >= shape.x &&
         point.x <= shape.x + shape.w &&
@@ -248,6 +250,7 @@ function getShapeBoundsArea(shape: Shape): number {
     case "generatedui":
     case "screen":
     case "image":
+    case "stickynote":
       return shape.w * shape.h;
 
     case "freedraw": {

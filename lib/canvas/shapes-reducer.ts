@@ -21,6 +21,7 @@ import {
   createArrow,
   createLine,
   createText,
+  createStickyNote,
   createGeneratedUI,
   createScreen,
   createImage,
@@ -110,6 +111,7 @@ type ShapesActionCore =
       };
     }
   | { type: "ADD_TEXT"; payload: { x: number; y: number } }
+  | { type: "ADD_STICKYNOTE"; payload: { x: number; y: number } }
   | {
       type: "ADD_GENERATED_UI";
       payload: {
@@ -177,6 +179,14 @@ type ShapesActionCore =
   | {
       type: "REORDER_SHAPE";
       payload: { shapeId: string; newIndex: number };
+    }
+  | {
+      // Apply shapes received from a remote collaborator (via the Y.Doc bridge).
+      // Replaces the shape set + z-order + frameCounter but leaves this user's
+      // ephemeral state (tool/selection/text-editing) intact, and does NOT enter
+      // the local undo history (remote edits aren't this user's to undo).
+      type: "SYNC_SHAPES_FROM_DOC";
+      payload: { shapes: EntityState<Shape>; frameCounter: number };
     };
 
 export type ShapesAction = ShapesActionCore & ShapesActionMeta;
@@ -321,6 +331,18 @@ export function shapesReducer(
       }));
     }
 
+    case "ADD_STICKYNOTE": {
+      // Mirrors ADD_TEXT: drop the note and immediately enter edit mode so the
+      // user can type right away. editingTextId is shared with the text shape
+      // (it just holds the id of whatever shape is being edited).
+      const note = createStickyNote(action.payload);
+      return applyStateChange(state, action, (current) => ({
+        ...current,
+        shapes: addEntity(current.shapes, note),
+        editingTextId: note.id,
+      }));
+    }
+
     case "ADD_GENERATED_UI": {
       const generatedUI = createGeneratedUI(action.payload);
       return applyStateChange(state, action, (current) => ({
@@ -366,15 +388,12 @@ export function shapesReducer(
       const newSelected = { ...state.selected };
       delete newSelected[id];
 
-      const removed = removeEntity(state.shapes, id);
-      const { shapes: renumberedShapes, frameCount } =
-        renumberFramesState(removed);
-
+      // Frame numbers are stable (assigned monotonically at creation, gaps OK on
+      // delete) — renumbering on every delete would churn/fight under multiplayer.
       return applyStateChange(state, action, (current) => ({
         ...current,
-        shapes: renumberedShapes,
+        shapes: removeEntity(current.shapes, id),
         selected: newSelected,
-        frameCounter: frameCount,
       }));
     }
 
@@ -428,16 +447,11 @@ export function shapesReducer(
         return state;
       }
 
-      const removed = removeMany(state.shapes, idsToDelete);
-      const { shapes: renumberedShapes, frameCount } =
-        renumberFramesState(removed);
-
       return applyStateChange(state, action, (current) => ({
         ...current,
-        shapes: renumberedShapes,
+        shapes: removeMany(current.shapes, idsToDelete),
         selected: {},
         editingTextId: null,
-        frameCounter: frameCount,
       }));
     }
 
@@ -535,6 +549,27 @@ export function shapesReducer(
       };
     }
 
+    case "SYNC_SHAPES_FROM_DOC": {
+      const incoming = action.payload.shapes;
+      // Prune selection / text-editing for shapes a collaborator removed.
+      const newSelected: Record<string, true> = {};
+      for (const id in state.selected) {
+        if (incoming.entities[id]) newSelected[id] = true;
+      }
+      const editingTextId =
+        state.editingTextId && incoming.entities[state.editingTextId]
+          ? state.editingTextId
+          : null;
+
+      return {
+        ...state,
+        shapes: incoming,
+        frameCounter: action.payload.frameCounter,
+        selected: newSelected,
+        editingTextId,
+      };
+    }
+
     case "REORDER_SHAPE": {
       const { shapeId, newIndex } = action.payload;
       const currentIndex = state.shapes.ids.indexOf(shapeId);
@@ -609,33 +644,6 @@ export function shapesReducer(
   }
 }
 
-function renumberFramesState(shapes: EntityState<Shape>): {
-  shapes: EntityState<Shape>;
-  frameCount: number;
-} {
-  let frameCount = 0;
-  const entities: EntityState<Shape>["entities"] = { ...shapes.entities };
-
-  shapes.ids.forEach((id) => {
-    const shape = entities[id];
-    if (shape?.type === "frame") {
-      frameCount += 1;
-      entities[id] = {
-        ...shape,
-        frameNumber: frameCount,
-      };
-    }
-  });
-
-  return {
-    shapes: {
-      ids: shapes.ids,
-      entities,
-    },
-    frameCount,
-  };
-}
-
 // Helper to get full shape bounds (position + dimensions) for paste positioning
 function getFullShapeBounds(
   shape: Shape
@@ -647,6 +655,7 @@ function getFullShapeBounds(
     case "generatedui":
     case "screen":
     case "image":
+    case "stickynote":
       return { x: shape.x, y: shape.y, w: shape.w, h: shape.h };
     case "text":
       return { x: shape.x, y: shape.y, w: shape.w ?? 100, h: shape.h ?? 20 };
@@ -706,6 +715,13 @@ function cloneShapeWithOffset(
         y: shape.y + offsetY,
       };
     case "text":
+      return {
+        ...shape,
+        id: newId,
+        x: shape.x + offsetX,
+        y: shape.y + offsetY,
+      };
+    case "stickynote":
       return {
         ...shape,
         id: newId,

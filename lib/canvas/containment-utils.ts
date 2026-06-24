@@ -25,6 +25,7 @@ export function getShapeBounds(shape: Shape): ShapeBounds {
     case "generatedui":
     case "screen":
     case "image":
+    case "stickynote":
       return {
         x: shape.x,
         y: shape.y,
