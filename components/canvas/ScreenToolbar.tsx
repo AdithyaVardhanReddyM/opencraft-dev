@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ThemeSelector } from "@/components/canvas/ThemeSelector";
+import { CopyToFigmaButton } from "@/components/canvas/CopyToFigmaButton";
 import {
   parseScreenTheme,
   formatScreenTheme,
@@ -480,6 +481,13 @@ export function ScreenToolbar({
             </TooltipTrigger>
             <TooltipContent>{getRefreshTooltip()}</TooltipContent>
           </Tooltip>
+
+          {/* Copy to Figma — serialize the live preview into Figma's clipboard
+              format so the user can paste editable layers (no plugin). */}
+          <CopyToFigmaButton
+            sandboxId={screenData?.sandboxId}
+            disabled={!canPreview}
+          />
 
           {/* Create Flow Button — connects a new page (route) built in this same
               sandbox. Requires a ready sandbox the child can reuse. */}

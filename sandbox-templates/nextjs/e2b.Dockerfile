@@ -57,5 +57,15 @@ RUN npx --yes shadcn@2.6.3 add --all --yes
 # the agent's required tsc validation — pass cleanly.
 RUN npm install react-day-picker@9
 
+# OpenCraft → Figma "Copy to Figma" bridge. `instrumentation-client.ts` runs on
+# the client for every route (Next 15.3 client instrumentation), so it listens
+# for the parent canvas's serialize request on whatever page the iframe shows,
+# without the agent's generated `app/` code needing to know about it. Figit
+# (@figit/dom-to-figma) converts the rendered DOM into Figma's clipboard format.
+COPY instrumentation-client.ts /home/user/nextjs-app/instrumentation-client.ts
+# Pinned: @figit/dom-to-figma is pre-1.0; the bridge is written against the
+# 0.0.2 API (createFigmaConverter().convert(...).toClipboardHtml()).
+RUN npm install @figit/dom-to-figma@0.0.2
+
 # Move the Nextjs app to the home directory and remove the nextjs-app directory
 RUN mv /home/user/nextjs-app/* /home/user/ && rm -rf /home/user/nextjs-app

@@ -1265,49 +1265,105 @@ body:has(.landing-page)::-webkit-scrollbar {
   }
 }
 
-/* The animated border band. Place inside the (overflow-hidden) screen
-   surface as an absolutely-positioned overlay. */
+/* A higher-floor pulse for the inward bleed so the colour wash stays bold
+   on the white artboard instead of fading toward transparent. */
+@keyframes screen-beam-pulse-strong {
+  0%,
+  100% {
+    opacity: 0.78;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* 1) The crisp animated border band — a bright comet on the very edge.
+   Place inside the (overflow-hidden) screen surface. The same comet
+   gradient is repeated on the blurred bleed layer below so the two stay
+   in sync as the angle animates. */
 .screen-beam {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  padding: 3px; /* beam thickness */
+  padding: 2px; /* beam thickness */
   pointer-events: none;
-  z-index: 5;
+  z-index: 6;
   /* Reveal only the border band */
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  /* A concentrated colorful arc; transparent elsewhere so it reads as a
-     comet beam travelling around the edge as the angle animates. */
+  /* A concentrated colorful arc; colour-matched transparent stops avoid
+     the grey fringe you get interpolating to the `transparent` keyword. */
   background: conic-gradient(
     from var(--screen-beam-angle),
-    transparent 0deg,
-    transparent 55deg,
-    #3b82f6 85deg,
-    #8b5cf6 105deg,
-    #ec4899 125deg,
-    #22d3ee 150deg,
-    transparent 185deg,
-    transparent 360deg
+    rgba(59, 130, 246, 0) 0deg,
+    rgba(59, 130, 246, 0) 35deg,
+    #3b82f6 70deg,
+    #8b5cf6 100deg,
+    #ec4899 130deg,
+    #f59e0b 150deg,
+    #22d3ee 175deg,
+    rgba(34, 211, 238, 0) 215deg,
+    rgba(34, 211, 238, 0) 360deg
   );
   animation: screen-beam-spin 2.4s linear infinite;
 }
 
-/* Soft outward bloom. Place on the (non-clipping) outer wrapper so the
+/* 2) Inner colour bleed — the SAME comet, masked to a band on the child,
+   then blurred by the parent so the colour bleeds *inward* across the
+   artboard (and outward, but that's clipped by the surface). The blur
+   MUST live on the parent: CSS applies filters before masks, so blurring
+   the masked element itself would just re-clip it to the sharp band. */
+.screen-beam-bleed {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 5;
+  filter: blur(24px) saturate(1.25);
+  animation: screen-beam-pulse-strong 2.4s ease-in-out infinite;
+}
+.screen-beam-bleed::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 13px; /* thicker source band → richer inward bleed */
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  background: conic-gradient(
+    from var(--screen-beam-angle),
+    rgba(59, 130, 246, 0) 0deg,
+    rgba(59, 130, 246, 0) 35deg,
+    #3b82f6 70deg,
+    #8b5cf6 100deg,
+    #ec4899 130deg,
+    #f59e0b 150deg,
+    #22d3ee 175deg,
+    rgba(34, 211, 238, 0) 215deg,
+    rgba(34, 211, 238, 0) 360deg
+  );
+  animation: screen-beam-spin 2.4s linear infinite;
+}
+
+/* 3) Soft outward bloom. Place on the (non-clipping) outer wrapper so the
    glow can extend beyond the screen edge. */
 .screen-beam-glow {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  box-shadow: 0 0 22px 1px rgba(139, 92, 246, 0.35),
-    0 0 44px 6px rgba(59, 130, 246, 0.18);
+  box-shadow: 0 0 34px 3px rgba(139, 92, 246, 0.55),
+    0 0 70px 12px rgba(59, 130, 246, 0.36),
+    0 0 110px 24px rgba(236, 72, 153, 0.22);
   animation: screen-beam-pulse 2.4s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .screen-beam,
+  .screen-beam-bleed,
+  .screen-beam-bleed::before,
   .screen-beam-glow {
     animation: none;
   }

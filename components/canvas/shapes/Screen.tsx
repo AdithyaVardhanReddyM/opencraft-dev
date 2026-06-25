@@ -144,8 +144,15 @@ export function Screen({
           }}
         />
 
-        {/* Animated border beam while the agent is generating for this screen */}
-        {isGenerating && <div className="screen-beam" aria-hidden />}
+        {/* Animated border beam while the agent is generating for this screen.
+            The bleed layer washes colour inward across the artboard; the crisp
+            beam rides the very edge on top of it. */}
+        {isGenerating && (
+          <>
+            <div className="screen-beam-bleed" aria-hidden />
+            <div className="screen-beam" aria-hidden />
+          </>
+        )}
       </div>
     </div>
   );
