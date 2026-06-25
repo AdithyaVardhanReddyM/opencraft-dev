@@ -1,8 +1,8 @@
 """The agent's default tool set (v1).
 
-screenshot_preview / read_preview_logs are deferred behind "Visual Mode" and are
-NOT included here. The `finish` tool is added by the runner (it owns the
-verification gate), not exported as a generic tool.
+The Visual Mode tool (`check_preview`, tools/visual.py) is NOT in this set — the
+runner adds it only when the per-turn `visual_mode` flag is on, alongside `finish`
+(which owns the verification gate). Neither is exported as a generic default tool.
 """
 
 from .files import create_files, edit_file, read_files

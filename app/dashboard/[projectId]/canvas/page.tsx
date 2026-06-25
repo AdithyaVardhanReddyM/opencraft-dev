@@ -38,7 +38,10 @@ import {
 } from "@/components/canvas/LayersSidebar";
 import { AISidebar } from "@/components/canvas/AISidebar";
 import { DEFAULT_MODEL_ID } from "@/lib/ai-models";
-import { getShapeCenter } from "@/lib/canvas/layers-sidebar-utils";
+import {
+  getShapeCenter,
+  getFrameDisplayNumbers,
+} from "@/lib/canvas/layers-sidebar-utils";
 import { getFramesWithContainedShapes } from "@/lib/canvas/containment-utils";
 import { captureFrameAsImage } from "@/lib/canvas/canvas-capture";
 import { GenerateButton } from "@/components/canvas/GenerateButton";
@@ -83,7 +86,6 @@ import {
   type TextAlignOption,
 } from "@/lib/canvas/properties-utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { resolveBoundArrow } from "@/lib/canvas/arrow-utils";
 import { joinSandboxUrl } from "@/lib/sandbox-url";
 
 function CanvasContent({ projectId }: { projectId: string }) {
@@ -202,6 +204,8 @@ function CanvasContent({ projectId }: { projectId: string }) {
 
   // Lookup of shape id -> shape, used to resolve bound flow connectors at render.
   const shapesById = new Map(shapes.map((s) => [s.id, s]));
+  // Contiguous 1..N frame labels (display-only; see getFrameDisplayNumbers).
+  const frameDisplayNumbers = getFrameDisplayNumbers(shapes);
 
   // Handle property change for selected shapes
   const handlePropertyChange = useCallback(
@@ -1115,7 +1119,13 @@ function CanvasContent({ projectId }: { projectId: string }) {
           {/* Render shapes using component files */}
           {shapes.map((shape) => {
             if (shape.type === "frame") {
-              return <Frame key={shape.id} shape={shape} />;
+              return (
+                <Frame
+                  key={shape.id}
+                  shape={shape}
+                  displayNumber={frameDisplayNumbers.get(shape.id)}
+                />
+              );
             }
             if (shape.type === "rect") {
               return <Rectangle key={shape.id} shape={shape} />;
@@ -1130,13 +1140,10 @@ function CanvasContent({ projectId }: { projectId: string }) {
               return <Line key={shape.id} shape={shape} />;
             }
             if (shape.type === "arrow") {
-              // Flow connectors carry bindings; resolve their endpoints from the
-              // connected shapes' live geometry so they follow on move/resize.
+              // Pass the live shape map so bound endpoints resolve from the
+              // connected shapes' geometry and route cleanly (follow on move/resize).
               return (
-                <Arrow
-                  key={shape.id}
-                  shape={resolveBoundArrow(shape, shapesById)}
-                />
+                <Arrow key={shape.id} shape={shape} shapesById={shapesById} />
               );
             }
             if (shape.type === "text") {
@@ -1223,6 +1230,8 @@ function CanvasContent({ projectId }: { projectId: string }) {
                   startWorld={draftShape.startWorld}
                   currentWorld={draftShape.currentWorld}
                   arrowType={defaultProperties.arrowType}
+                  bindStart={draftShape.bindStart}
+                  bindEnd={draftShape.bindEnd}
                 />
               )}
             </>

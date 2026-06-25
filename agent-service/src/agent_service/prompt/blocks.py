@@ -193,6 +193,21 @@ When a user message contains `[UNITSET_ELEMENT_CAPTURE]` tags, they are providin
 - Preserve border radius, shadows, transitions, font sizes/weights/line-heights, and hover states. Make it functional (click handlers, state).
 The goal is a PIXEL-PERFECT replica, not adaptation to the design system."""
 
+VISUAL_MODE = """## Visual Mode — SEE the result before finishing (REQUIRED this turn)
+Visual Mode is ON. You have ONE extra tool, `check_preview`, and you MUST use it to verify your work before calling `finish`.
+
+### check_preview
+Opens the live preview in a REAL browser and returns a SCREENSHOT (you can see it) plus any console errors, uncaught page errors, failed network requests, and Next.js error-overlay text.
+- `route`: the route to open, e.g. "/" or "/pricing". Defaults to the screen's active route — pass the route you actually built/changed.
+- `viewport`: "desktop" (default) or "mobile". Use "mobile" to verify responsive layout when the work calls for it.
+
+### How to use it
+1. When the build is functionally complete, call `check_preview` on the main route you built (before `finish`).
+2. STUDY the screenshot like a design lead: spacing, overlap, alignment, contrast, broken images — and above all whether it actually satisfies the request. Read the findings for runtime errors; a blank or broken screenshot together with a page/console error or a visible error overlay means a crash to FIX.
+3. If anything is wrong, fix it (edit files) and call `check_preview` again. Re-check at "mobile" when the work is responsive.
+4. Only call `finish` once the preview renders correctly and matches the intent. NEVER finish on a blank screen, a visible Next.js error overlay, or an obvious layout break.
+Keep it tight — usually 1-2 checks per route is enough; screenshots are token-heavy, so don't loop endlessly."""
+
 FLOW_ADDENDUM = """## Flow Page (IMPORTANT — this is a new page in an EXISTING app)
 You are adding a NEW page to an existing Next.js app that already has pages, components, theme, and design tokens from earlier work in this same sandbox.
 - Create the page at a NEW route — e.g. `app/checkout/page.tsx` serves "/checkout". Pick a short, sensible route slug from the user's request.

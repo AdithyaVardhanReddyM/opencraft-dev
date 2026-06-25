@@ -96,11 +96,31 @@ export interface FreeDrawShape extends BaseShape {
   strokeType?: "solid" | "dashed";
 }
 
+// Which edge of a shape an arrow endpoint attaches to. The outward normal of
+// this side is the direction the connector leaves/enters the shape, which is what
+// lets the elbow router build clean orthogonal routes (e.g. top-to-top -> a ∩).
+export type ShapeSide = "top" | "right" | "bottom" | "left";
+
 // A binding ties an arrow endpoint to a shape so the connector follows that shape
 // when it is moved or resized. Endpoints are recomputed from the bound shape's
 // live geometry at render time.
 export interface ArrowBinding {
   shapeId: string;
+  // Edge the endpoint sits on. Optional for legacy bindings (derived at render
+  // from the facing edge when absent).
+  side?: ShapeSide;
+  // Normalized position along that edge (0..1), so the anchor tracks where the
+  // user dropped the endpoint and slides with the shape on resize. Defaults 0.5.
+  position?: number;
+}
+
+// Resolved result of testing a point against the shapes: the shape + edge an
+// arrow endpoint would bind to, plus the snapped anchor point on that edge.
+export interface ArrowBindTarget {
+  shapeId: string;
+  side: ShapeSide;
+  position: number;
+  point: Point;
 }
 
 export interface ArrowShape extends BaseShape {
@@ -245,6 +265,10 @@ export interface DraftShape {
   type: "frame" | "rect" | "ellipse" | "arrow" | "line";
   startWorld: Point;
   currentWorld: Point;
+  // For the arrow tool: the shape/edge each endpoint is currently snapping to, so
+  // the live preview can show the same bound elbow route the committed arrow gets.
+  bindStart?: ArrowBindTarget | null;
+  bindEnd?: ArrowBindTarget | null;
 }
 
 // Touch pointer (for multi-touch support)

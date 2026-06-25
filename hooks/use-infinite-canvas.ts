@@ -8,13 +8,17 @@ import type {
   Tool,
   ViewportState,
   Shape,
+  ArrowShape,
   SelectionMap,
   DraftShape,
   TouchPointer,
   ResizeData,
 } from "@/types/canvas";
 import { screenToWorld } from "@/lib/canvas/coordinate-utils";
-import { getShapeAtPoint } from "@/lib/canvas/hit-testing";
+import {
+  getArrowBindingForPoint,
+  getShapeAtPoint,
+} from "@/lib/canvas/hit-testing";
 import { getTextShapeDimensions } from "@/lib/canvas/text-utils";
 import {
   canUndo as checkCanUndo,
@@ -137,6 +141,9 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
 
   // Resize tracking
   const resizeDataRef = useRef<ResizeData | null>(null);
+  // Last world position of an arrow/line endpoint handle during a drag, captured
+  // so we can rebind the endpoint to a shape on release without reading stale state.
+  const lastLineEndpointRef = useRef<Point | null>(null);
 
   // RAF optimization refs
   const lastFreehandFrameRef = useRef(0);
@@ -396,10 +403,23 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
         (shape.type === "arrow" || shape.type === "line") &&
         (handle === "line-start" || handle === "line-end")
       ) {
-        const patch =
+        // Detach the dragged endpoint's binding so it follows the cursor live;
+        // it rebinds on release if dropped on a shape (handleResizeEnd).
+        const patch: Partial<ArrowShape> =
           handle === "line-start"
-            ? { startX: world.x, startY: world.y }
-            : { endX: world.x, endY: world.y };
+            ? {
+                startX: world.x,
+                startY: world.y,
+                ...(shape.type === "arrow" && { startBinding: undefined }),
+              }
+            : {
+                endX: world.x,
+                endY: world.y,
+                ...(shape.type === "arrow" && { endBinding: undefined }),
+              };
+
+        // Remember where the endpoint ended up so release can rebind it.
+        lastLineEndpointRef.current = world;
 
         dispatchInteractionUpdate({
           type: "UPDATE_SHAPE",
@@ -674,6 +694,42 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
     };
 
     const handleResizeEnd = () => {
+      // When an arrow endpoint was dragged, (re)bind it to whatever shape it was
+      // dropped on — or clear the binding if it now sits in open space.
+      const data = resizeDataRef.current;
+      const endpoint = lastLineEndpointRef.current;
+      if (
+        data &&
+        endpoint &&
+        (data.corner === "line-start" || data.corner === "line-end")
+      ) {
+        const shape = shapesState.shapes.entities[data.shapeId];
+        if (shape?.type === "arrow") {
+          const target = getArrowBindingForPoint(
+            endpoint,
+            shapesList,
+            shape.id
+          );
+          const binding = target
+            ? {
+                shapeId: target.shapeId,
+                side: target.side,
+                position: target.position,
+              }
+            : undefined;
+          const snapped = target?.point ?? endpoint;
+          const patch: Partial<ArrowShape> =
+            data.corner === "line-start"
+              ? { startBinding: binding, startX: snapped.x, startY: snapped.y }
+              : { endBinding: binding, endX: snapped.x, endY: snapped.y };
+          dispatchInteractionUpdate({
+            type: "UPDATE_SHAPE",
+            payload: { id: shape.id, patch },
+          });
+        }
+      }
+
+      lastLineEndpointRef.current = null;
       isResizingRef.current = false;
       resizeDataRef.current = null;
       commitHistoryBatch();
@@ -1069,7 +1125,14 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
 
     if (isDrawingRef.current) {
       if (draftShapeRef.current) {
-        draftShapeRef.current.currentWorld = world;
+        const draft = draftShapeRef.current;
+        draft.currentWorld = world;
+        // Live-snap arrow endpoints to shape edges so the preview shows the same
+        // bound elbow route (e.g. a ∩ between two tops) the committed arrow gets.
+        if (draft.type === "arrow") {
+          draft.bindStart = getArrowBindingForPoint(draft.startWorld, shapesList);
+          draft.bindEnd = getArrowBindingForPoint(world, shapesList);
+        }
         requestRender();
       } else if (currentTool === "freedraw") {
         freeDrawPointsRef.current.push(world);
@@ -1093,7 +1156,11 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
       const w = Math.abs(draft.currentWorld.x - draft.startWorld.x);
       const h = Math.abs(draft.currentWorld.y - draft.startWorld.y);
 
-      if (w > 1 && h > 1) {
+      // Box shapes need real area; linear shapes (arrow/line) just need length on
+      // either axis, so a perfectly horizontal/vertical connector isn't dropped.
+      const isLinear = draft.type === "arrow" || draft.type === "line";
+      const isValid = isLinear ? w > 1 || h > 1 : w > 1 && h > 1;
+      if (isValid) {
         if (draft.type === "frame") {
           dispatchShapes({ type: "ADD_FRAME", payload: { x, y, w, h } });
         } else if (draft.type === "rect") {
@@ -1124,16 +1191,42 @@ export function useInfiniteCanvas(): UseInfiniteCanvasReturn {
             },
           });
         } else if (draft.type === "arrow") {
+          // Bind endpoints to any shape they were dropped on so the connector
+          // follows it and the elbow router can route from the bound edges.
+          const bindStart = getArrowBindingForPoint(
+            draft.startWorld,
+            shapesList
+          );
+          const bindEnd = getArrowBindingForPoint(
+            draft.currentWorld,
+            shapesList
+          );
+          const startPt = bindStart?.point ?? draft.startWorld;
+          const endPt = bindEnd?.point ?? draft.currentWorld;
           dispatchShapes({
             type: "ADD_ARROW",
             payload: {
-              startX: draft.startWorld.x,
-              startY: draft.startWorld.y,
-              endX: draft.currentWorld.x,
-              endY: draft.currentWorld.y,
+              startX: startPt.x,
+              startY: startPt.y,
+              endX: endPt.x,
+              endY: endPt.y,
               stroke: defaultProperties.strokeColor,
               strokeType: defaultProperties.strokeType,
               arrowType: defaultProperties.arrowType,
+              ...(bindStart && {
+                startBinding: {
+                  shapeId: bindStart.shapeId,
+                  side: bindStart.side,
+                  position: bindStart.position,
+                },
+              }),
+              ...(bindEnd && {
+                endBinding: {
+                  shapeId: bindEnd.shapeId,
+                  side: bindEnd.side,
+                  position: bindEnd.position,
+                },
+              }),
             },
           });
         } else if (draft.type === "line") {

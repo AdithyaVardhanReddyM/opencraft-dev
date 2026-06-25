@@ -1,6 +1,11 @@
-import type { Point, Shape } from "@/types/canvas";
+import type { ArrowBindTarget, Point, Shape } from "@/types/canvas";
 import { getTextShapeDimensions } from "./text-utils";
-import { getArrowPoints } from "./arrow-utils";
+import {
+  anchorOnSide,
+  getArrowRoute,
+  nearestSideOfBounds,
+} from "./arrow-utils";
+import { getShapeBounds } from "./containment-utils";
 
 // Hit testing thresholds
 const FREEDRAW_HIT_THRESHOLD = 5;
@@ -47,7 +52,13 @@ export function distanceToLineSegment(
 /**
  * Check if a point is inside a shape
  */
-export function isPointInShape(point: Point, shape: Shape): boolean {
+export function isPointInShape(
+  point: Point,
+  shape: Shape,
+  // Live shapes, so a bound arrow hit-tests against its *resolved* route (the
+  // elbow bridge), not its raw two endpoints. Optional: omit for unbound shapes.
+  shapesById?: Map<string, Shape>
+): boolean {
   switch (shape.type) {
     case "frame":
     case "rect": {
@@ -132,14 +143,8 @@ export function isPointInShape(point: Point, shape: Shape): boolean {
       return false;
 
     case "arrow": {
-      // Test every segment of the (possibly elbow) route.
-      const pts = getArrowPoints(
-        shape.startX,
-        shape.startY,
-        shape.endX,
-        shape.endY,
-        shape.arrowType
-      );
+      // Test every segment of the resolved route (elbow bridge included).
+      const pts = getArrowRoute(shape, shapesById);
       for (let i = 0; i < pts.length - 1; i++) {
         if (distanceToLineSegment(point, pts[i], pts[i + 1]) <= LINE_HIT_THRESHOLD) {
           return true;
@@ -177,7 +182,11 @@ export function isPointInShape(point: Point, shape: Shape): boolean {
 /**
  * Check if a point is within the bounding box of a shape (regardless of fill)
  */
-function isPointInShapeBounds(point: Point, shape: Shape): boolean {
+function isPointInShapeBounds(
+  point: Point,
+  shape: Shape,
+  shapesById?: Map<string, Shape>
+): boolean {
   switch (shape.type) {
     case "frame":
     case "rect":
@@ -208,10 +217,21 @@ function isPointInShapeBounds(point: Point, shape: Shape): boolean {
 
     case "arrow":
     case "line": {
-      const minX = Math.min(shape.startX, shape.endX);
-      const maxX = Math.max(shape.startX, shape.endX);
-      const minY = Math.min(shape.startY, shape.endY);
-      const maxY = Math.max(shape.startY, shape.endY);
+      // Arrows bound to shapes route beyond their raw endpoints (the elbow
+      // bridge), so derive the box from the resolved route when available.
+      const pts =
+        shape.type === "arrow"
+          ? getArrowRoute(shape, shapesById)
+          : [
+              { x: shape.startX, y: shape.startY },
+              { x: shape.endX, y: shape.endY },
+            ];
+      const xs = pts.map((p) => p.x);
+      const ys = pts.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
       // Add threshold for lines since they have no area
       const threshold = LINE_HIT_THRESHOLD;
       return (
@@ -306,6 +326,8 @@ export function getShapeAtPoint(
   const allowBoundsFallback = options?.allowBoundsFallback ?? true;
   const excludeScreenShapes = options?.excludeScreenShapes ?? false;
   const excludeImageShapes = options?.excludeImageShapes ?? false;
+  // Built once so bound arrows can resolve their route during hit-testing.
+  const shapesById = new Map(shapes.map((s) => [s.id, s]));
 
   // Collect all shapes whose bounds contain the point
   for (let i = shapes.length - 1; i >= 0; i--) {
@@ -319,8 +341,8 @@ export function getShapeAtPoint(
     if (excludeImageShapes && shape.type === "image") {
       continue;
     }
-    if (isPointInShapeBounds(point, shape)) {
-      const hits = isPointInShape(point, shape);
+    if (isPointInShapeBounds(point, shape, shapesById)) {
+      const hits = isPointInShape(point, shape, shapesById);
       const area = getShapeBoundsArea(shape);
       candidateShapes.push({ shape, hits, area });
     }
@@ -362,4 +384,43 @@ export function getShapeAtPoint(
   }
 
   return null;
+}
+
+// Box-like shapes an arrow endpoint can attach to. Lines, arrows and free-draw
+// strokes have no meaningful edges to bind against, so they're excluded.
+const ARROW_BINDABLE_TYPES = new Set<Shape["type"]>([
+  "frame",
+  "rect",
+  "ellipse",
+  "generatedui",
+  "screen",
+  "image",
+  "stickynote",
+  "text",
+]);
+
+/**
+ * Find the shape an arrow endpoint dropped at `point` should bind to, along with
+ * the edge it snaps to and the snapped anchor point. Returns null when the point
+ * isn't over a bindable shape. `excludeId` skips the arrow being edited itself.
+ */
+export function getArrowBindingForPoint(
+  point: Point,
+  shapes: Shape[],
+  excludeId?: string
+): ArrowBindTarget | null {
+  const candidates = shapes.filter(
+    (s) => s.id !== excludeId && ARROW_BINDABLE_TYPES.has(s.type)
+  );
+  const hit = getShapeAtPoint(point, candidates);
+  if (!hit) return null;
+
+  const bounds = getShapeBounds(hit);
+  const { side, position } = nearestSideOfBounds(point, bounds);
+  return {
+    shapeId: hit.id,
+    side,
+    position,
+    point: anchorOnSide(bounds, side, position),
+  };
 }

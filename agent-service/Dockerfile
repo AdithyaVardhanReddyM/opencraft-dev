@@ -12,10 +12,13 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Install deps from pyproject (the `agentcore` extra adds bedrock-agentcore +
-# the AWS OTEL distro). Copy build inputs first for better layer caching.
+# the AWS OTEL distro; `visual` adds the AgentCore Browser self-check deps —
+# strands-agents-tools[agent_core_browser] + Playwright. We connect to the REMOTE
+# browser over CDP, so no `playwright install` / Chromium binaries are needed).
+# Copy build inputs first for better layer caching.
 COPY pyproject.toml ./
 COPY src ./src
-RUN pip install --upgrade pip && pip install '.[agentcore]'
+RUN pip install --upgrade pip && pip install '.[agentcore,visual]'
 
 # AgentCore Runtime calls POST /invocations and GET /ping on 8080 — both served
 # by BedrockAgentCoreApp.run() in agentcore_entrypoint.py.

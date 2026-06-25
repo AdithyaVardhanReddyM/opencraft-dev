@@ -53,6 +53,21 @@ export interface StreamingStep {
   toolUseId?: string;
 }
 
+/** A screenshot the agent captured in Visual Mode (the live preview), shown as a
+ *  card in the thread while a run is in flight. */
+export interface VisualCheck {
+  /** Screenshot as a data URL (image/jpeg, base64). */
+  image: string;
+  route?: string;
+  viewport?: string;
+  findings?: {
+    consoleErrors?: string[];
+    pageErrors?: string[];
+    failedRequests?: string[];
+    overlay?: boolean;
+  };
+}
+
 /**
  * An attachment shown as a pill in the chat input. Either a freshly added file
  * (`upload` — needs PUTing to S3) or a reference to an existing canvas image
@@ -69,6 +84,8 @@ export interface SendMessageOptions {
   thinking?: boolean;
   /** Design system chosen in the composer, encoded as "<id>" or "<id>:dark". */
   designSystem?: string;
+  /** Visual Mode — when on, the agent screenshots the live preview and self-corrects. */
+  visualMode?: boolean;
 }
 
 export interface UseChatStreamingReturn {
@@ -80,6 +97,8 @@ export interface UseChatStreamingReturn {
   streamingSteps: StreamingStep[];
   /** Concrete current action (e.g. "Writing files"), derived from the live tool frame. */
   currentActivity: string;
+  /** Visual Mode screenshots captured during the in-flight run (live preview cards). */
+  visualChecks: VisualCheck[];
   error: { message: string; canRetry: boolean } | null;
   sendMessage: (content: string, options?: SendMessageOptions) => Promise<void>;
   retryLastMessage: () => void;
@@ -172,6 +191,8 @@ export function useChatStreaming({
   // run is in flight (the persisted rows take over once SWR catches up).
   const [optimisticUser, setOptimisticUser] = useState<ChatMessage | null>(null);
   const [liveAssistant, setLiveAssistant] = useState<LiveAssistant | null>(null);
+  // Visual Mode screenshots streamed during the current run (cleared on each send).
+  const [visualChecks, setVisualChecks] = useState<VisualCheck[]>([]);
 
   // Realtime collaboration channel (null when realtime is off → pure local chat).
   const collab = useCollabOptional();
@@ -568,6 +589,22 @@ export function useChatStreaming({
           if (projectId) void refreshScreens(projectId);
           break;
         }
+        case "visual_check": {
+          const image = typeof frame.image === "string" ? frame.image : "";
+          if (!image) break;
+          setVisualChecks((prev) => [
+            ...prev,
+            {
+              image,
+              route: typeof frame.route === "string" ? frame.route : undefined,
+              viewport:
+                typeof frame.viewport === "string" ? frame.viewport : undefined,
+              findings: frame.findings as VisualCheck["findings"],
+            },
+          ]);
+          setStatusText("Checking the preview");
+          break;
+        }
         case "result": {
           // Terminal success. The assistant row is persisted by the service
           // callback (may land a beat later) — mark steps done and let the SWR
@@ -598,6 +635,7 @@ export function useChatStreaming({
           setCurrentActivity("");
           setLiveAssistant(null);
           setOptimisticUser(null);
+          setVisualChecks([]);
           if (screenId) void refreshMessages(screenId);
           break;
         }
@@ -611,7 +649,8 @@ export function useChatStreaming({
   const sendMessage = useCallback(
     async (content: string, options?: SendMessageOptions) => {
       const trimmedContent = content.trim();
-      const { modelId, images = [], thinking, designSystem } = options || {};
+      const { modelId, images = [], thinking, designSystem, visualMode } =
+        options || {};
       const hasUploads = images.some((i) => i.kind === "upload");
 
       if (!trimmedContent && images.length === 0) return;
@@ -639,6 +678,7 @@ export function useChatStreaming({
 
       setIsWaitingForResponse(true);
       setLiveAssistant(null);
+      setVisualChecks([]);
       setStatusText(hasUploads ? "Uploading images..." : "Starting...");
       setStreamingSteps([
         {
@@ -711,6 +751,7 @@ export function useChatStreaming({
             imageUrls: imageAgentUrls.length > 0 ? imageAgentUrls : undefined,
             imageIds: imageStorageIds.length > 0 ? imageStorageIds : undefined,
             designSystem,
+            visualMode,
           }),
           signal: ac.signal,
         });
@@ -766,6 +807,7 @@ export function useChatStreaming({
         setStreamingSteps([]);
         setLiveAssistant(null);
         setOptimisticUser(null);
+        setVisualChecks([]);
         broadcastRef.current?.({ kind: "chat", screenId, phase: "end" });
       }
     },
@@ -794,6 +836,7 @@ export function useChatStreaming({
     statusText,
     streamingSteps,
     currentActivity,
+    visualChecks,
     error: error ? { message: error.message, canRetry: error.canRetry } : null,
     sendMessage,
     retryLastMessage,

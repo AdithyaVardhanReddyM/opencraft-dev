@@ -1,20 +1,25 @@
-import { ArrowShape } from "@/types/canvas";
-import { getArrowPoints } from "@/lib/canvas/arrow-utils";
+import { ArrowShape, Shape } from "@/types/canvas";
+import { getArrowRoute } from "@/lib/canvas/arrow-utils";
 
-export const Arrow = ({ shape }: { shape: ArrowShape }) => {
+export const Arrow = ({
+  shape,
+  shapesById,
+}: {
+  shape: ArrowShape;
+  shapesById?: Map<string, Shape>;
+}) => {
   const arrowHeadSize = 10;
   const isDashed = shape.strokeType === "dashed";
 
-  const minX = Math.min(shape.startX, shape.endX);
-  const minY = Math.min(shape.startY, shape.endY);
-
-  const points = getArrowPoints(
-    shape.startX,
-    shape.startY,
-    shape.endX,
-    shape.endY,
-    shape.arrowType
-  );
+  // Resolve bindings and route here so the SVG is sized from the *actual* path —
+  // an elbow bridge can extend beyond the raw start/end box (e.g. above two tops).
+  const points = getArrowRoute(shape, shapesById);
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
 
   // Convert world points to the SVG's local coordinate space.
   const localPoints = points
@@ -27,8 +32,8 @@ export const Arrow = ({ shape }: { shape: ArrowShape }) => {
       style={{
         left: minX - arrowHeadSize,
         top: minY - arrowHeadSize,
-        width: Math.abs(shape.endX - shape.startX) + arrowHeadSize * 2,
-        height: Math.abs(shape.endY - shape.startY) + arrowHeadSize * 2,
+        width: maxX - minX + arrowHeadSize * 2,
+        height: maxY - minY + arrowHeadSize * 2,
         overflow: "visible",
       }}
     >

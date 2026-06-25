@@ -43,6 +43,29 @@ export async function createUploadUrl(userId: string, contentType: string) {
   return { key, uploadUrl };
 }
 
+/**
+ * Upload raw image bytes (e.g. an agent-captured screenshot) straight to S3 and
+ * return the object key. Server-side counterpart to `createUploadUrl` — no
+ * presigned round-trip, since the caller already holds the bytes.
+ */
+export async function uploadImageBuffer(
+  userId: string,
+  body: Buffer | Uint8Array,
+  contentType: string
+): Promise<string> {
+  const ext = contentType.split("/")[1] || "png";
+  const key = `uploads/${userId}/${randomUUID()}.${ext}`;
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  );
+  return key;
+}
+
 /** Presigned GET URL for one object key. */
 export async function getDownloadUrl(key: string): Promise<string> {
   return getSignedUrl(

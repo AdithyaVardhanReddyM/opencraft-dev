@@ -12,6 +12,7 @@ import {
   SquareTerminal,
   Zap,
   ChevronUp,
+  Eye,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ import {
   useChatStreaming,
   type ChatMessage,
   type PillAttachment,
+  type VisualCheck,
 } from "@/hooks/use-chat-streaming";
 import { CodeExplorer } from "@/components/canvas/code-explorer";
 import { EditModeProvider } from "@/contexts/EditModeContext";
@@ -59,6 +61,7 @@ import {
   DesignSystemPicker,
   type DesignSystemValue,
 } from "@/components/canvas/design-systems/DesignSystemPicker";
+import { VisualModeToggle } from "@/components/canvas/VisualModeToggle";
 import { formatScreenTheme } from "@/lib/canvas/theme-utils";
 import {
   MentionInput,
@@ -125,7 +128,7 @@ const SUGGESTIONS = [
 ];
 
 // Sidebar widths
-const COLLAPSED_WIDTH = 340;
+const COLLAPSED_WIDTH = 420;
 const EXPANDED_WIDTH_VW = 50; // 50% of viewport width
 
 export function AISidebar({
@@ -192,6 +195,7 @@ export function AISidebar({
     statusText,
     streamingSteps,
     currentActivity,
+    visualChecks,
     error,
     sendMessage,
     retryLastMessage,
@@ -257,9 +261,11 @@ export function AISidebar({
         thinking: boolean;
         extensionData?: CapturedElement;
         designSystem?: string;
+        visualMode?: boolean;
       }
     ) => {
-      const { modelId, images, thinking, extensionData, designSystem } = options;
+      const { modelId, images, thinking, extensionData, designSystem, visualMode } =
+        options;
       if (!message.text.trim() && !extensionData && images.length === 0) return;
 
       // If extension data is present, format it for AI
@@ -283,8 +289,14 @@ export function AISidebar({
         });
       }
 
-      // Pass modelId, images, thinking, and the chosen design system to sendMessage
-      sendMessage(finalMessage, { modelId, images, thinking, designSystem });
+      // Pass modelId, images, thinking, the chosen design system, and Visual Mode.
+      sendMessage(finalMessage, {
+        modelId,
+        images,
+        thinking,
+        designSystem,
+        visualMode,
+      });
     },
     [sendMessage, selectedScreenId]
   );
@@ -414,6 +426,14 @@ export function AISidebar({
                     activeDetail={currentActivity}
                     attached={hasLiveAssistant}
                   />
+                  {/* Visual Mode — screenshots the agent took this run, shown live */}
+                  {isLoading && visualChecks.length > 0 && (
+                    <div className="ml-8 flex flex-col gap-1.5">
+                      {visualChecks.map((c, i) => (
+                        <VisualCheckCard key={`vc-${i}`} check={c} />
+                      ))}
+                    </div>
+                  )}
                   {error?.canRetry && !isLoading && (
                     <ErrorRetryButton onRetry={retryLastMessage} />
                   )}
@@ -677,6 +697,14 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
           {isStreaming && assistantContent && (
             <span className="inline-block w-2 h-4 ml-0.5 bg-foreground/70 animate-pulse" />
           )}
+          {/* Visual Mode screenshots captured this turn (persisted on the message) */}
+          {imageUrls && Object.keys(imageUrls).length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {Object.entries(imageUrls).map(([id, url]) =>
+                url ? <MessageImageThumbnail key={id} url={url} /> : null
+              )}
+            </div>
+          )}
         </div>
       </div>
       {/* Time footer - only show when not streaming */}
@@ -726,6 +754,7 @@ function ChatInput({
       thinking: boolean;
       extensionData?: CapturedElement;
       designSystem?: string;
+      visualMode?: boolean;
     }
   ) => void;
   status: ChatInputStatus;
@@ -753,6 +782,9 @@ function ChatInput({
   const [designSystem, setDesignSystem] = useState<DesignSystemValue | null>(
     null
   );
+  // Visual Mode — lets the agent see and refine the rendered screen as it
+  // builds. UI-only for now (off by default); not yet wired into submit.
+  const [visualMode, setVisualMode] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const initialDataProcessedRef = useRef(false);
 
@@ -882,6 +914,7 @@ function ChatInput({
       designSystem: designSystem
         ? formatScreenTheme(designSystem.id, designSystem.mode)
         : undefined,
+      visualMode,
     });
     mentionRef.current?.clear();
     setExtensionContent(null);
@@ -891,6 +924,7 @@ function ChatInput({
     selectedModel,
     thinking,
     designSystem,
+    visualMode,
     canGenerate,
     status,
   ]);
@@ -984,7 +1018,7 @@ function ChatInput({
             </div>
           </PromptInputBody>
           <PromptInputFooter className="justify-between px-2 pb-2">
-            <PromptInputTools>
+            <PromptInputTools className="min-w-0">
               {/* Add Image Button - only show for models that support vision */}
               {modelSupportsVision(selectedModel) && (
                 <PromptInputActionMenu>
@@ -1056,6 +1090,13 @@ function ChatInput({
                 </DropdownMenuContent>
               </DropdownMenu>
 
+              {/* Visual Mode — agent sees & refines the rendered screen */}
+              <VisualModeToggle
+                value={visualMode}
+                onChange={setVisualMode}
+                disabled={!canGenerate}
+              />
+
               {/* Design system picker — themes the new sandbox from the start */}
               <DesignSystemPicker
                 value={designSystem}
@@ -1067,7 +1108,7 @@ function ChatInput({
             <PromptInputSubmit
               status={status}
               size="icon-sm"
-              className="h-8 w-8 rounded-lg"
+              className="h-8 w-8 shrink-0 rounded-lg"
               disabled={
                 !canGenerate ||
                 status === "submitted" ||
@@ -1111,5 +1152,38 @@ function MessageImageThumbnail({ url }: { url: string }) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/** Live card for a Visual Mode screenshot — thumbnail + a one-line verdict. */
+function VisualCheckCard({ check }: { check: VisualCheck }) {
+  const errCount =
+    (check.findings?.consoleErrors?.length || 0) +
+    (check.findings?.pageErrors?.length || 0);
+  const hasOverlay = !!check.findings?.overlay;
+  const problem = hasOverlay || errCount > 0;
+  const verdict = hasOverlay
+    ? "Error overlay detected"
+    : errCount > 0
+      ? `${errCount} console/runtime error${errCount > 1 ? "s" : ""}`
+      : "No errors detected";
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border border-border/50 bg-muted/20 p-1.5">
+      <MessageImageThumbnail url={check.image} />
+      <div className="min-w-0 flex-1 text-[11px]">
+        <div className="flex items-center gap-1 font-medium text-foreground">
+          <Eye className="size-3 text-primary" />
+          <span>Visual check{check.route ? ` · ${check.route}` : ""}</span>
+        </div>
+        <div
+          className={cn(
+            "mt-0.5 truncate",
+            problem ? "text-destructive" : "text-muted-foreground"
+          )}
+        >
+          {verdict}
+        </div>
+      </div>
+    </div>
   );
 }

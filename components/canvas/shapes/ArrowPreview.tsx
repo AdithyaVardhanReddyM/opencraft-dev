@@ -1,26 +1,43 @@
-import { getArrowPoints, type ArrowRouting } from "@/lib/canvas/arrow-utils";
+import {
+  getDraftArrowRoute,
+  type ArrowRouting,
+} from "@/lib/canvas/arrow-utils";
+import type { ArrowBindTarget } from "@/types/canvas";
 
 export const ArrowPreview = ({
   startWorld,
   currentWorld,
   arrowType,
+  bindStart,
+  bindEnd,
 }: {
   startWorld: { x: number; y: number };
   currentWorld: { x: number; y: number };
   arrowType?: ArrowRouting;
+  // When an endpoint is hovering a shape, the preview snaps to that edge and
+  // routes like the committed arrow will, so the bend you see is what you get.
+  bindStart?: ArrowBindTarget | null;
+  bindEnd?: ArrowBindTarget | null;
 }) => {
   const arrowHeadSize = 6;
 
-  const minX = Math.min(startWorld.x, currentWorld.x);
-  const minY = Math.min(startWorld.y, currentWorld.y);
+  const start = bindStart?.point ?? startWorld;
+  const end = bindEnd?.point ?? currentWorld;
 
-  const points = getArrowPoints(
-    startWorld.x,
-    startWorld.y,
-    currentWorld.x,
-    currentWorld.y,
+  const points = getDraftArrowRoute(
+    start,
+    end,
+    bindStart?.side ?? null,
+    bindEnd?.side ?? null,
     arrowType
   );
+
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
 
   const localPoints = points
     .map((p) => `${p.x - minX + arrowHeadSize},${p.y - minY + arrowHeadSize}`)
@@ -32,8 +49,8 @@ export const ArrowPreview = ({
       style={{
         left: minX - arrowHeadSize,
         top: minY - arrowHeadSize,
-        width: Math.abs(currentWorld.x - startWorld.x) + arrowHeadSize * 2,
-        height: Math.abs(currentWorld.y - startWorld.y) + arrowHeadSize * 2,
+        width: maxX - minX + arrowHeadSize * 2,
+        height: maxY - minY + arrowHeadSize * 2,
         overflow: "visible",
       }}
     >

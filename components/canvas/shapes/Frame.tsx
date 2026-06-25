@@ -1,6 +1,14 @@
 import { FrameShape } from "@/types/canvas";
 
-export const Frame = ({ shape }: { shape: FrameShape }) => {
+export const Frame = ({
+  shape,
+  displayNumber,
+}: {
+  shape: FrameShape;
+  // Contiguous label number (1..N by creation order); falls back to the stored
+  // frameNumber when not provided.
+  displayNumber?: number;
+}) => {
   const borderRadius = shape.borderRadius ?? 0;
   const fillColor = shape.fill ?? "rgba(226, 226, 226, 0.9)";
 
@@ -26,7 +34,7 @@ export const Frame = ({ shape }: { shape: FrameShape }) => {
           lineHeight: "1.2",
         }}
       >
-        Frame {shape.frameNumber}
+        Frame {displayNumber ?? shape.frameNumber}
       </div>
     </>
   );

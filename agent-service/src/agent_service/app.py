@@ -37,6 +37,9 @@ class ChatRequest(BaseModel):
     modelId: str | None = None
     thinking: bool = False
     imageUrls: list[str] | None = None
+    # Visual Mode — per-run flag; when on, the agent screenshots the live preview
+    # and self-corrects before finishing.
+    visualMode: bool = False
     callback: Callback | None = None
 
 
@@ -68,6 +71,7 @@ async def chat(
             model_id=req.modelId,
             thinking=req.thinking,
             image_urls=req.imageUrls,
+            visual_mode=req.visualMode,
             callback=req.callback,
         ):
             yield _sse(frame)

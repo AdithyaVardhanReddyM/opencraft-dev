@@ -10,7 +10,11 @@ import {
   MousePointer2,
 } from "lucide-react";
 import type { Shape, SelectionMap } from "@/types/canvas";
-import { getShapeIcon, getShapeName } from "@/lib/canvas/layers-sidebar-utils";
+import {
+  getShapeIcon,
+  getShapeName,
+  getFrameDisplayNumbers,
+} from "@/lib/canvas/layers-sidebar-utils";
 import {
   Tooltip,
   TooltipContent,
@@ -46,6 +50,7 @@ interface ShapeItemProps {
   isDragging: boolean;
   isDragOver: boolean;
   screenTitle?: string;
+  frameNumber?: number;
 }
 
 function ShapeItem({
@@ -59,9 +64,10 @@ function ShapeItem({
   isDragging,
   isDragOver,
   screenTitle,
+  frameNumber,
 }: ShapeItemProps) {
   const Icon = getShapeIcon(shape.type);
-  const fullName = getShapeName(shape, screenTitle);
+  const fullName = getShapeName(shape, screenTitle, frameNumber);
   // Truncate long names with ellipsis
   const maxLength = 30;
   const name =
@@ -223,15 +229,22 @@ export function LayersSidebar({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
+  // Contiguous 1..N frame labels, keyed by all frames (not just the filtered set).
+  const frameNumbers = useMemo(() => getFrameDisplayNumbers(shapes), [shapes]);
+
   const filteredShapes = useMemo(() => {
     if (!searchQuery.trim()) return shapes;
     const query = searchQuery.toLowerCase();
     return shapes.filter((shape) => {
-      const name = getShapeName(shape).toLowerCase();
+      const name = getShapeName(
+        shape,
+        undefined,
+        frameNumbers.get(shape.id)
+      ).toLowerCase();
       const type = shape.type.toLowerCase();
       return name.includes(query) || type.includes(query);
     });
-  }, [shapes, searchQuery]);
+  }, [shapes, searchQuery, frameNumbers]);
 
   // Keep original order - bottom layer first in list, top layer last
   const displayShapes = filteredShapes;
@@ -332,6 +345,7 @@ export function LayersSidebar({
                       ? screenDataMap?.get(shape.id)?.title
                       : undefined
                   }
+                  frameNumber={frameNumbers.get(shape.id)}
                 />
               ))}
             </div>

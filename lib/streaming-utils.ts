@@ -16,6 +16,7 @@ export type AgentFrameType =
   | "tool"
   | "tool_detail"
   | "reasoning"
+  | "visual_check"
   | "result"
   | "error";
 
@@ -39,6 +40,7 @@ const TOOL_LABELS: Record<string, string> = {
   search_project: "Searching project",
   scrape_webpage: "Inspecting webpage",
   terminal: "Running command",
+  check_preview: "Checking the preview",
   finish: "Finalizing",
 };
 

@@ -119,7 +119,7 @@ export function DesignSystemPicker({
       {selected ? (
         <div
           className={cn(
-            "inline-flex h-8 items-center rounded-full border bg-background text-xs font-medium",
+            "inline-flex h-8 min-w-0 items-center rounded-full border bg-background text-xs font-medium",
             disabled && "opacity-50"
           )}
         >
@@ -127,19 +127,19 @@ export function DesignSystemPicker({
             <button
               type="button"
               disabled={disabled}
-              className="inline-flex items-center gap-1.5 py-1 pl-2 pr-1.5 outline-none"
+              className="inline-flex min-w-0 items-center gap-1.5 py-1 pl-2 pr-1.5 outline-none"
             >
               <SwatchCircle colors={selected.colors} />
-              <span className="max-w-[120px] truncate">{selected.name}</span>
+              <span className="min-w-0 truncate">{selected.name}</span>
             </button>
           </PopoverTrigger>
-          <span className="h-4 w-px bg-border" />
+          <span className="h-4 w-px shrink-0 bg-border" />
           <button
             type="button"
             onClick={() => onChange(null)}
             disabled={disabled}
             aria-label="Remove design system"
-            className="flex h-full items-center rounded-r-full px-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            className="flex h-full shrink-0 items-center rounded-r-full px-1.5 text-muted-foreground transition-colors hover:text-foreground"
           >
             <X className="size-3.5" />
           </button>
@@ -167,7 +167,13 @@ export function DesignSystemPicker({
         </Tooltip>
       )}
 
-      <PopoverContent className="w-80 p-0" align="start" side="top" sideOffset={8}>
+      {/* z-100 to clear the z-60 AI sidebar (matches the @-mention dropdown). */}
+      <PopoverContent
+        className="w-80 p-0 z-100"
+        align="start"
+        side="top"
+        sideOffset={8}
+      >
         {/* Search + light/dark toggle */}
         <div className="flex items-center gap-2 border-b p-2">
           <div className="relative flex-1">

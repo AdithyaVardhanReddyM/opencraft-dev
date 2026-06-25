@@ -1,4 +1,4 @@
-import type { Shape, Point } from "@/types/canvas";
+import type { Shape, Point, FrameShape } from "@/types/canvas";
 import {
   Frame,
   Square,
@@ -40,14 +40,35 @@ export function getShapeIcon(type: Shape["type"]): LucideIcon {
 }
 
 /**
+ * Map each frame's id to a contiguous 1-based display number, ordered by creation
+ * (ascending stored frameNumber). This is display-only — it never writes the
+ * stored frameNumber, so it's safe under live collaboration (no values for peers
+ * to fight over) and stays gapless as frames are added or deleted.
+ */
+export function getFrameDisplayNumbers(shapes: Shape[]): Map<string, number> {
+  const frames = shapes.filter((s): s is FrameShape => s.type === "frame");
+  frames.sort((a, b) => a.frameNumber - b.frameNumber);
+  const numbers = new Map<string, number>();
+  frames.forEach((frame, i) => numbers.set(frame.id, i + 1));
+  return numbers;
+}
+
+/**
  * Generate a readable display name for a shape
  * @param shape - The shape to get the name for
  * @param screenTitle - Optional title for screen shapes (from Convex)
+ * @param frameNumber - Optional contiguous display number for frames
  */
-export function getShapeName(shape: Shape, screenTitle?: string): string {
+export function getShapeName(
+  shape: Shape,
+  screenTitle?: string,
+  // Contiguous display number for frames (see getFrameDisplayNumbers). Falls back
+  // to the stored frameNumber when not supplied.
+  frameNumber?: number
+): string {
   switch (shape.type) {
     case "frame":
-      return `Frame ${shape.frameNumber}`;
+      return `Frame ${frameNumber ?? shape.frameNumber}`;
     case "rect":
       return "Rectangle";
     case "ellipse":

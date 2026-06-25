@@ -35,6 +35,9 @@ const bodySchema = z.object({
   // "<id>" or "<id>:dark". Persisted as the screen's theme and forwarded so the
   // agent-service themes a freshly-created sandbox before it generates.
   designSystem: z.string().optional(),
+  // Visual Mode — per-run flag (like `thinking`); when on, the agent screenshots
+  // the live preview and self-corrects before finishing. Not persisted.
+  visualMode: z.boolean().optional(),
 });
 
 const SSE_HEADERS = {
@@ -105,8 +108,16 @@ export async function POST(req: NextRequest) {
   } catch {
     return json(400, { error: "Invalid request" });
   }
-  const { screenId, message, modelId, thinking, imageUrls, imageIds, designSystem } =
-    body;
+  const {
+    screenId,
+    message,
+    modelId,
+    thinking,
+    imageUrls,
+    imageIds,
+    designSystem,
+    visualMode,
+  } = body;
 
   // Generation limit → SSE error frame so the client's single streaming path
   // renders it (the composer already flipped to "streaming"). No user msg, no run.
@@ -157,6 +168,7 @@ export async function POST(req: NextRequest) {
         modelId,
         thinking: thinking ?? false,
         imageUrls,
+        visualMode: visualMode ?? false,
         callback: {
           url: `${APP_URL}/api/internal/agent-result`,
           secret: AGENT_SHARED_SECRET || undefined,

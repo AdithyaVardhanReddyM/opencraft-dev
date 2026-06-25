@@ -24,6 +24,7 @@ from ..context.file_meta import changed_paths, derive_route_from_changes, merge_
 from ..models import build_model
 from ..tools import DEFAULT_TOOLS
 from ..tools.sandbox import apply_theme, get_or_create_sandbox, host_url
+from ..tools.visual import check_preview, close_browser, drain_visual_checks
 from .finish import finish
 from .stream import enriched_tool_label, normalize_event
 
@@ -36,6 +37,7 @@ async def run_turn(
     model_id: str | None = None,
     thinking: bool = False,
     image_urls: list[str] | None = None,
+    visual_mode: bool = False,
 ) -> AsyncIterator[dict[str, Any]]:
     """Run one turn. `screen` and `history` are supplied by the caller (no DB).
 
@@ -80,7 +82,9 @@ async def run_turn(
         seed_files = dict(screen.get("files") or {})
 
     # 2. assemble context
-    system_prompt, history_msgs, current_text = build_turn(screen, history, message)
+    system_prompt, history_msgs, current_text = build_turn(
+        screen, history, message, visual_mode=visual_mode
+    )
     image_blocks = await build_image_blocks(image_urls)
     prompt: Any = (
         current_text if not image_blocks else [{"text": current_text}, *image_blocks]
@@ -95,12 +99,21 @@ async def run_turn(
         "files": seed_files,
         "is_first_build": not seed_files,
         "result_holder": result_holder,
+        # Visual Mode: check_preview reads these to open the right preview URL; the
+        # harness closes the browser session check_preview lazily starts.
+        "sandbox_url": sandbox_url,
+        "route": screen.get("route"),
     }
 
+    # Visual Mode adds the browser self-check tool; the prompt block tells the agent
+    # to call it before finishing. Off by default → the lean core set, no image tokens.
+    turn_tools = (
+        [*DEFAULT_TOOLS, check_preview, finish] if visual_mode else [*DEFAULT_TOOLS, finish]
+    )
     agent = Agent(
         model=model,
         system_prompt=system_prompt,
-        tools=[*DEFAULT_TOOLS, finish],
+        tools=turn_tools,
         messages=history_msgs,
         callback_handler=None,
     )
@@ -111,6 +124,11 @@ async def run_turn(
     reasoning_parts: list[str] = []  # the model's thinking, for persistence/display
     try:
         async for event in agent.stream_async(prompt, invocation_state=invocation_state):
+            # Emit any screenshots check_preview captured since the last event as
+            # `visual_check` frames (and accumulate them for end-of-turn persistence).
+            if visual_mode:
+                for card in drain_visual_checks(invocation_state):
+                    yield {"type": "visual_check", **card}
             frame = normalize_event(event)
             if frame is None:
                 continue
@@ -143,9 +161,19 @@ async def run_turn(
             elif ftype == "reasoning":
                 reasoning_parts.append(frame.get("text") or "")
             yield frame
+        # Flush a final card (e.g. a check_preview immediately before finish).
+        if visual_mode:
+            for card in drain_visual_checks(invocation_state):
+                yield {"type": "visual_check", **card}
     except Exception as e:  # noqa: BLE001 — final failure handler
         yield {"type": "error", "message": f"Agent run failed: {e}"}
         return
+    finally:
+        # Cost-critical: close the AgentCore Browser session here, inside run_turn,
+        # so it fires even when the SSE client disconnects (the durable task still
+        # runs this generator to completion). No-op when no session was started.
+        if visual_mode:
+            await close_browser(invocation_state)
 
     # 4. emit the result for the caller to persist (no DB writes here)
     result = result_holder.get("result")
@@ -176,6 +204,9 @@ async def run_turn(
         # thinking was off (no reasoning streamed).
         "reasoning": "".join(reasoning_parts).strip() or None,
         "changes": changes,
+        # Visual Mode screenshots (data URLs) for the caller to persist onto the
+        # assistant message. Empty unless the agent ran check_preview this turn.
+        "screenshots": invocation_state.get("screenshots_acc") or [],
         # Final state for the caller to write verbatim:
         "files": files_state,        # full merged {path: content}
         "fileMeta": new_file_meta,   # full merged {path: {description, updatedAt, status}}

@@ -5,6 +5,7 @@ import {
   internalGetMessages,
 } from "@/lib/db/queries/messages";
 import { incrementGeneration } from "@/lib/db/queries/users";
+import { uploadImageBuffer } from "@/lib/s3";
 
 // Durable terminal persistence. The agent-service POSTs the final `result`/`error`
 // frame here when a turn finishes — independent of the /api/chat streaming
@@ -34,6 +35,7 @@ interface ResultFrame {
   files?: unknown;
   fileMeta?: unknown;
   recentEdits?: string[];
+  screenshots?: string[]; // Visual Mode: screenshots as data URLs, to persist
   message?: string; // error frames
 }
 
@@ -99,12 +101,32 @@ export async function POST(req: NextRequest) {
       // Display the full streamed narration; fall back to the summary if the run
       // produced no prose. Keep the terse summary in `summary` for history/context.
       const summary = result.summary || "Done.";
+      // Visual Mode: persist any screenshots (data URLs) the agent captured so
+      // they survive a reload as thumbnails on this assistant message. Best-effort
+      // — a screenshot that fails to upload is simply dropped.
+      let imageIds: string[] | undefined;
+      if (clerkId && Array.isArray(result.screenshots) && result.screenshots.length > 0) {
+        const keys: string[] = [];
+        for (const dataUrl of result.screenshots.slice(0, 3)) {
+          const m = /^data:(image\/[a-zA-Z]+);base64,(.+)$/.exec(dataUrl);
+          if (!m) continue;
+          try {
+            keys.push(
+              await uploadImageBuffer(clerkId, Buffer.from(m[2], "base64"), m[1])
+            );
+          } catch {
+            /* skip this screenshot */
+          }
+        }
+        if (keys.length > 0) imageIds = keys;
+      }
       await internalCreateMessage({
         screenId,
         role: "assistant",
         content: (result.narration && result.narration.trim()) || summary,
         summary,
         modelId,
+        imageIds,
         reasoningDetails:
           result.reasoning && result.reasoning.trim()
             ? { content: result.reasoning.trim() }

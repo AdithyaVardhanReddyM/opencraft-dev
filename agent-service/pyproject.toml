@@ -27,6 +27,16 @@ agentcore = [
     "aws-opentelemetry-distro",
 ]
 
+# Visual Mode — the agent self-checks its render in an AWS AgentCore Browser
+# (aws.browser.v1). We drive that remote browser over CDP with Playwright to pull
+# real screenshot BYTES back to the model (the raw strands browser tool only
+# returns a remote file path). BrowserClient comes from bedrock-agentcore, so
+# install alongside the agentcore extra: uv pip install -e '.[agentcore,visual]'.
+visual = [
+    "strands-agents-tools[agent_core_browser]",
+    "playwright>=1.40",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

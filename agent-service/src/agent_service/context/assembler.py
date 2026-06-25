@@ -26,6 +26,7 @@ def build_turn(
     screen: dict[str, Any] | None,
     messages: list[dict[str, Any]],
     user_message: str,
+    visual_mode: bool = False,
 ) -> tuple[str, list[dict[str, Any]], str]:
     """Build the turn inputs.
 
@@ -41,6 +42,7 @@ def build_turn(
         is_flow=is_flow,
         include_recreation=has_url,
         include_capture=has_capture,
+        include_visual=visual_mode,
     )
 
     history_messages = history_mod.to_messages(messages)

@@ -14,6 +14,7 @@ def build_system_prompt(
     is_flow: bool = False,
     include_recreation: bool = False,
     include_capture: bool = False,
+    include_visual: bool = False,
 ) -> str:
     parts: list[str] = [
         blocks.HEADER,
@@ -31,4 +32,8 @@ def build_system_prompt(
         parts.append(blocks.CAPTURED_ELEMENT)
     if is_flow:
         parts.append(blocks.FLOW_ADDENDUM)
+    # Last so it sits closest to the user turn — and conditional, so toggling
+    # Visual Mode only busts the cache on the turn it flips.
+    if include_visual:
+        parts.append(blocks.VISUAL_MODE)
     return "\n\n".join(parts)

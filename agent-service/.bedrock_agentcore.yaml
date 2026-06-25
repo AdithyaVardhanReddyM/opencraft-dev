@@ -32,7 +32,7 @@ agents:
     bedrock_agentcore:
       agent_id: opencraft_agent-6NXBOC8Dfu
       agent_arn: arn:aws:bedrock-agentcore:us-east-1:339712700064:runtime/opencraft_agent-6NXBOC8Dfu
-      agent_session_id: 5618463b-6336-4b85-ac1f-2a63d6f0ab87
+      agent_session_id: null
     codebuild:
       project_name: bedrock-agentcore-opencraft_agent-builder
       execution_role: arn:aws:iam::339712700064:role/AmazonBedrockAgentCoreSDKCodeBuild-us-east-1-94225d0d7a

@@ -69,6 +69,13 @@ class Settings(BaseSettings):
     aws_region: str = "us-east-1"
     bedrock_model_id: str = "us.anthropic.claude-sonnet-4-6"
 
+    # Visual Mode — AWS AgentCore Browser (aws.browser.v1) for the post-build
+    # screenshot self-check. `aws_region` selects the browser region (must be an
+    # AgentCore region). Keep the session timeout modest: a leaked session bills
+    # until it's stopped or this elapses.
+    agentcore_browser_identifier: str = "aws.browser.v1"
+    agentcore_browser_session_timeout: int = 600  # seconds
+
     # E2B
     e2b_api_key: str
     sandbox_template: str = "unitset-sandbox-v1"
@@ -93,6 +100,14 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     # Populate os.environ so boto3's default credential chain (used by Bedrock)
-    # picks up AWS_* from the service .env, in addition to pydantic Settings.
-    load_dotenv(_ENV_PATH)
+    # and Google ADC (GOOGLE_APPLICATION_CREDENTIALS) pick up values from the
+    # service .env, in addition to pydantic Settings.
+    #
+    # override=True so the .env is authoritative over a polluted parent shell.
+    # Without it, a stale `export GOOGLE_APPLICATION_CREDENTIALS=...` (e.g. left
+    # over from `source .env` when the file was malformed) silently wins over the
+    # corrected .env, since load_dotenv defaults to NOT overriding existing vars.
+    # Safe on AgentCore: the Dockerfile doesn't copy .env, so this is a no-op
+    # there and the container's injected secrets are untouched.
+    load_dotenv(_ENV_PATH, override=True)
     return Settings()  # type: ignore[call-arg]
