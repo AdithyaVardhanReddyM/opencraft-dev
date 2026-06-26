@@ -49,7 +49,12 @@ export interface SaveResult {
  */
 export function serializeCanvasState(
   viewport: ViewportState,
-  shapes: ShapesState
+  shapes: ShapesState,
+  // Conflict resolution compares this across local/cloud. Autosave passes a
+  // monotonic value (never below the last server-acked time) so a device with a
+  // lagging clock can't stamp an edit older than the cloud and lose it. Defaults
+  // to wall-clock for non-autosave callers.
+  lastModified: number = Date.now()
 ): CanvasProjectData {
   // Limit persisted history to most recent entries
   let persistedHistory: HistoryEntry[] | undefined;
@@ -94,7 +99,7 @@ export function serializeCanvasState(
     history: persistedHistory,
     historyPointer: persistedPointer,
     version: CANVAS_VERSION,
-    lastModified: Date.now(),
+    lastModified,
   };
 }
 
@@ -189,10 +194,11 @@ export function getLocalStorageTimestamp(projectId: string): number | null {
 export function saveToLocalStorage(
   projectId: string,
   viewport: ViewportState,
-  shapes: ShapesState
+  shapes: ShapesState,
+  lastModified?: number
 ): SaveResult {
   try {
-    const data = serializeCanvasState(viewport, shapes);
+    const data = serializeCanvasState(viewport, shapes, lastModified);
     localStorage.setItem(`canvas-project-${projectId}`, JSON.stringify(data));
     return { success: true };
   } catch (error) {

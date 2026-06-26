@@ -80,6 +80,15 @@ export function useAutosave(
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadDoneRef = useRef(false);
   const pendingCloudSyncRef = useRef(false);
+  // The last server-acked lastModified. Local saves stamp max(now, this+1) so a
+  // device whose clock lags can't write an edit that reads older than the cloud
+  // and get it discarded on reload. Seeded from the cloud state at load and
+  // advanced on every successful cloud sync (the server returns its stamp).
+  const lastServerTsRef = useRef(0);
+  const nextLocalTs = useCallback(
+    () => Math.max(Date.now(), lastServerTsRef.current + 1),
+    []
+  );
   // Live handle to the collab doc, read inside the one-shot load effect without
   // making the doc a dependency of that effect.
   const docRef = useRef(doc);
@@ -95,13 +104,14 @@ export function useAutosave(
     if (!initialLoadDoneRef.current || !isDirty) return;
 
     // localStorage is synchronous and survives both unmount and tab close.
-    saveToLocalStorage(projectId, viewport, shapes);
+    const ts = nextLocalTs();
+    saveToLocalStorage(projectId, viewport, shapes, ts);
 
     // Best-effort cloud flush (fire-and-forget; no setState, so it's safe after
     // unmount). Completes normally on client-side nav; on a hard tab close it may
     // be cut off, but localStorage already holds the state for the next open.
     if (canEdit && !isOffline) {
-      const data = serializeCanvasState(viewport, shapes);
+      const data = serializeCanvasState(viewport, shapes, ts);
       void saveCanvasStateRequest({
         projectId,
         canvasData: {
@@ -167,9 +177,9 @@ export function useAutosave(
     setError(null);
 
     try {
-      const data = serializeCanvasState(viewport, shapes);
+      const data = serializeCanvasState(viewport, shapes, nextLocalTs());
 
-      await saveCanvasStateRequest({
+      const result = await saveCanvasStateRequest({
         projectId,
         canvasData: {
           viewport: data.viewport,
@@ -182,8 +192,11 @@ export function useAutosave(
         },
       });
 
-      // Success
-      setLastSavedAt(data.lastModified);
+      // Success — adopt the server's authoritative timestamp as our baseline so
+      // subsequent local saves stay monotonic against the cloud.
+      const serverTs = result?.lastModified ?? data.lastModified;
+      lastServerTsRef.current = Math.max(lastServerTsRef.current, serverTs);
+      setLastSavedAt(serverTs);
       setIsDirty(false);
       setError(null);
       retryCountRef.current = 0;
@@ -219,17 +232,18 @@ export function useAutosave(
     } finally {
       setIsSyncing(false);
     }
-  }, [viewport, shapes, projectId, isOffline, maxRetries, canEdit]);
+  }, [viewport, shapes, projectId, isOffline, maxRetries, canEdit, nextLocalTs]);
 
   // Save to localStorage (debounced)
   const saveToLocal = useCallback(() => {
-    const result = saveToLocalStorage(projectId, viewport, shapes);
+    const ts = nextLocalTs();
+    const result = saveToLocalStorage(projectId, viewport, shapes, ts);
 
     if (!result.success) {
       if (result.error === "quota_exceeded") {
         // Try to clear old data and retry
         clearOldLocalStorageData(5);
-        const retryResult = saveToLocalStorage(projectId, viewport, shapes);
+        const retryResult = saveToLocalStorage(projectId, viewport, shapes, ts);
         if (!retryResult.success) {
           setError({
             type: "localStorage",
@@ -243,7 +257,7 @@ export function useAutosave(
 
     // Mark as dirty (needs cloud sync)
     setIsDirty(true);
-  }, [projectId, viewport, shapes]);
+  }, [projectId, viewport, shapes, nextLocalTs]);
 
   // Debounced local save effect
   useEffect(() => {
@@ -322,6 +336,15 @@ export function useAutosave(
             lastModified: cloudState.lastModified,
           }
         : null;
+
+      // Seed the monotonic baseline from the cloud's authoritative timestamp so
+      // the first local edits this session stamp above it (never below).
+      if (cloudData) {
+        lastServerTsRef.current = Math.max(
+          lastServerTsRef.current,
+          cloudData.lastModified
+        );
+      }
 
       // Resolve conflict
       const resolvedData = resolveConflict(localData, cloudData);

@@ -21,6 +21,7 @@ import {
 import { ApiError } from "@/lib/server/errors";
 import { getProjectRole, ROLE_RANK } from "@/lib/db/queries/members";
 import { createProject, getAllProjects } from "@/lib/db/queries/projects";
+import { createImageRow } from "@/lib/db/queries/images";
 import {
   createScreen as createScreenRow,
   getScreensByProject,
@@ -533,10 +534,31 @@ function registerTools(server: McpServer) {
           s3Key = await uploadImageBuffer(userId, buf, contentType);
         }
 
+        // Reuse one shapeId for both the canvas shape and its durable row, so
+        // the canvas can self-heal the image if an open editor's autosave
+        // clobbers the blob append (images, unlike screens, otherwise have no
+        // recovery source). Row persistence is best-effort: if it fails (e.g.
+        // the migration hasn't run), the image is still placed.
+        const shapeId = nanoid();
         const shape = await appendImageShape(args.projectId, {
+          id: shapeId,
           s3Key,
           name: args.name,
         });
+        try {
+          await createImageRow(userId, {
+            shapeId,
+            projectId: args.projectId,
+            s3Key: shape.s3Key,
+            name: shape.name,
+            w: shape.w,
+            h: shape.h,
+            naturalWidth: shape.naturalWidth,
+            naturalHeight: shape.naturalHeight,
+          });
+        } catch {
+          // Non-fatal: the shape is on the canvas; only durability is lost.
+        }
         return ok({ name: shape.name, s3Key: shape.s3Key });
       })
   );

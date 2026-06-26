@@ -21,7 +21,10 @@ import type {
  * shapes land in the durable Aurora snapshot and surface the next time the
  * canvas opens/reloads. We only ever ADD an entity + its id — never rewrite or
  * drop existing shapes — so an open collaborator's autosave is the only thing
- * that can race, and it can only lose the just-added shape (recovered on reload).
+ * that can race, and it can only lose the just-added shape. That loss is
+ * recovered by the canvas's screen-row reconciliation (see the self-heal effect
+ * in app/dashboard/[projectId]/canvas/page.tsx), which re-adds a shape for any
+ * `screens` row whose shapeId is missing from the blob after hydration.
  */
 
 const GAP = 80;
@@ -120,6 +123,8 @@ export async function appendImageShape(
     width?: number;
     height?: number;
     position?: { x: number; y: number };
+    /** Reuse a specific shape id so a durable `images` row can link to it. */
+    id?: string;
   }
 ): Promise<ImageShape> {
   const state = await readState(projectId);
@@ -127,6 +132,7 @@ export async function appendImageShape(
   const w = input.width ?? IMAGE_DEFAULTS.maxWidth;
   const h = input.height ?? Math.round(IMAGE_DEFAULTS.maxWidth * 0.66);
   const shape = makeImageShape({
+    id: input.id,
     x: pos.x,
     y: pos.y,
     w,

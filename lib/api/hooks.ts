@@ -5,6 +5,7 @@ import * as keys from "./keys";
 import type {
   ProjectDoc,
   ScreenDoc,
+  ImageDoc,
   MessageDoc,
   CanvasStateData,
   GenerationStats,
@@ -59,6 +60,19 @@ export function useScreens(
  * no/empty files. Files only change when a build finishes, so we don't
  * revalidate on focus — refreshScreenFiles() invalidates it at that point.
  */
+/**
+ * Durable rows for MCP-placed image shapes. Polled like useScreens so the canvas
+ * can self-heal an image whose blob append was clobbered by an open editor's
+ * autosave. Returns [] when the images table isn't present yet (graceful).
+ */
+export function useImages(projectId?: string, config?: SWRConfiguration) {
+  return useSWR<ImageDoc[]>(
+    projectId ? keys.imagesKey(projectId) : null,
+    jsonFetcher,
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
 export function useScreenFiles(screenId?: string) {
   return useSWR<Record<string, string> | null>(
     screenId ? keys.screenFilesKey(screenId) : null,

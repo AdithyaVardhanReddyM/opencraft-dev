@@ -124,7 +124,14 @@ export function CollabProvider({
     });
 
     const recomputePeers = () => {
-      const next: PeerPresence[] = [];
+      // Dedupe by userId, not by Yjs clientId. A refresh/reconnect assigns a new
+      // clientID while the previous one's awareness state lingers until the
+      // provider sweep (~30s). Keying only on clientId makes the SAME person show
+      // twice during that window — most visibly the local user, whose stale
+      // clientID slips past the doc.clientID check below and leaks into `peers`,
+      // rendering alongside the explicit "self" avatar. We (a) never list the
+      // local user as a peer and (b) keep just the freshest connection per user.
+      const byUser = new Map<string, PeerPresence>();
       awareness.getStates().forEach((state, clientId) => {
         if (clientId === doc.clientID) return;
         const u = (state?.user ?? {}) as {
@@ -133,18 +140,31 @@ export function CollabProvider({
           image?: string;
           color?: string;
         };
-        next.push({
+        // Never list the local user as a peer — even via a stale clientID.
+        if (u.id && u.id === user.id) return;
+        const userId = u.id ?? String(clientId);
+        const peer: PeerPresence = {
           clientId,
-          userId: u.id ?? String(clientId),
+          userId,
           name: u.name ?? "Guest",
           image: u.image ?? "",
           color: u.color ?? "#64748b",
           cursor: (state?.cursor as Point | null) ?? null,
           selection: (state?.selection as string[]) ?? [],
           editing: (state?.editing as string | null) ?? null,
-        });
+        };
+        // Collapse multiple connections for one user, keeping the most recently
+        // updated (so live cursors track the active tab, not a stale one).
+        const existing = byUser.get(userId);
+        if (!existing) {
+          byUser.set(userId, peer);
+        } else {
+          const tsNew = awareness.meta.get(clientId)?.lastUpdated ?? 0;
+          const tsOld = awareness.meta.get(existing.clientId)?.lastUpdated ?? 0;
+          if (tsNew >= tsOld) byUser.set(userId, peer);
+        }
       });
-      setPeers(next);
+      setPeers([...byUser.values()]);
     };
     awareness.on("change", recomputePeers);
 

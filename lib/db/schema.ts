@@ -126,6 +126,37 @@ export const screens = pgTable(
   ]
 );
 
+// Durable backing for image shapes placed OUT-OF-BAND by the MCP server
+// (place_image). Like `screens`, an image lives both as an ImageShape in the
+// canvas blob (projects.sketches_data) and — for MCP-placed ones — as a row
+// here, so the canvas can self-heal it if an open editor's autosave clobbers
+// the blob append. In-app pasted/dropped images go through the live Yjs path
+// and need no row. Additive table; absence degrades to prior behavior.
+export const images = pgTable(
+  "images",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    shapeId: text("shape_id").notNull(), // canvas shape id (nanoid)
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    s3Key: text("s3_key").notNull(),
+    name: text("name").notNull(),
+    // Display + natural dimensions, enough to reconstruct the ImageShape. Position
+    // is recomputed on heal (the row only exists to recover a lost shape).
+    w: integer("w").notNull(),
+    h: integer("h").notNull(),
+    naturalWidth: integer("natural_width").notNull(),
+    naturalHeight: integer("natural_height").notNull(),
+    createdAt: bigint("created_at", { mode: "number" }).notNull(),
+    updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    index("images_by_shape_id").on(t.shapeId),
+    index("images_by_project_id").on(t.projectId),
+  ]
+);
+
 // User-created design systems (imported from a URL or pasted CSS, then edited).
 // Presets live in code (lib/canvas/theme-utils.ts); these are the per-user,
 // DB-backed custom systems. A screen references one by storing this row's uuid in

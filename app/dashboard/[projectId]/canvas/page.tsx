@@ -3,11 +3,12 @@
 import { use, useState, useCallback, useEffect, useRef } from "react";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { useAuth } from "@clerk/nextjs";
-import { useScreens, useScreenFiles } from "@/lib/api/hooks";
+import { useScreens, useScreenFiles, useImages } from "@/lib/api/hooks";
 import {
   createScreen,
   createFlowScreen,
   deleteScreen,
+  deleteImage,
   getUploadUrl,
   deleteUploads,
 } from "@/lib/api/mutations";
@@ -198,9 +199,13 @@ function CanvasContent({ projectId }: { projectId: string }) {
         if (!stillReferenced) {
           void deleteUploads([target.s3Key]).catch(() => {});
         }
+        // Best-effort: drop the durable row for MCP-placed images so the
+        // self-heal can't resurrect it. (The seen-guard already prevents that;
+        // this just keeps the table from accumulating orphan rows.)
+        void deleteImage({ projectId, shapeId }).catch(() => {});
       }
     },
-    [dispatchShapes]
+    [dispatchShapes, projectId]
   );
 
   // Lookup of shape id -> shape, used to resolve bound flow connectors at render.
@@ -374,6 +379,12 @@ function CanvasContent({ projectId }: { projectId: string }) {
     isSignedIn ? projectId : undefined,
     { refreshInterval: isSelectedScreenGenerating ? 2500 : 15000 }
   );
+  // Durable rows for MCP-placed images, polled so the canvas can self-heal one
+  // whose blob append was clobbered by an open editor's autosave. [] when the
+  // images table isn't present yet (graceful — no behavior change).
+  const { data: imagesData } = useImages(isSignedIn ? projectId : undefined, {
+    refreshInterval: 15000,
+  });
 
   // Map of screen _id -> screen doc, used to resolve a flow child's parent.
   const screensById = new Map((screensData ?? []).map((s) => [s._id, s]));
@@ -419,6 +430,122 @@ function CanvasContent({ projectId }: { projectId: string }) {
   // The Code tab's content cache: lazily fetched only for the selected screen,
   // so the heavy source tree no longer rides on the polled screens list.
   const { data: selectedScreenFiles } = useScreenFiles(selectedScreenId);
+
+  // ---- Self-heal: every screen row must have a canvas shape ----------------
+  // A screen lives in two places: a row in the `screens` table (the source of
+  // truth for WHAT exists) and a ScreenShape in the canvas blob (the source of
+  // truth for WHERE it sits). The MCP `create_screen` tool appends the shape to
+  // the durable blob, but an open canvas autosaves the whole blob last-write-
+  // wins and can clobber that just-appended shape — leaving an orphaned row that
+  // renders nowhere and never comes back, even on reload. Reconcile here, after
+  // hydration: any screen row whose shapeId is absent from the canvas gets a
+  // shape re-added to the right of the existing screens. The add marks the
+  // canvas dirty, so the heal is persisted on the next autosave.
+  const reconciledShapeIdsRef = useRef<Set<string>>(new Set());
+  // Every screen-shape id this client has rendered this session. Lets us tell a
+  // genuinely orphaned row (its shape never reached us — e.g. an MCP append that
+  // the open canvas's autosave clobbered) apart from a row whose shape we DID
+  // have and then removed. The latter is a delete in flight: screensData (SWR,
+  // polled) lags the delete by up to a poll interval, so without this guard the
+  // heal below would re-add — and resurrect — a screen the user just deleted.
+  const seenScreenShapeIdsRef = useRef<Set<string>>(new Set());
+  const seenImageShapeIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const s of shapes) {
+      if (s.type === "screen") seenScreenShapeIdsRef.current.add(s.id);
+      else if (s.type === "image") seenImageShapeIdsRef.current.add(s.id);
+    }
+  }, [shapes]);
+
+  useEffect(() => {
+    if (isLoading) return; // wait for the cloud/local blob to hydrate first
+    if (!screensData || screensData.length === 0) return;
+
+    const presentIds = new Set(shapes.map((s) => s.id));
+    const orphanRows = screensData.filter(
+      (sc) =>
+        sc.shapeId &&
+        !presentIds.has(sc.shapeId) &&
+        !reconciledShapeIdsRef.current.has(sc.shapeId) &&
+        // Skip rows whose shape we've shown before: if it's gone now it was
+        // deleted, and re-adding would fight the delete. A truly clobbered
+        // orphan was never rendered here and still heals on the next reload
+        // (this set starts empty each load).
+        !seenScreenShapeIdsRef.current.has(sc.shapeId)
+    );
+    if (orphanRows.length === 0) return;
+
+    const SCREEN_GAP = 80; // keep in sync with lib/mcp/canvas-mutations.ts
+    const screenShapes = shapes.filter((s) => s.type === "screen");
+    // Start one gap to the left of x=0 so the first-ever screen lands at x=0.
+    let rightEdge = screenShapes.length
+      ? Math.max(...screenShapes.map((s) => s.x + s.w))
+      : -SCREEN_GAP;
+
+    for (const sc of orphanRows) {
+      reconciledShapeIdsRef.current.add(sc.shapeId);
+      const x = rightEdge + SCREEN_GAP;
+      dispatchShapes({
+        type: "ADD_SCREEN",
+        payload: {
+          x,
+          y: 0,
+          w: SCREEN_DEFAULTS.width,
+          h: SCREEN_DEFAULTS.height,
+          screenId: sc._id, // DB row id for linking
+          id: sc.shapeId, // reuse the row's shapeId so the lookup matches
+        },
+      });
+      rightEdge = x + SCREEN_DEFAULTS.width;
+    }
+  }, [isLoading, screensData, shapes, dispatchShapes]);
+
+  // Same self-heal for MCP-placed images: they have no live Yjs presence, so an
+  // open editor's autosave can clobber the blob append. Unlike screens, images
+  // are only durable when the `images` table is present; until the migration
+  // runs imagesData is [] and this is a no-op (no regression). Identical
+  // seen-guard so a deleted image is never resurrected.
+  const reconciledImageIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (isLoading) return;
+    if (!imagesData || imagesData.length === 0) return;
+
+    const presentIds = new Set(shapes.map((s) => s.id));
+    const orphanRows = imagesData.filter(
+      (img) =>
+        img.shapeId &&
+        !presentIds.has(img.shapeId) &&
+        !reconciledImageIdsRef.current.has(img.shapeId) &&
+        !seenImageShapeIdsRef.current.has(img.shapeId)
+    );
+    if (orphanRows.length === 0) return;
+
+    const GAP = 80;
+    const imageShapes = shapes.filter((s) => s.type === "image");
+    let nextY = imageShapes.length
+      ? Math.max(...imageShapes.map((s) => s.y + s.h)) + GAP
+      : 0;
+
+    for (const img of orphanRows) {
+      reconciledImageIdsRef.current.add(img.shapeId);
+      dispatchShapes({
+        type: "ADD_IMAGE",
+        payload: {
+          x: 0,
+          y: nextY,
+          w: img.w,
+          h: img.h,
+          s3Key: img.s3Key,
+          name: img.name,
+          naturalWidth: img.naturalWidth,
+          naturalHeight: img.naturalHeight,
+          id: img.shapeId, // reuse the row's shapeId so the lookup matches
+          status: "ready",
+        },
+      });
+      nextY += img.h + GAP;
+    }
+  }, [isLoading, imagesData, shapes, dispatchShapes]);
 
   // Handle screen tool click - create screen record and add to canvas
   useEffect(() => {

@@ -214,9 +214,6 @@ export default function Page() {
 
         {/* Section Header */}
         <div className="flex flex-col items-center text-center max-w-4xl mb-20 relative z-10">
-          <span className="text-xs font-mono text-primary/80 uppercase tracking-[0.3em] mb-6">
-            Everything you need
-          </span>
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-medium tracking-tight text-[#15151c] mb-6 leading-[1.1]">
             From <span className="italic text-slate-400">sketch</span> to{" "}
             <span className="text-primary">ship</span>,
@@ -240,9 +237,6 @@ export default function Page() {
 
             {/* Content - Top */}
             <div className="p-8 pb-4 relative z-10">
-              <span className="inline-block text-[10px] font-mono text-primary/70 uppercase tracking-widest mb-3">
-                Core Feature
-              </span>
               <h3 className="text-2xl md:text-3xl font-serif font-medium tracking-tight text-[#15151c] mb-2">
                 Infinite Canvas
               </h3>
@@ -336,9 +330,6 @@ export default function Page() {
 
             {/* Content - Left */}
             <div className="p-8 relative z-10 flex flex-col justify-center md:w-2/5">
-              <span className="inline-block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2">
-                Export
-              </span>
               <h3 className="text-xl font-semibold tracking-tight text-[#15151c] mb-3">
                 Ship to your <span className="text-primary">IDE</span>
               </h3>
@@ -383,10 +374,6 @@ export default function Page() {
             {/* Content - Bottom frosted panel */}
             <div className="p-6 relative z-10 mt-auto">
               <div className="rounded-2xl border border-white/70 bg-white/80 backdrop-blur-md p-5 shadow-[0_8px_24px_-12px_rgba(2,12,40,0.3)]">
-                <span className="inline-flex items-center gap-2 text-[10px] font-mono text-primary uppercase tracking-widest mb-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  AI Magic
-                </span>
                 <h3 className="text-xl font-semibold tracking-tight text-[#15151c] mb-2">
                   Frame to Design
                 </h3>
@@ -408,9 +395,6 @@ export default function Page() {
 
             {/* Content - Right */}
             <div className="p-8 relative z-10 flex flex-col justify-center md:w-1/2">
-              <span className="inline-block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2">
-                Chrome Extension
-              </span>
               <h3 className="text-xl font-semibold tracking-tight text-[#15151c] mb-3">
                 Remix <span className="italic font-serif font-normal">any</span>{" "}
                 component
@@ -444,22 +428,15 @@ export default function Page() {
 
             {/* Content - Left */}
             <div className="p-8 lg:p-12 relative z-10 flex flex-col justify-center lg:w-2/5">
-              <span className="inline-flex items-center gap-2 text-[10px] font-mono text-primary uppercase tracking-widest mb-3">
-                <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[9px] font-semibold tracking-wider">
-                  New
-                </span>
-                Sandbox · Create Flow
-              </span>
               <h3 className="text-2xl md:text-3xl font-serif font-medium tracking-tight text-[#15151c] mb-3">
-                From shape to{" "}
-                <span className="text-primary italic">live screen</span>
+                Design your full{" "}
+                <span className="text-primary italic">product flow</span>
               </h3>
               <p className="text-sm md:text-base text-slate-500 leading-relaxed font-light max-w-md">
-                Drop a screen shape on the canvas, hit{" "}
-                <span className="text-slate-700 font-medium">Create Flow</span>,
-                and OpenCraft spins up a live sandbox — your design running as
-                real, editable code in seconds. Chain screens together to
-                prototype an entire product flow.
+                Generate screens straight onto the canvas and connect them into
+                a complete, navigable flow. Map how users move through your
+                product — from first screen to last — and watch each one come to
+                life as a real, editable preview.
               </p>
 
               <div className="mt-6 flex items-center gap-2 text-xs font-medium text-primary">
@@ -478,6 +455,69 @@ export default function Page() {
               />
               <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-white opacity-60 hidden lg:block" />
               <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-white opacity-60 lg:hidden" />
+            </div>
+          </div>
+
+          {/* Card 8: Design Systems - Half width */}
+          <div
+            ref={addSpotlightRef}
+            className="landing-spotlight-card group relative flex flex-col md:col-span-1 lg:col-span-6 rounded-[24px] border border-slate-200/80 bg-white overflow-hidden transition-all duration-500 shadow-[0_1px_2px_rgba(2,12,40,0.04),0_18px_44px_-26px_rgba(2,12,40,0.22)] hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(2,12,40,0.04),0_28px_60px_-24px_rgba(0,114,229,0.28)]"
+          >
+            <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[24px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+            {/* Image */}
+            <div className="relative z-10 w-full h-52 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/feature_8.png"
+                alt="Design systems — use a curated system or build your own"
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent opacity-80" />
+            </div>
+
+            {/* Content */}
+            <div className="p-6 relative z-10">
+              <h3 className="text-lg font-semibold tracking-tight text-[#15151c] mb-2">
+                Design Systems
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed font-light">
+                Apply a curated design system in one click, or craft your own —
+                colors, type, and components stay consistent across every
+                screen.
+              </p>
+            </div>
+          </div>
+
+          {/* Card 9: Live Collaboration - Half width */}
+          <div
+            ref={addSpotlightRef}
+            className="landing-spotlight-card group relative flex flex-col md:col-span-1 lg:col-span-6 rounded-[24px] border border-slate-200/80 bg-white overflow-hidden transition-all duration-500 shadow-[0_1px_2px_rgba(2,12,40,0.04),0_18px_44px_-26px_rgba(2,12,40,0.22)] hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(2,12,40,0.04),0_28px_60px_-24px_rgba(0,114,229,0.28)]"
+          >
+            <div className="landing-spotlight-bg pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="landing-spotlight-border pointer-events-none absolute inset-0 rounded-[24px] border border-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+            {/* Image */}
+            <div className="relative z-10 w-full h-52 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/feature_9.png"
+                alt="Live collaboration — design together with your team in real time"
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent opacity-80" />
+            </div>
+
+            {/* Content */}
+            <div className="p-6 relative z-10">
+              <h3 className="text-lg font-semibold tracking-tight text-[#15151c] mb-2">
+                Live Collaboration
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed font-light">
+                Collaborate with your team in real time — share a canvas, see
+                each other&apos;s cursors, and build together, all in one place.
+              </p>
             </div>
           </div>
         </div>

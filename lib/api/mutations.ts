@@ -41,17 +41,37 @@ export async function saveCanvasState(input: {
   projectId: string;
   canvasData: CanvasStateData;
 }) {
-  const res = await putJson(keys.canvasKey(input.projectId), {
-    canvasData: input.canvasData,
-  });
+  const res = await putJson<{ success: boolean; lastModified: number }>(
+    keys.canvasKey(input.projectId),
+    { canvasData: input.canvasData }
+  );
   // Keep SWR's cached canvas in sync with what we just persisted (no
   // revalidation — we are the writer). Otherwise the cache holds the stale
   // value from the initial GET (often the empty seed) and a later
   // remount/refocus can reload that stale-empty state over good shapes.
-  await mutate(keys.canvasKey(input.projectId), input.canvasData, {
-    revalidate: false,
-  });
+  // Use the SERVER-stamped lastModified (not the client's) so the cached cloud
+  // state matches the DB and conflict resolution compares like-for-like.
+  await mutate(
+    keys.canvasKey(input.projectId),
+    { ...input.canvasData, lastModified: res.lastModified },
+    { revalidate: false }
+  );
   return res;
+}
+
+// ---- Images ---------------------------------------------------------------
+
+/** Remove the durable row for an image shape (best-effort; no-op without table). */
+export async function deleteImage(input: {
+  projectId: string;
+  shapeId: string;
+}): Promise<void> {
+  await del(
+    `${keys.imagesKey(input.projectId)}&shapeId=${encodeURIComponent(
+      input.shapeId
+    )}`
+  );
+  await mutate(keys.imagesKey(input.projectId));
 }
 
 // ---- Design systems -------------------------------------------------------

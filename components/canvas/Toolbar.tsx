@@ -67,7 +67,7 @@ export function Toolbar({
   // The AI sidebar is a full-height panel flush to the left edge, 340px wide;
   // slide the toolbar past its right edge (+ a small gap) when it's open,
   // otherwise hug the left.
-  const leftOffset = sidebarOpen ? 352 : 12;
+  const leftOffset = sidebarOpen ? 432 : 12;
 
   return (
     <div

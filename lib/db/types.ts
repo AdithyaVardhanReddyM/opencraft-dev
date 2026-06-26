@@ -3,6 +3,7 @@ import type {
   users,
   projects,
   screens,
+  images,
   messages,
   reasoningTokens,
   designSystems,
@@ -30,6 +31,7 @@ type AsDoc<T extends { id: string }> = { _id: string } & NullToOptional<
 export type UserDoc = AsDoc<InferSelectModel<typeof users>>;
 export type ProjectDoc = AsDoc<InferSelectModel<typeof projects>>;
 export type ScreenDoc = AsDoc<InferSelectModel<typeof screens>>;
+export type ImageDoc = AsDoc<InferSelectModel<typeof images>>;
 export type MessageDoc = AsDoc<InferSelectModel<typeof messages>>;
 export type ReasoningTokenDoc = AsDoc<InferSelectModel<typeof reasoningTokens>>;
 

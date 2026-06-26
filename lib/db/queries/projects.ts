@@ -101,8 +101,13 @@ export async function saveCanvasState(
   userId: string,
   projectId: string,
   canvasData: CanvasStateData
-): Promise<{ success: boolean }> {
+): Promise<{ success: boolean; lastModified: number }> {
   await assertAccess(userId, projectId, "editor");
+  // Stamp the durable time server-side rather than trusting the client clock —
+  // a device whose clock lags would otherwise persist a timestamp older than a
+  // peer's newer write and win conflict resolution on reload. The client adopts
+  // this returned value as its baseline so local and cloud stay on one clock.
+  const now = Date.now();
   await db
     .update(projects)
     .set({
@@ -112,10 +117,10 @@ export async function saveCanvasState(
       tool: canvasData.tool,
       frameCounter: canvasData.frameCounter,
       canvasVersion: canvasData.version,
-      lastModified: canvasData.lastModified,
+      lastModified: now,
     })
     .where(eq(projects.id, projectId));
-  return { success: true };
+  return { success: true, lastModified: now };
 }
 
 /**

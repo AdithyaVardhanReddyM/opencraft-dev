@@ -22,3 +22,6 @@ export const messagesKey = (screenId: string) =>
 
 export const screenFilesKey = (screenId: string) =>
   `/api/screens/${screenId}/files`;
+
+export const imagesKey = (projectId: string) =>
+  `/api/images?projectId=${projectId}`;
