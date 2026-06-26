@@ -85,7 +85,7 @@ function CopyBlock({ text, label }: { text: string; label?: string }) {
     }
   };
   return (
-    <div className="group relative">
+    <div className="group relative min-w-0">
       <pre className="overflow-x-auto rounded-lg border border-border/70 bg-muted/40 p-3 pr-11 font-mono text-[12.5px] leading-relaxed text-foreground/90 scrollbar-thin">
         {text}
       </pre>
@@ -205,7 +205,7 @@ export function McpConnectDialog({ open, onOpenChange }: McpConnectDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-2xl scrollbar-thin">
+      <DialogContent className="max-h-[88vh] overflow-x-hidden overflow-y-auto sm:max-w-2xl scrollbar-thin">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2.5 text-xl">
             <span className="inline-flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -219,7 +219,7 @@ export function McpConnectDialog({ open, onOpenChange }: McpConnectDialogProps) 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 pt-1">
+        <div className="min-w-0 space-y-6 pt-1">
           {/* Step 1 — API key */}
           <section className="space-y-3">
             <StepHeading
@@ -235,7 +235,7 @@ export function McpConnectDialog({ open, onOpenChange }: McpConnectDialogProps) 
                   Copy this key now — you won&apos;t see it again.
                 </div>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 truncate rounded-md border border-border/70 bg-background px-3 py-2 font-mono text-[12.5px]">
+                  <code className="min-w-0 flex-1 truncate rounded-md border border-border/70 bg-background px-3 py-2 font-mono text-[12.5px]">
                     {newKey}
                   </code>
                   <Button size="sm" onClick={copyNewKey} className="shrink-0">
