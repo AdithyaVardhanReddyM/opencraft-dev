@@ -263,6 +263,16 @@ export function getThemeById(id: string): ThemeDefinition | undefined {
   return THEMES.find((t) => t.id === id);
 }
 
+/**
+ * True when `id` is a built-in preset (in THEMES). Custom, user-created design
+ * systems are stored in the DB under a uuid; everywhere a theme id is resolved we
+ * branch "preset if isPresetThemeId(id), else custom → DB lookup". A bare uuid has
+ * no `:` so it round-trips through parseScreenTheme/formatScreenTheme unchanged.
+ */
+export function isPresetThemeId(id: string): boolean {
+  return THEMES.some((t) => t.id === id);
+}
+
 export function getThemeCommand(themeId: string): string {
   const theme = getThemeById(themeId);
   return theme?.command || "";

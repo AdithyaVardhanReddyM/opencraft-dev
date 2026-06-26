@@ -3,6 +3,7 @@
  * mutations (to revalidate via `mutate(key)`), so they never drift apart.
  */
 export const projectsKey = "/api/projects";
+export const designSystemsKey = "/api/design-systems";
 export const statsKey = "/api/users/stats";
 export const metadataKey = "/api/users/metadata";
 export const usersEnsureKey = "/api/users/ensure";

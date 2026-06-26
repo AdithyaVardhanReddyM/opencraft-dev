@@ -47,6 +47,16 @@ app = BedrockAgentCoreApp()
 
 @app.entrypoint
 async def invoke(payload: dict):
+    # Design-system extraction rides the same /invocations entrypoint (AgentCore
+    # exposes no other route), discriminated by `op`. Additive: a normal chat turn
+    # never sets `op`, so the path below is byte-for-byte unchanged for it.
+    if payload.get("op") == "extract_design_system":
+        from .extract_design import extract_design_system_stream
+
+        async for frame in extract_design_system_stream(payload.get("url", "")):
+            yield frame
+        return
+
     cb = payload.get("callback")
     callback = Callback(**cb) if cb else None
     async for frame in run_turn_durable(

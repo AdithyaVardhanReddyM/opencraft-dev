@@ -29,6 +29,13 @@
       "when": 1782258625186,
       "tag": "0003_stale_cardiac",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782398008754,
+      "tag": "0004_harsh_shockwave",
+      "breakpoints": true
     }
   ]
 }

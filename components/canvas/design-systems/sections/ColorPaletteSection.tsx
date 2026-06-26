@@ -1,4 +1,5 @@
-const SWATCHES: { key: string; label: string }[] = [
+// Exported so the design-system editor edits exactly the swatches shown here.
+export const COLOR_SWATCHES: { key: string; label: string }[] = [
   { key: "background", label: "Background" },
   { key: "foreground", label: "Foreground" },
   { key: "card", label: "Card" },
@@ -32,7 +33,7 @@ export function ColorPaletteSection({
 }: {
   tokens: Record<string, string>;
 }) {
-  const items = SWATCHES.filter((s) => tokens[s.key]);
+  const items = COLOR_SWATCHES.filter((s) => tokens[s.key]);
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

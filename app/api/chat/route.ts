@@ -7,8 +7,11 @@ import {
   internalCreateMessage,
 } from "@/lib/db/queries/messages";
 import { canGenerate } from "@/lib/db/queries/users";
+import { internalGetDesignSystem } from "@/lib/db/queries/designSystems";
 import { invokeAgentService } from "@/lib/agent-service";
-import type { ScreenDoc } from "@/lib/db/types";
+import { parseScreenTheme, isPresetThemeId } from "@/lib/canvas/theme-utils";
+import { buildGlobalsCss } from "@/lib/canvas/build-globals-css";
+import type { ScreenDoc, MessageDoc } from "@/lib/db/types";
 
 // Needs pg (DB queries) + a long-lived stream → Node runtime, never cached.
 // maxDuration bounds the LIVE stream on serverless; terminal persistence does
@@ -65,7 +68,7 @@ function json(status: number, body: Record<string, unknown>): Response {
 }
 
 /** camelCase ScreenDoc → snake_case keys the agent-service reads. */
-function toScreenPayload(s: ScreenDoc) {
+function toScreenPayload(s: ScreenDoc, themeCss?: string) {
   return {
     sandbox_id: s.sandboxId,
     sandbox_url: s.sandboxUrl,
@@ -76,6 +79,10 @@ function toScreenPayload(s: ScreenDoc) {
     title: s.title,
     parent_screen_id: s.parentScreenId,
     theme: s.theme,
+    // Prebuilt globals.css for a CUSTOM design system — the Python harness can't
+    // run our TS generator, so we resolve + build it here and it writes the CSS
+    // straight in (skipping shadcn). Absent for presets (they run their command).
+    theme_css: themeCss,
   };
 }
 
@@ -137,15 +144,42 @@ export async function POST(req: NextRequest) {
     void internalUpdateScreen(screenId, { theme: designSystem }).catch(() => {});
   }
 
+  // If the screen's theme is a CUSTOM design system (a uuid, not a preset),
+  // resolve it once and build its globals.css here — the Python harness writes
+  // that string into a fresh sandbox (it can't run our TS generator). Presets
+  // ship no theme_css and keep their fast remote shadcn command.
+  let themeCss: string | undefined;
+  const themeId = parseScreenTheme(screen.theme).id;
+  if (themeId && !isPresetThemeId(themeId)) {
+    const ds = await internalGetDesignSystem(themeId);
+    if (ds) themeCss = buildGlobalsCss(ds.tokens);
+  }
+
   // Load prior history BEFORE inserting the new turn (the new message is sent
   // separately as `message`; including it in history would duplicate it). Use the
   // terse `summary` for assistant turns (token-lean context) and fall back to the
   // full `content` for user turns / legacy rows without a summary.
-  const priorMessages = await internalGetMessages(screenId, 10);
-  const history = priorMessages.map((m) => ({
-    role: m.role,
-    content: m.summary ?? m.content,
-  }));
+  const toHistory = (msgs: MessageDoc[]) =>
+    msgs.map((m) => ({ role: m.role, content: m.summary ?? m.content }));
+  let history = toHistory(await internalGetMessages(screenId, 10));
+
+  // Flow child: it shares the parent's sandbox but its own files/history start
+  // empty, so the agent would see an empty repo-map (contradicting the flow
+  // prompt's "reuse the existing app") and build from scratch. Inherit the
+  // parent's file map — child wins on conflicts — so the repo-map + seed files
+  // reflect the existing app, and prepend the parent's recent turns for design
+  // intent. Re-applied every turn, so later parent edits are picked up.
+  if (screen.parentScreenId) {
+    const parent = await internalGetScreen(screen.parentScreenId);
+    if (parent) {
+      screen.files = { ...(parent.files ?? {}), ...(screen.files ?? {}) };
+      screen.fileMeta = {
+        ...(parent.fileMeta ?? {}),
+        ...(screen.fileMeta ?? {}),
+      };
+      history = [...toHistory(await internalGetMessages(parent._id, 6)), ...history];
+    }
+  }
 
   // Persist the user turn (client renders it optimistically; SWR reconciles).
   await internalCreateMessage({
@@ -163,7 +197,7 @@ export async function POST(req: NextRequest) {
     upstream = await invokeAgentService(
       {
         message,
-        screen: toScreenPayload(screen),
+        screen: toScreenPayload(screen, themeCss),
         history,
         modelId,
         thinking: thinking ?? false,

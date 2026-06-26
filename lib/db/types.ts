@@ -1,5 +1,13 @@
 import type { InferSelectModel } from "drizzle-orm";
-import type { users, projects, screens, messages, reasoningTokens } from "./schema";
+import type {
+  users,
+  projects,
+  screens,
+  messages,
+  reasoningTokens,
+  designSystems,
+} from "./schema";
+import type { ThemeTokens } from "@/lib/canvas/theme-tokens";
 
 /**
  * Serialized document types — the shape returned by the API and consumed by the
@@ -24,6 +32,18 @@ export type ProjectDoc = AsDoc<InferSelectModel<typeof projects>>;
 export type ScreenDoc = AsDoc<InferSelectModel<typeof screens>>;
 export type MessageDoc = AsDoc<InferSelectModel<typeof messages>>;
 export type ReasoningTokenDoc = AsDoc<InferSelectModel<typeof reasoningTokens>>;
+
+/**
+ * Custom (user-created) design system. The `tokens`/`previewColors` jsonb columns
+ * infer as `unknown`; override them with the concrete shapes the API guarantees.
+ */
+export type DesignSystemDoc = Omit<
+  AsDoc<InferSelectModel<typeof designSystems>>,
+  "tokens" | "previewColors"
+> & {
+  tokens: ThemeTokens;
+  previewColors: [string, string, string];
+};
 
 /** Canvas state payload (matches the former `getCanvasState` return shape). */
 export interface CanvasViewport {

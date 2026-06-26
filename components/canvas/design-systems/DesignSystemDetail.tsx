@@ -1,7 +1,12 @@
+"use client";
+
 import * as React from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getThemeById } from "@/lib/canvas/theme-utils";
-import { getThemeTokens } from "@/lib/canvas/theme-tokens";
+import { useDesignSystems } from "@/lib/api/hooks";
+import {
+  resolveTokens,
+  resolveDisplayTheme,
+} from "@/lib/canvas/custom-systems";
 import { ThemePreviewScope } from "@/components/canvas/design-systems/ThemePreviewScope";
 import { ColorPaletteSection } from "@/components/canvas/design-systems/sections/ColorPaletteSection";
 import { TypographySection } from "@/components/canvas/design-systems/sections/TypographySection";
@@ -32,9 +37,9 @@ interface DesignSystemDetailProps {
 }
 
 export function DesignSystemDetail({ themeId, mode }: DesignSystemDetailProps) {
-  const meta = getThemeById(themeId);
-  const tokens = getThemeTokens(themeId);
-  const name = meta?.name ?? themeId;
+  const { data: custom } = useDesignSystems();
+  const tokens = resolveTokens(themeId, custom);
+  const name = resolveDisplayTheme(themeId, custom).name;
 
   if (!tokens) {
     return (

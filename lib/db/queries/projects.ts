@@ -59,7 +59,11 @@ export async function createProject(
       userId,
       name,
       description: description ?? null,
-      sketchesData: { shapes: [], selectedIds: [] },
+      // Never-saved projects have no canvas state. Leaving this null (rather than
+      // an empty blob stamped with the creation time) makes getCanvasState return
+      // null, so the client's conflict resolver never picks a phantom empty cloud
+      // state over real local/collab shapes.
+      sketchesData: null,
       createdAt: now,
       lastModified: now,
       projectNumber,

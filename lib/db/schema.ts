@@ -126,6 +126,33 @@ export const screens = pgTable(
   ]
 );
 
+// User-created design systems (imported from a URL or pasted CSS, then edited).
+// Presets live in code (lib/canvas/theme-utils.ts); these are the per-user,
+// DB-backed custom systems. A screen references one by storing this row's uuid in
+// `screens.theme` (encoded "<uuid>" / "<uuid>:dark"), resolved preset-vs-custom by
+// "is it in THEMES? else look up here" (see isPresetThemeId).
+export const designSystemSource = pgEnum("design_system_source", [
+  "web",
+  "css",
+  "manual",
+]);
+
+export const designSystems = pgTable(
+  "design_systems",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull(), // Clerk user id, like projects.userId
+    name: text("name").notNull(),
+    source: designSystemSource("source").notNull().default("manual"),
+    sourceUrl: text("source_url"), // set for web imports
+    tokens: jsonb("tokens").notNull(), // ThemeTokens: { theme, light, dark }
+    previewColors: jsonb("preview_colors").notNull(), // [primary, secondary, accent]
+    createdAt: bigint("created_at", { mode: "number" }).notNull(),
+    updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+  },
+  (t) => [index("design_systems_by_user_id").on(t.userId)]
+);
+
 // Chat messages for screen threads.
 export const messages = pgTable(
   "messages",

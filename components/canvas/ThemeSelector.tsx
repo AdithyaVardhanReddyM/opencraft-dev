@@ -24,9 +24,9 @@ import { cn } from "@/lib/utils";
 import {
   THEMES,
   parseScreenTheme,
-  type ThemeDefinition,
   type ThemeMode,
 } from "@/lib/canvas/theme-utils";
+import { useDesignSystems } from "@/lib/api/hooks";
 
 function SwatchPill({ colors }: { colors: [string, string, string] }) {
   return (
@@ -88,6 +88,7 @@ export function ThemeSelector({
   disabled = false,
 }: ThemeSelectorProps) {
   const { id: currentId, mode: currentMode } = parseScreenTheme(currentTheme);
+  const { data: custom } = useDesignSystems();
 
   const [isOpen, setIsOpen] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
@@ -119,10 +120,10 @@ export function ThemeSelector({
   );
 
   const handleThemeSelect = useCallback(
-    async (theme: ThemeDefinition) => {
+    async (themeId: string) => {
       if (isApplying) return;
-      if (theme.id === currentId && mode === currentMode) return;
-      const ok = await apply(theme.id, mode);
+      if (themeId === currentId && mode === currentMode) return;
+      const ok = await apply(themeId, mode);
       if (ok) setIsOpen(false);
     },
     [apply, isApplying, currentId, currentMode, mode]
@@ -143,6 +144,9 @@ export function ThemeSelector({
   const filtered = q
     ? THEMES.filter((t) => t.name.toLowerCase().includes(q))
     : THEMES;
+  const filteredCustom = (custom ?? []).filter(
+    (d) => !q || d.name.toLowerCase().includes(q)
+  );
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -204,39 +208,77 @@ export function ThemeSelector({
 
         {/* Theme list */}
         <div className="max-h-72 overflow-y-auto p-1">
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && filteredCustom.length === 0 ? (
             <div className="px-3 py-6 text-center text-sm text-muted-foreground">
               No design systems found
             </div>
           ) : (
-            filtered.map((theme) => {
-              const isActive = currentId === theme.id;
-              const isThisApplying = applyingThemeId === theme.id;
-              return (
-                <button
-                  key={theme.id}
-                  className={cn(
-                    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
-                    isActive
-                      ? "bg-accent text-accent-foreground"
-                      : "hover:bg-accent hover:text-accent-foreground",
-                    isApplying && !isThisApplying && "opacity-50"
-                  )}
-                  onClick={() => handleThemeSelect(theme)}
-                  disabled={isApplying}
-                >
-                  <span className="flex-1 truncate text-sm font-medium">
-                    {theme.name}
-                  </span>
-                  {isThisApplying ? (
-                    <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
-                  ) : isActive ? (
-                    <Check className="size-4 shrink-0 text-primary" />
-                  ) : null}
-                  <SwatchPill colors={theme.colors} />
-                </button>
-              );
-            })
+            <>
+              {filtered.map((theme) => {
+                const isActive = currentId === theme.id;
+                const isThisApplying = applyingThemeId === theme.id;
+                return (
+                  <button
+                    key={theme.id}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
+                      isActive
+                        ? "bg-accent text-accent-foreground"
+                        : "hover:bg-accent hover:text-accent-foreground",
+                      isApplying && !isThisApplying && "opacity-50"
+                    )}
+                    onClick={() => handleThemeSelect(theme.id)}
+                    disabled={isApplying}
+                  >
+                    <span className="flex-1 truncate text-sm font-medium">
+                      {theme.name}
+                    </span>
+                    {isThisApplying ? (
+                      <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+                    ) : isActive ? (
+                      <Check className="size-4 shrink-0 text-primary" />
+                    ) : null}
+                    <SwatchPill colors={theme.colors} />
+                  </button>
+                );
+              })}
+
+              {filteredCustom.length > 0 && (
+                <>
+                  <div className="px-2.5 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+                    Your design systems
+                  </div>
+                  {filteredCustom.map((d) => {
+                    const isActive = currentId === d._id;
+                    const isThisApplying = applyingThemeId === d._id;
+                    return (
+                      <button
+                        key={d._id}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
+                          isActive
+                            ? "bg-accent text-accent-foreground"
+                            : "hover:bg-accent hover:text-accent-foreground",
+                          isApplying && !isThisApplying && "opacity-50"
+                        )}
+                        onClick={() => handleThemeSelect(d._id)}
+                        disabled={isApplying}
+                      >
+                        <span className="flex-1 truncate text-sm font-medium">
+                          {d.name}
+                        </span>
+                        {isThisApplying ? (
+                          <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+                        ) : isActive ? (
+                          <Check className="size-4 shrink-0 text-primary" />
+                        ) : null}
+                        <SwatchPill colors={d.previewColors} />
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+            </>
           )}
         </div>
       </PopoverContent>

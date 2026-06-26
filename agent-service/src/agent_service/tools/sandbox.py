@@ -133,15 +133,27 @@ def apply_html_dark_class(layout: str, dark: bool) -> str:
     return re.sub(r"<html([^>]*)>", repl, layout, count=1)
 
 
-async def apply_theme(sandbox: AsyncSandbox, theme_value: str | None) -> None:
-    """Install a design-system preset into a sandbox. Best-effort, never raises.
+async def apply_theme(
+    sandbox: AsyncSandbox,
+    theme_value: str | None,
+    theme_css: str | None = None,
+) -> None:
+    """Install a design system into a sandbox. Best-effort, never raises.
 
-    Runs the shadcn add command for the preset (skipped for 'default'), then
-    toggles the <html> dark class in the layout for the chosen mode.
+    PRESET: run its shadcn add command (skipped for 'default'). CUSTOM: the caller
+    passes the prebuilt globals.css as `theme_css` (a custom system's uuid theme id
+    has no shadcn command), which we write straight in — fast, no npm install.
+    Either way, dark mode is then activated by toggling the <html> class.
     """
     theme_id, dark = _parse_screen_theme(theme_value)
 
-    if theme_id and theme_id != "default":
+    if theme_css:
+        # Custom system: write the generated CSS straight in, skip shadcn.
+        try:
+            await sandbox.files.write("app/globals.css", theme_css)
+        except Exception:  # noqa: BLE001 — best-effort, keep toggling dark below
+            pass
+    elif theme_id and theme_id != "default":
         url = _TWEAKCN_URL.format(id=theme_id)
         await run_command(sandbox, f"npx shadcn@latest add {url} --yes", timeout=120)
 

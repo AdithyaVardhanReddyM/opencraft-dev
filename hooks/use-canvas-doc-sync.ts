@@ -69,6 +69,21 @@ export function useCanvasDocSync({
       if (txn.origin === LOCAL_ORIGIN) return; // our own write — ignore
       const projected = projectToEntityState(doc);
       const fc = getDocFrameCounter(doc);
+
+      // Data-loss guard: never let a remote update that empties the doc wipe a
+      // canvas that still has shapes locally. This is where the "everything
+      // vanished during collaboration" bug landed — a stale/empty snapshot from a
+      // peer projected to {} and replaced our shapes, which autosave then made
+      // permanent. We keep our shapes and reset the baseline so our next local
+      // edit re-seeds the doc (self-heal). Trade-off: a deliberate delete-to-empty
+      // by a peer won't reflect here until our next change — an intentional bias
+      // toward preserving data over honoring an empty broadcast.
+      if (projected.ids.length === 0 && latestRef.current.shapes.ids.length > 0) {
+        syncedRef.current = EMPTY; // force a full re-seed on the next local flush
+        frameCounterRef.current = -1;
+        return;
+      }
+
       syncedRef.current = projected; // echo guard for the upcoming local effect
       frameCounterRef.current = fc;
       applyRemoteRef.current(projected, fc);

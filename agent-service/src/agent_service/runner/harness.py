@@ -71,7 +71,11 @@ async def run_turn(
     is_new_sandbox = context_lost or not screen.get("sandbox_id")
     if is_new_sandbox and screen.get("theme"):
         try:
-            await apply_theme(sandbox, screen.get("theme"))
+            # theme_css is set (by the Next chat route) only for CUSTOM systems;
+            # presets pass None and run their shadcn command inside apply_theme.
+            await apply_theme(
+                sandbox, screen.get("theme"), theme_css=screen.get("theme_css")
+            )
         except Exception:  # noqa: BLE001
             pass
 

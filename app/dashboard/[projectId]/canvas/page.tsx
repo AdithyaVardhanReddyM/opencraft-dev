@@ -92,10 +92,11 @@ function CanvasContent({ projectId }: { projectId: string }) {
   // Redeem a ?invite=… share-link token into project membership (once).
   useJoinInvite(projectId);
   // Live collaboration: presence (cursors + selection) + edit permission.
-  const { setCursor, setSelection, canEdit } = useCollab();
+  const { doc, setCursor, setSelection, canEdit } = useCollab();
   // Autosave hook — viewers persist locally only (no cloud writes).
   const { saveStatus, lastSavedAt, isLoading } = useAutosave(projectId, {
     canEdit,
+    doc,
   });
   const {
     viewport,

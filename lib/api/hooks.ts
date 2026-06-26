@@ -8,6 +8,7 @@ import type {
   MessageDoc,
   CanvasStateData,
   GenerationStats,
+  DesignSystemDoc,
 } from "@/lib/db/types";
 
 /**
@@ -20,6 +21,15 @@ export function useProjects(enabled = true) {
   return useSWR<ProjectDoc[]>(
     enabled ? keys.projectsKey : null,
     jsonFetcher
+  );
+}
+
+/** The user's custom (DB-backed) design systems. Presets stay in code. */
+export function useDesignSystems(enabled = true) {
+  return useSWR<DesignSystemDoc[]>(
+    enabled ? keys.designSystemsKey : null,
+    jsonFetcher,
+    { revalidateOnFocus: false }
   );
 }
 

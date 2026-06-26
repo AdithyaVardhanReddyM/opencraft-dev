@@ -3,6 +3,7 @@ import { mutate } from "swr";
 import { postJson, putJson, patchJson, del } from "./fetcher";
 import * as keys from "./keys";
 import type { CanvasStateData } from "@/lib/db/types";
+import type { ThemeTokens } from "@/lib/canvas/theme-tokens";
 
 /**
  * Mutation functions replacing Convex `useMutation`. Each call revalidates the
@@ -36,13 +37,51 @@ export async function deleteProject(input: { projectId: string }): Promise<void>
   await mutate(keys.projectsKey);
 }
 
-export function saveCanvasState(input: {
+export async function saveCanvasState(input: {
   projectId: string;
   canvasData: CanvasStateData;
 }) {
-  return putJson(keys.canvasKey(input.projectId), {
+  const res = await putJson(keys.canvasKey(input.projectId), {
     canvasData: input.canvasData,
   });
+  // Keep SWR's cached canvas in sync with what we just persisted (no
+  // revalidation — we are the writer). Otherwise the cache holds the stale
+  // value from the initial GET (often the empty seed) and a later
+  // remount/refocus can reload that stale-empty state over good shapes.
+  await mutate(keys.canvasKey(input.projectId), input.canvasData, {
+    revalidate: false,
+  });
+  return res;
+}
+
+// ---- Design systems -------------------------------------------------------
+
+export async function createDesignSystem(input: {
+  name: string;
+  source?: "web" | "css" | "manual";
+  sourceUrl?: string | null;
+  tokens: ThemeTokens;
+  previewColors?: [string, string, string];
+}): Promise<string> {
+  const res = await postJson<{ _id: string }>(keys.designSystemsKey, input);
+  await mutate(keys.designSystemsKey);
+  return res._id;
+}
+
+export async function updateDesignSystem(input: {
+  id: string;
+  name?: string;
+  tokens?: ThemeTokens;
+  previewColors?: [string, string, string];
+}): Promise<void> {
+  const { id, ...patch } = input;
+  await patchJson(`${keys.designSystemsKey}/${id}`, patch);
+  await mutate(keys.designSystemsKey);
+}
+
+export async function deleteDesignSystem(input: { id: string }): Promise<void> {
+  await del(`${keys.designSystemsKey}/${input.id}`);
+  await mutate(keys.designSystemsKey);
 }
 
 // ---- Screens --------------------------------------------------------------

@@ -29,7 +29,7 @@ app = FastAPI(title="OpenCraft Agent Service")
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = ""
     # The screen row (sandbox_id, files, file_meta, recent_edits, route, title,
     # parent_screen_id, ...) and prior messages, supplied by the caller.
     screen: dict[str, Any] | None = None
@@ -41,6 +41,11 @@ class ChatRequest(BaseModel):
     # and self-corrects before finishing.
     visualMode: bool = False
     callback: Callback | None = None
+    # Non-chat operation discriminator. `op="extract_design_system"` (+ `url`)
+    # routes to design-system extraction instead of a generation turn — same seam
+    # the AgentCore /invocations entrypoint uses, so dev and prod stay identical.
+    op: str | None = None
+    url: str | None = None
 
 
 def _sse(frame: dict) -> str:
@@ -62,6 +67,21 @@ async def chat(
     # matching header so the otherwise-unauthenticated compute endpoint isn't open.
     if settings.agent_shared_secret and x_agent_secret != settings.agent_shared_secret:
         raise HTTPException(status_code=401, detail="Invalid agent secret")
+
+    # Design-system extraction: short, non-streaming work emitted as a single SSE
+    # `design_system` frame over the same channel (the Next proxy reads that frame).
+    if req.op == "extract_design_system":
+        from .extract_design import extract_design_system_stream
+
+        async def gen_extract() -> AsyncIterator[str]:
+            async for frame in extract_design_system_stream(req.url or ""):
+                yield _sse(frame)
+
+        return StreamingResponse(
+            gen_extract(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     async def gen() -> AsyncIterator[str]:
         async for frame in run_turn_durable(

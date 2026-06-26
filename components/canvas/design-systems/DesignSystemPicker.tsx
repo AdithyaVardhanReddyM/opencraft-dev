@@ -13,7 +13,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { THEMES, getThemeById, type ThemeMode } from "@/lib/canvas/theme-utils";
+import { THEMES, type ThemeMode } from "@/lib/canvas/theme-utils";
+import { resolveDisplayTheme } from "@/lib/canvas/custom-systems";
+import { useDesignSystems } from "@/lib/api/hooks";
 
 export interface DesignSystemValue {
   id: string;
@@ -97,12 +99,16 @@ export function DesignSystemPicker({
   const [draftMode, setDraftMode] = useState<ThemeMode>(value?.mode ?? "light");
   const mode = value?.mode ?? draftMode;
 
-  const selected = value ? getThemeById(value.id) : null;
+  const { data: custom } = useDesignSystems();
+  const selected = value ? resolveDisplayTheme(value.id, custom) : null;
 
   const q = query.trim().toLowerCase();
   const filtered = q
     ? THEMES.filter((t) => t.name.toLowerCase().includes(q))
     : THEMES;
+  const filteredCustom = (custom ?? []).filter(
+    (d) => !q || d.name.toLowerCase().includes(q)
+  );
 
   const handleModeChange = (next: ThemeMode) => {
     setDraftMode(next);
@@ -201,33 +207,69 @@ export function DesignSystemPicker({
 
         {/* Theme list */}
         <div className="max-h-72 overflow-y-auto p-1">
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && filteredCustom.length === 0 ? (
             <div className="px-3 py-6 text-center text-sm text-muted-foreground">
               No design systems found
             </div>
           ) : (
-            filtered.map((theme) => {
-              const isActive = value?.id === theme.id;
-              return (
-                <button
-                  key={theme.id}
-                  type="button"
-                  onClick={() => handleSelect(theme.id)}
-                  className={cn(
-                    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
-                    isActive
-                      ? "bg-accent text-accent-foreground"
-                      : "hover:bg-accent hover:text-accent-foreground"
-                  )}
-                >
-                  <span className="flex-1 truncate text-sm font-medium">
-                    {theme.name}
-                  </span>
-                  {isActive && <Check className="size-4 shrink-0 text-primary" />}
-                  <SwatchPill colors={theme.colors} />
-                </button>
-              );
-            })
+            <>
+              {filtered.map((theme) => {
+                const isActive = value?.id === theme.id;
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => handleSelect(theme.id)}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
+                      isActive
+                        ? "bg-accent text-accent-foreground"
+                        : "hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    <span className="flex-1 truncate text-sm font-medium">
+                      {theme.name}
+                    </span>
+                    {isActive && (
+                      <Check className="size-4 shrink-0 text-primary" />
+                    )}
+                    <SwatchPill colors={theme.colors} />
+                  </button>
+                );
+              })}
+
+              {filteredCustom.length > 0 && (
+                <>
+                  <div className="px-2.5 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+                    Your design systems
+                  </div>
+                  {filteredCustom.map((d) => {
+                    const isActive = value?.id === d._id;
+                    return (
+                      <button
+                        key={d._id}
+                        type="button"
+                        onClick={() => handleSelect(d._id)}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
+                          isActive
+                            ? "bg-accent text-accent-foreground"
+                            : "hover:bg-accent hover:text-accent-foreground"
+                        )}
+                      >
+                        <span className="flex-1 truncate text-sm font-medium">
+                          {d.name}
+                        </span>
+                        {isActive && (
+                          <Check className="size-4 shrink-0 text-primary" />
+                        )}
+                        <SwatchPill colors={d.previewColors} />
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+            </>
           )}
         </div>
       </PopoverContent>

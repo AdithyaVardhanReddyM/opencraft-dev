@@ -4,6 +4,7 @@ import { Check, Plus } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { THEMES } from "@/lib/canvas/theme-utils";
+import { useDesignSystems } from "@/lib/api/hooks";
 
 function Swatches({ colors }: { colors: [string, string, string] }) {
   return (
@@ -32,6 +33,7 @@ export function DesignSystemRail({
   onSelect,
   onSelectCreate,
 }: DesignSystemRailProps) {
+  const { data: custom } = useDesignSystems();
   return (
     <div className="flex w-60 shrink-0 flex-col border-r">
       <ScrollArea className="flex-1">
@@ -55,6 +57,35 @@ export function DesignSystemRail({
               </button>
             );
           })}
+
+          {custom && custom.length > 0 && (
+            <>
+              <div className="px-2.5 pb-1 pt-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Your design systems
+              </div>
+              {custom.map((d) => {
+                const active = !isCreate && selectedId === d._id;
+                return (
+                  <button
+                    key={d._id}
+                    onClick={() => onSelect(d._id)}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
+                      active
+                        ? "bg-accent text-accent-foreground"
+                        : "hover:bg-accent/50"
+                    )}
+                  >
+                    <Swatches colors={d.previewColors} />
+                    <span className="flex-1 truncate font-medium">{d.name}</span>
+                    {active && (
+                      <Check className="size-4 shrink-0 text-primary" />
+                    )}
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
       </ScrollArea>
       <div className="border-t p-2">

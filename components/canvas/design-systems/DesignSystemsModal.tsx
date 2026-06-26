@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { THEMES } from "@/lib/canvas/theme-utils";
 import { DesignSystemRail } from "@/components/canvas/design-systems/DesignSystemRail";
 import { DesignSystemDetail } from "@/components/canvas/design-systems/DesignSystemDetail";
-import { CreateDesignSystemPlaceholder } from "@/components/canvas/design-systems/CreateDesignSystemPlaceholder";
+import { CreateDesignSystemPanel } from "@/components/canvas/design-systems/CreateDesignSystemPanel";
 
 type Mode = "light" | "dark";
 
@@ -72,7 +72,7 @@ export function DesignSystemsModal({
             <div className="space-y-0.5">
               <DialogTitle className="text-base">Design systems</DialogTitle>
               <DialogDescription className="text-xs">
-                Preview the preset design systems available for your screens.
+                Preview the presets, or create your own from a website or CSS.
               </DialogDescription>
             </div>
             {!isCreate && <ModeToggle mode={mode} onModeChange={setMode} />}
@@ -91,7 +91,12 @@ export function DesignSystemsModal({
           />
           <div className="min-w-0 flex-1">
             {isCreate ? (
-              <CreateDesignSystemPlaceholder />
+              <CreateDesignSystemPanel
+                onCreated={(id) => {
+                  setSelectedId(id);
+                  setIsCreate(false);
+                }}
+              />
             ) : (
               <DesignSystemDetail themeId={selectedId} mode={mode} />
             )}

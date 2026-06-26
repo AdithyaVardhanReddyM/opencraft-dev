@@ -23,6 +23,8 @@ import {
   type SaveStatus,
   type AutosaveError,
 } from "@/lib/canvas/autosave-utils";
+import type * as Y from "yjs";
+import { isDocEmpty } from "@/lib/realtime/canvas-doc";
 
 export interface UseAutosaveOptions {
   localDebounceMs?: number;
@@ -30,6 +32,13 @@ export interface UseAutosaveOptions {
   maxRetries?: number;
   /** When false (viewer role), persist locally but never push to the cloud. */
   canEdit?: boolean;
+  /**
+   * The live collaboration doc (or null when realtime is off). When this doc
+   * already holds shapes at load time it is authoritative, and the persisted
+   * blob is NOT loaded — this prevents a stale snapshot from clobbering a peer's
+   * live state (which the doc-sync bridge would then re-broadcast as deletions).
+   */
+  doc?: Y.Doc | null;
 }
 
 export interface UseAutosaveReturn {
@@ -50,6 +59,7 @@ export function useAutosave(
     cloudDebounceMs = DEBOUNCE_CONFIG.cloudSyncMs,
     maxRetries = RETRY_CONFIG.maxRetries,
     canEdit = true,
+    doc = null,
   } = options;
 
   const { viewport, dispatchViewport, shapes, dispatchShapes } =
@@ -70,6 +80,42 @@ export function useAutosave(
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadDoneRef = useRef(false);
   const pendingCloudSyncRef = useRef(false);
+  // Live handle to the collab doc, read inside the one-shot load effect without
+  // making the doc a dependency of that effect.
+  const docRef = useRef(doc);
+  docRef.current = doc;
+
+  // Flush pending changes immediately — used on unmount / tab-hide so a debounced
+  // save isn't lost when leaving within the debounce window. Reassigned each
+  // render so it captures the latest state (not a stale closure).
+  const flushRef = useRef<() => void>(() => {});
+  flushRef.current = () => {
+    // Only flush real post-load changes; never write a pre-load empty/stale state
+    // (the clobber guarded against in the load effect).
+    if (!initialLoadDoneRef.current || !isDirty) return;
+
+    // localStorage is synchronous and survives both unmount and tab close.
+    saveToLocalStorage(projectId, viewport, shapes);
+
+    // Best-effort cloud flush (fire-and-forget; no setState, so it's safe after
+    // unmount). Completes normally on client-side nav; on a hard tab close it may
+    // be cut off, but localStorage already holds the state for the next open.
+    if (canEdit && !isOffline) {
+      const data = serializeCanvasState(viewport, shapes);
+      void saveCanvasStateRequest({
+        projectId,
+        canvasData: {
+          viewport: data.viewport,
+          shapes: data.shapes,
+          tool: data.tool,
+          selected: data.selected,
+          frameCounter: data.frameCounter,
+          version: data.version,
+          lastModified: data.lastModified,
+        },
+      }).catch(() => {});
+    }
+  };
 
   // One-shot load of cloud canvas state (SWR: `undefined` while loading, then
   // the state object or `null`). The cloud save is a request to our API.
@@ -250,6 +296,18 @@ export function useAutosave(
     if (initialLoadDoneRef.current) return;
 
     const loadInitialState = () => {
+      // Collab guard: if the shared doc already holds shapes, a peer's live
+      // state was adopted into the reducer before our persisted blob resolved.
+      // The doc is authoritative now — loading the (possibly stale) blob would
+      // wholesale-replace those live shapes, and the doc-sync bridge would then
+      // diff the shrink and broadcast it as deletions, wiping the canvas for
+      // everyone. Skip the restore; the adopted state already populated state.
+      if (docRef.current && !isDocEmpty(docRef.current)) {
+        initialLoadDoneRef.current = true;
+        setIsLoading(false);
+        return;
+      }
+
       const localData = loadRawFromLocalStorage(projectId);
 
       // Convert cloud state to CanvasProjectData format
@@ -308,7 +366,7 @@ export function useAutosave(
     loadInitialState();
   }, [cloudState, projectId, dispatchViewport, dispatchShapes]);
 
-  // Beforeunload warning
+  // Beforeunload warning + pagehide flush
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isDirty) {
@@ -316,14 +374,23 @@ export function useAutosave(
         e.returnValue = "";
       }
     };
+    // pagehide fires on tab close / refresh / bfcache — flush pending changes
+    // (localStorage synchronously; cloud best-effort) so they aren't lost.
+    const handlePageHide = () => flushRef.current();
 
     window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
   }, [isDirty]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount — flush pending changes (covers client-side navigation,
+  // which fires no pagehide) before tearing down the debounce timers.
   useEffect(() => {
     return () => {
+      flushRef.current();
       if (localSaveTimeoutRef.current)
         clearTimeout(localSaveTimeoutRef.current);
       if (cloudSyncTimeoutRef.current)

@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import Sandbox from "@e2b/code-interpreter";
-import { getThemeCommand, DEFAULT_GLOBALS_CSS } from "@/lib/canvas/theme-utils";
+import {
+  getThemeCommand,
+  isPresetThemeId,
+  DEFAULT_GLOBALS_CSS,
+} from "@/lib/canvas/theme-utils";
+import { buildGlobalsCss } from "@/lib/canvas/build-globals-css";
+import { internalGetDesignSystem } from "@/lib/db/queries/designSystems";
+
+export const runtime = "nodejs";
 
 // Auto-pause timeout for sandboxes (15 minutes)
 const SANDBOX_AUTO_PAUSE_TIMEOUT_MS = 15 * 60 * 1000;
@@ -76,26 +84,42 @@ export async function POST(request: NextRequest) {
       timeoutMs: SANDBOX_AUTO_PAUSE_TIMEOUT_MS,
     });
 
-    // Install the preset only when a themeId is provided. Mode-only flips omit
+    // Install the theme only when a themeId is provided. Mode-only flips omit
     // themeId so we skip the (slow) reinstall and just re-toggle the layout.
     if (themeId !== undefined && themeId !== null) {
-      const command = getThemeCommand(themeId);
+      if (isPresetThemeId(themeId)) {
+        const command = getThemeCommand(themeId);
+        if (!command) {
+          // Default preset: write the baked default globals.css.
+          await sandbox.files.write("app/globals.css", DEFAULT_GLOBALS_CSS);
+        } else {
+          const result = await sandbox.commands.run(command, {
+            timeoutMs: 60000, // 60s for npm/shadcn install
+          });
 
-      if (!command) {
-        // Default theme: write the baked default globals.css.
-        await sandbox.files.write("app/globals.css", DEFAULT_GLOBALS_CSS);
+          if (result.exitCode !== 0) {
+            console.error("Theme command failed:", result.stderr);
+            return NextResponse.json(
+              { error: "Failed to apply theme", details: result.stderr },
+              { status: 500 }
+            );
+          }
+        }
       } else {
-        const result = await sandbox.commands.run(command, {
-          timeoutMs: 60000, // 60s for npm/shadcn install
-        });
-
-        if (result.exitCode !== 0) {
-          console.error("Theme command failed:", result.stderr);
+        // Custom design system (uuid): no shadcn command — generate its
+        // globals.css from the stored tokens and write it straight in. Fast
+        // (no npm install) and the dark toggle below works identically.
+        const ds = await internalGetDesignSystem(themeId);
+        if (!ds) {
           return NextResponse.json(
-            { error: "Failed to apply theme", details: result.stderr },
-            { status: 500 }
+            { error: "Design system not found" },
+            { status: 404 }
           );
         }
+        await sandbox.files.write(
+          "app/globals.css",
+          buildGlobalsCss(ds.tokens)
+        );
       }
     }
 
