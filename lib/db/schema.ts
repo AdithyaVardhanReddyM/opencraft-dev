@@ -153,6 +153,27 @@ export const designSystems = pgTable(
   (t) => [index("design_systems_by_user_id").on(t.userId)]
 );
 
+// API keys for the MCP server — let external agents authenticate as a Clerk user
+// without a browser session. The plaintext key (prefix "oc_…") is shown ONCE at
+// creation and never stored; we keep only its sha256 so a presented token can be
+// hashed and matched. Additive table — nothing else references it.
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull(), // Clerk user ID this key acts as
+    name: text("name").notNull(), // user-facing label
+    hashedKey: text("hashed_key").notNull(), // sha256(plaintext)
+    prefix: text("prefix").notNull(), // first chars, shown in listings (e.g. "oc_AbC1")
+    lastUsedAt: bigint("last_used_at", { mode: "number" }),
+    createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("api_keys_hashed_key").on(t.hashedKey),
+    index("api_keys_by_user_id").on(t.userId),
+  ]
+);
+
 // Chat messages for screen threads.
 export const messages = pgTable(
   "messages",
