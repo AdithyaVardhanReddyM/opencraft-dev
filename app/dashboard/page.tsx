@@ -8,6 +8,7 @@ import {
 import { ProjectsGrid } from "@/components/dashboard/ProjectsGrid";
 import { SharedEmptyState } from "@/components/dashboard/SharedEmptyState";
 import { CreateProjectDialog } from "@/components/dashboard/CreateProjectDialog";
+import { McpConnectBanner } from "@/components/dashboard/McpConnectBanner";
 import { ProjectSortOption } from "@/types/project";
 
 const SORT_PREFERENCE_KEY = "dashboard-sort-preference";
@@ -48,11 +49,14 @@ export default function DashboardPage() {
       />
       <main className="container mx-auto px-4 pb-20 pt-6 sm:px-6 lg:px-8">
         {activeTab === "your-projects" ? (
-          <ProjectsGrid
-            sortOption={sortBy}
-            searchQuery={searchQuery}
-            onCreateProject={handleCreateClick}
-          />
+          <>
+            <McpConnectBanner />
+            <ProjectsGrid
+              sortOption={sortBy}
+              searchQuery={searchQuery}
+              onCreateProject={handleCreateClick}
+            />
+          </>
         ) : (
           <SharedEmptyState />
         )}
