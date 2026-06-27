@@ -40,6 +40,9 @@ class ChatRequest(BaseModel):
     # Visual Mode — per-run flag; when on, the agent screenshots the live preview
     # and self-corrects before finishing.
     visualMode: bool = False
+    # External MCP connections the user authorized (Notion, Linear, …), each
+    # {provider, url, token}. Empty/absent → a plain agent (unchanged behavior).
+    connections: list[dict[str, Any]] | None = None
     callback: Callback | None = None
     # Non-chat operation discriminator. `op="extract_design_system"` (+ `url`)
     # routes to design-system extraction instead of a generation turn — same seam
@@ -92,6 +95,7 @@ async def chat(
             thinking=req.thinking,
             image_urls=req.imageUrls,
             visual_mode=req.visualMode,
+            connections=req.connections,
             callback=req.callback,
         ):
             yield _sse(frame)

@@ -15,6 +15,7 @@ Frames yielded (see runner/stream.py for the streamed ones):
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any, AsyncIterator
 
 from strands import Agent
@@ -23,6 +24,7 @@ from ..context.assembler import build_image_blocks, build_turn
 from ..context.file_meta import changed_paths, derive_route_from_changes, merge_changes
 from ..models import build_model
 from ..tools import DEFAULT_TOOLS
+from ..tools.mcp_connections import build_mcp_clients
 from ..tools.sandbox import apply_theme, get_or_create_sandbox, host_url
 from ..tools.visual import check_preview, close_browser, drain_visual_checks
 from .finish import finish
@@ -38,12 +40,16 @@ async def run_turn(
     thinking: bool = False,
     image_urls: list[str] | None = None,
     visual_mode: bool = False,
+    connections: list[dict[str, Any]] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """Run one turn. `screen` and `history` are supplied by the caller (no DB).
 
     screen: the screen row as a dict (sandbox_id, files, file_meta, recent_edits,
         route, title, parent_screen_id, ...). None/empty = a brand-new screen.
     history: prior messages oldest-first, each {role, content}.
+    connections: external MCP servers the user has authorized, each
+        {provider, url, token}. When present, their tools are merged into this
+        turn's Agent. Empty/None = a plain agent (today's behavior, unchanged).
     """
     screen = screen or {}
     history = history or []
@@ -86,8 +92,15 @@ async def run_turn(
         seed_files = dict(screen.get("files") or {})
 
     # 2. assemble context
+    connection_providers = [
+        str(c.get("provider")) for c in (connections or []) if c.get("provider")
+    ]
     system_prompt, history_msgs, current_text = build_turn(
-        screen, history, message, visual_mode=visual_mode
+        screen,
+        history,
+        message,
+        visual_mode=visual_mode,
+        connections=connection_providers,
     )
     image_blocks = await build_image_blocks(image_urls)
     prompt: Any = (
@@ -109,24 +122,37 @@ async def run_turn(
         "route": screen.get("route"),
     }
 
-    # Visual Mode adds the browser self-check tool; the prompt block tells the agent
-    # to call it before finishing. Off by default → the lean core set, no image tokens.
-    turn_tools = (
-        [*DEFAULT_TOOLS, check_preview, finish] if visual_mode else [*DEFAULT_TOOLS, finish]
-    )
-    agent = Agent(
-        model=model,
-        system_prompt=system_prompt,
-        tools=turn_tools,
-        messages=history_msgs,
-        callback_handler=None,
-    )
-
     seen_tools: set[str] = set()
     tool_label_sent: dict[str, str] = {}  # tool_use_id -> last detail label emitted
     narration_parts: list[str] = []  # the model's visible prose, for user display
     reasoning_parts: list[str] = []  # the model's thinking, for persistence/display
+    # MCP connection clients must stay open for the whole run (their tools are only
+    # callable while entered); this stack owns them and is torn down in `finally`.
+    mcp_stack = contextlib.ExitStack()
     try:
+        # Attach tools from each connected MCP server (Notion, Linear, …). Best-effort
+        # per connection: a bad/expired token is skipped so the turn still runs — as a
+        # plain agent if all fail. Visual Mode's check_preview is added the same way.
+        mcp_tools: list[Any] = []
+        for _provider, _client in build_mcp_clients(connections):
+            try:
+                mcp_stack.enter_context(_client)
+                mcp_tools.extend(_client.list_tools_sync())
+            except Exception:  # noqa: BLE001 — degrade: skip this connection
+                pass
+        turn_tools = [
+            *DEFAULT_TOOLS,
+            *mcp_tools,
+            *([check_preview] if visual_mode else []),
+            finish,
+        ]
+        agent = Agent(
+            model=model,
+            system_prompt=system_prompt,
+            tools=turn_tools,
+            messages=history_msgs,
+            callback_handler=None,
+        )
         async for event in agent.stream_async(prompt, invocation_state=invocation_state):
             # Emit any screenshots check_preview captured since the last event as
             # `visual_check` frames (and accumulate them for end-of-turn persistence).
@@ -178,6 +204,8 @@ async def run_turn(
         # runs this generator to completion). No-op when no session was started.
         if visual_mode:
             await close_browser(invocation_state)
+        # Tear down any MCP connection clients opened for this turn (no-op if none).
+        mcp_stack.close()
 
     # 4. emit the result for the caller to persist (no DB writes here)
     result = result_holder.get("result")

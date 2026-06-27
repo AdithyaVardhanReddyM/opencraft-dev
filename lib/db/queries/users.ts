@@ -8,12 +8,17 @@ import type { GenerationStats, UserDoc } from "../types";
 export const DEFAULT_GENERATION_LIMIT = 10;
 
 /**
- * Per-user generation limit toggle. Disabled in dev mode so message counts
- * aren't capped. Flip back to `true` (or wire to an env var) to re-enable the
- * cap — `canGenerate` and `getGenerationStats` both honor this flag, so the
- * server block and the client credit-bar UI come back together.
+ * Per-user generation limit toggle. When enabled, each user is capped at
+ * `generationsLimit` generations (default 10). Set to `false` to lift the cap in
+ * dev — `canGenerate` and `getGenerationStats` both honor this flag, so the
+ * server block and the client credit-bar UI toggle together.
+ *
+ * The cap counts only SUCCESSFUL generations: `incrementGeneration` runs solely
+ * in the agent-result success path (after the error-frame early return, behind
+ * the idempotency guard), so a failed/errored run is never charged against the
+ * user's quota.
  */
-export const GENERATION_LIMIT_ENABLED = false;
+export const GENERATION_LIMIT_ENABLED = true;
 
 async function findByClerkId(clerkId: string) {
   const [row] = await db

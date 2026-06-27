@@ -15,6 +15,7 @@ The invoke payload mirrors the FastAPI POST /chat body the Next.js proxy sends:
         "thinking": bool,
         "imageUrls": list[str] | None,
         "visualMode": bool,           # Visual Mode: screenshot self-check before finish
+        "connections": list[dict] | None,  # authorized MCP servers {provider,url,token}
         "callback": {                 # durable terminal-persistence webhook
             "url": str,               #   Next.js /api/internal/agent-result
             "secret": str | None,
@@ -67,6 +68,7 @@ async def invoke(payload: dict):
         thinking=bool(payload.get("thinking", False)),
         image_urls=payload.get("imageUrls"),
         visual_mode=bool(payload.get("visualMode", False)),
+        connections=payload.get("connections"),
         callback=callback,
     ):
         yield frame

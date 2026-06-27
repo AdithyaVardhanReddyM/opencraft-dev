@@ -62,6 +62,7 @@ async def run_turn_durable(
     thinking: bool = False,
     image_urls: list[str] | None = None,
     visual_mode: bool = False,
+    connections: list[dict[str, Any]] | None = None,
     callback: Callback | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """Yield turn frames while running the turn in a decoupled task.
@@ -85,6 +86,7 @@ async def run_turn_durable(
                 thinking=thinking,
                 image_urls=image_urls,
                 visual_mode=visual_mode,
+                connections=connections,
             ):
                 await queue.put(frame)
                 if frame.get("type") in ("result", "error"):

@@ -205,6 +205,38 @@ export const apiKeys = pgTable(
   ]
 );
 
+// External MCP connections (Notion, Linear, …) a user has authorized via OAuth.
+// Our coding agent acts as an MCP *client*: when a row exists here, the chat
+// route decrypts the access token and forwards it to the agent-service, which
+// opens an MCP session to the provider's hosted server and merges its tools into
+// the turn. Tokens are REVERSIBLE secrets (unlike api_keys' one-way hash), so
+// access/refresh/clientSecret are stored as AES-GCM ciphertext (lib/server/crypto.ts);
+// never logged, never sent to the browser. Additive table — absence = today's
+// behavior (a plain agent with no external tools). The DCR-issued client_id is
+// kept so the token can be refreshed later without re-registering.
+export const oauthConnections = pgTable(
+  "oauth_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull(), // Clerk user ID that owns this connection
+    provider: text("provider").notNull(), // "notion" | "linear" (registry id)
+    accessToken: text("access_token").notNull(), // AES-GCM ciphertext
+    refreshToken: text("refresh_token"), // ciphertext, nullable (some providers omit)
+    expiresAt: bigint("expires_at", { mode: "number" }), // epoch-ms; null = no expiry
+    scope: text("scope"), // space-separated granted scopes (informational)
+    accountId: text("account_id"), // workspace/org id, when the provider returns one
+    accountName: text("account_name"), // display name for the modal ("Acme workspace")
+    clientId: text("client_id"), // DCR-issued client id, needed to refresh
+    clientSecret: text("client_secret"), // ciphertext, nullable (public PKCE clients omit)
+    createdAt: bigint("created_at", { mode: "number" }).notNull(),
+    updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("oauth_connections_user_provider").on(t.userId, t.provider),
+    index("oauth_connections_by_user_id").on(t.userId),
+  ]
+);
+
 // Chat messages for screen threads.
 export const messages = pgTable(
   "messages",

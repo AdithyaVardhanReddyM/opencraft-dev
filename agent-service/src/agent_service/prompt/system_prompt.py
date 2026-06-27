@@ -15,6 +15,7 @@ def build_system_prompt(
     include_recreation: bool = False,
     include_capture: bool = False,
     include_visual: bool = False,
+    connections: list[str] | None = None,
 ) -> str:
     parts: list[str] = [
         blocks.HEADER,
@@ -36,4 +37,8 @@ def build_system_prompt(
     # Visual Mode only busts the cache on the turn it flips.
     if include_visual:
         parts.append(blocks.VISUAL_MODE)
+    # Connections nudge — appended only when the user has connected accounts, so a
+    # normal (unconnected) turn's prompt is byte-for-byte unchanged.
+    if connections:
+        parts.append(blocks.connections_block(connections))
     return "\n\n".join(parts)

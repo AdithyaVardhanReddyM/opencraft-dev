@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/queries/messages";
 import { canGenerate } from "@/lib/db/queries/users";
 import { internalGetDesignSystem } from "@/lib/db/queries/designSystems";
+import { listConnectionTokensForAgent } from "@/lib/db/queries/connections";
 import { invokeAgentService } from "@/lib/agent-service";
 import { parseScreenTheme, isPresetThemeId } from "@/lib/canvas/theme-utils";
 import { buildGlobalsCss } from "@/lib/canvas/build-globals-css";
@@ -190,6 +191,17 @@ export async function POST(req: NextRequest) {
     imageIds: imageIds && imageIds.length > 0 ? imageIds : undefined,
   });
 
+  // External MCP connections the user has authorized (Notion, Linear, …). The
+  // agent-service opens an MCP client per entry and merges its tools into the turn.
+  // Best-effort: a missing table / decrypt / refresh problem must never break a
+  // normal generation, so fall back to none → today's exact behavior.
+  let connections: Awaited<ReturnType<typeof listConnectionTokensForAgent>> = [];
+  try {
+    connections = await listConnectionTokensForAgent(userId);
+  } catch {
+    connections = [];
+  }
+
   // Call the agent compute layer, handing it a durable callback for terminal
   // persistence. The callback fires even if this stream/relay is aborted.
   let upstream;
@@ -203,6 +215,7 @@ export async function POST(req: NextRequest) {
         thinking: thinking ?? false,
         imageUrls,
         visualMode: visualMode ?? false,
+        connections,
         callback: {
           url: `${APP_URL}/api/internal/agent-result`,
           secret: AGENT_SHARED_SECRET || undefined,

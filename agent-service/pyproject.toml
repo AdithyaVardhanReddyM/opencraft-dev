@@ -12,6 +12,9 @@ dependencies = [
     "pydantic>=2",
     "pydantic-settings",
     "python-dotenv",
+    # MCP client — lets the agent attach tools from a user's connected servers
+    # (Notion, Linear, …) via `strands.tools.mcp` + `mcp.client.streamable_http`.
+    "mcp",
 ]
 
 [project.optional-dependencies]

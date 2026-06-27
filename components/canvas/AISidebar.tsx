@@ -13,6 +13,7 @@ import {
   Zap,
   ChevronUp,
   Eye,
+  Plug,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ import {
   type DesignSystemValue,
 } from "@/components/canvas/design-systems/DesignSystemPicker";
 import { VisualModeToggle } from "@/components/canvas/VisualModeToggle";
+import { ConnectionsModal } from "@/components/canvas/connections/ConnectionsModal";
 import { formatScreenTheme } from "@/lib/canvas/theme-utils";
 import {
   MentionInput,
@@ -785,6 +787,10 @@ function ChatInput({
   // Visual Mode — lets the agent see and refine the rendered screen as it
   // builds. UI-only for now (off by default); not yet wired into submit.
   const [visualMode, setVisualMode] = useState(false);
+  // Connections modal (Notion/Linear MCP via OAuth). Connecting is global per
+  // user, so there's no per-message state — the chat route attaches connected
+  // tools server-side; this just opens the manage UI.
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const initialDataProcessedRef = useRef(false);
 
@@ -1019,18 +1025,23 @@ function ChatInput({
           </PromptInputBody>
           <PromptInputFooter className="justify-between px-2 pb-2">
             <PromptInputTools className="min-w-0">
-              {/* Add Image Button - only show for models that support vision */}
-              {modelSupportsVision(selectedModel) && (
-                <PromptInputActionMenu>
-                  <PromptInputActionMenuTrigger />
-                  <PromptInputActionMenuContent>
+              {/* Plus menu — always rendered so Connections is reachable; the
+                  photos item is gated to vision-capable models. */}
+              <PromptInputActionMenu>
+                <PromptInputActionMenuTrigger />
+                <PromptInputActionMenuContent>
+                  {modelSupportsVision(selectedModel) && (
                     <DropdownMenuItem onSelect={openFilePicker}>
                       <ImageIcon className="mr-2 size-4" />
                       Add photos
                     </DropdownMenuItem>
-                  </PromptInputActionMenuContent>
-                </PromptInputActionMenu>
-              )}
+                  )}
+                  <DropdownMenuItem onSelect={() => setConnectionsOpen(true)}>
+                    <Plug className="mr-2 size-4" />
+                    Connections
+                  </DropdownMenuItem>
+                </PromptInputActionMenuContent>
+              </PromptInputActionMenu>
 
               {/* Build mode selector — Deep Build (extended thinking on) vs
                   Fast Build (thinking off). Replaces the old think + model
@@ -1117,6 +1128,10 @@ function ChatInput({
             />
           </PromptInputFooter>
         </PromptInput>
+        <ConnectionsModal
+          open={connectionsOpen}
+          onOpenChange={setConnectionsOpen}
+        />
       </div>
     </div>
   );

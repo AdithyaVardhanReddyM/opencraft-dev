@@ -209,6 +209,20 @@ Opens the live preview in a REAL browser and returns a SCREENSHOT (you can see i
 4. Only call `finish` once the preview renders correctly and matches the intent. NEVER finish on a blank screen, a visible Next.js error overlay, or an obvious layout break.
 Keep it tight — usually 1-2 checks per route is enough; screenshots are token-heavy, so don't loop endlessly."""
 
+def connections_block(providers: list[str]) -> str:
+    """Guidance appended when the user has connected external MCP servers.
+
+    Generated (not a constant) so it can name the live providers; appended LAST in
+    the prompt, so it only busts the cache on a turn where connections change.
+    """
+    names = ", ".join(p.capitalize() for p in providers) if providers else "external accounts"
+    return f"""## Connected accounts — use the user's real data
+The user has connected: {names}. Their tools are available to you THIS turn (tool names are provider-specific, e.g. searching/reading pages or issues).
+- When the user references their own content — a Notion page/doc/spec, a Linear issue/ticket/project, etc. — USE these tools to fetch the real data instead of guessing, and cite what you found (titles, ids, status, links) in your reply.
+- These connections can READ and WRITE. You may create or update items (file a Linear issue, add a Notion note) when the user clearly asks — but never modify their data without an explicit request. Prefer reading for context; keep any writes minimal and intentional.
+- Best-effort: if a connection tool errors or returns nothing, say so briefly and continue with the build. The connections are an aid, not a blocker."""
+
+
 FLOW_ADDENDUM = """## Flow Page (IMPORTANT — this is a new page in an EXISTING app)
 You are adding a NEW page to an existing Next.js app that already has pages, components, theme, and design tokens from earlier work in this same sandbox.
 - Create the page at a NEW route — e.g. `app/checkout/page.tsx` serves "/checkout". Pick a short, sensible route slug from the user's request.

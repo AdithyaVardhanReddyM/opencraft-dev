@@ -27,12 +27,15 @@ def build_turn(
     messages: list[dict[str, Any]],
     user_message: str,
     visual_mode: bool = False,
+    connections: list[str] | None = None,
 ) -> tuple[str, list[dict[str, Any]], str]:
     """Build the turn inputs.
 
     Returns (system_prompt, history_messages, current_turn_text). The caller
     passes `history_messages` as the Agent's `messages=` and feeds
     `current_turn_text` (optionally wrapped with image blocks) as the prompt.
+    `connections` is the list of connected provider names (e.g. ["notion"]),
+    used only to append the connections prompt block.
     """
     is_flow = bool((screen or {}).get("parent_screen_id"))
     has_url = bool(_URL_RE.search(user_message))
@@ -43,6 +46,7 @@ def build_turn(
         include_recreation=has_url,
         include_capture=has_capture,
         include_visual=visual_mode,
+        connections=connections,
     )
 
     history_messages = history_mod.to_messages(messages)

@@ -77,7 +77,22 @@ export function CanvasProvider({ children }: { children: React.ReactNode }) {
       return [];
     }
 
+    // Dedupe by id before rendering. `shapes.shapes.ids` can transiently hold the
+    // same id twice (e.g. a local ADD racing a Yjs echo when a shape is placed),
+    // which would render two elements with the same React key and crash the canvas.
+    // RENDER-ONLY guard — keep it that way: shapesList feeds rendering, hit-testing
+    // and selection, never persistence. Autosave and the Yjs push serialize the raw
+    // `shapes.shapes` EntityState (see use-autosave.ts / use-canvas-doc-sync.ts), so
+    // collapsing a duplicate here cannot drop a real shape or change what's saved.
+    // (Do NOT "fix the root" by making addEntity idempotent — that touches the
+    // self-heal/Yjs mutation path and dropped real screens. Keep the guard here.)
+    const seen = new Set<string>();
     return shapes.shapes.ids
+      .filter((id) => {
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
       .map((id) => shapes.shapes.entities[id])
       .filter((shape): shape is Shape => Boolean(shape));
   }, [shapes.shapes]);
