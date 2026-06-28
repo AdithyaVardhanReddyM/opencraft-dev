@@ -87,7 +87,8 @@ export async function GET(
       path: "/api/connections",
     });
     return res;
-  } catch {
+  } catch (err) {
+    console.error(`[connections/${provider}/callback] failed:`, err);
     return fail("Couldn't complete the connection. Please try again.");
   }
 }

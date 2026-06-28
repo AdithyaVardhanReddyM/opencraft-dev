@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Loader2, Plug, Check, Link2 } from "lucide-react";
+import { Loader2, Plug, Check, Link2, ExternalLink } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,6 +27,7 @@ interface ConnectionItem {
   connected: boolean;
   accountName: string | null;
   connectedAt?: number | null;
+  authMode?: "oauth" | "token";
 }
 
 function NotionIcon() {
@@ -44,11 +46,33 @@ function LinearIcon() {
   );
 }
 
+function SlackIcon() {
+  return (
+    <svg viewBox="0 0 122.8 122.8" className="size-5" aria-hidden>
+      <path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9z" fill="#E01E5A" />
+      <path d="M32.3 77.6c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="#E01E5A" />
+      <path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2z" fill="#36C5F0" />
+      <path d="M45.2 32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="#36C5F0" />
+      <path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2z" fill="#2EB67D" />
+      <path d="M90.5 45.2c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z" fill="#2EB67D" />
+      <path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9z" fill="#ECB22E" />
+      <path d="M77.6 90.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="#ECB22E" />
+    </svg>
+  );
+}
+
 /** Presentation metadata keyed by registry id (registry.ts is server-only). */
-const PROVIDER_META: Record<
-  string,
-  { label: string; blurb: string; tile: string; icon: ReactNode }
-> = {
+type ProviderMeta = {
+  label: string;
+  blurb: string;
+  tile: string;
+  icon: ReactNode;
+  authMode?: "oauth" | "token";
+  /** token mode: copy for the paste-token form. */
+  token?: { placeholder: string; docsUrl?: string; steps: string[] };
+};
+
+const PROVIDER_META: Record<string, ProviderMeta> = {
   notion: {
     label: "Notion",
     blurb: "Pull in your pages, docs and databases.",
@@ -61,13 +85,30 @@ const PROVIDER_META: Record<
     tile: "bg-[#5E6AD2] text-white",
     icon: <LinearIcon />,
   },
+  slack: {
+    label: "Slack",
+    blurb: "Search messages, read channels, and post updates.",
+    tile: "bg-white ring-1 ring-border/60",
+    icon: <SlackIcon />,
+    authMode: "token",
+    token: {
+      placeholder: "xoxp-…",
+      docsUrl: "https://api.slack.com/apps",
+      steps: [
+        "Create a Slack app at api.slack.com/apps → From scratch, and pick your workspace.",
+        "Open OAuth & Permissions → User Token Scopes and add: search:read.public, channels:read, channels:history, users:read, chat:write.",
+        "Click Install to Workspace and Allow.",
+        "Copy the User OAuth Token (starts with xoxp-) and paste it below.",
+      ],
+    },
+  },
 };
 
 // Shown even if the status fetch fails (e.g. before the table exists) so the user
 // can still start a connection. The API returns the authoritative merged list.
-const FALLBACK_PROVIDERS = ["notion", "linear"];
+const FALLBACK_PROVIDERS = ["notion", "linear", "slack"];
 
-function metaFor(id: string) {
+function metaFor(id: string): ProviderMeta {
   return (
     PROVIDER_META[id] ?? {
       label: id.charAt(0).toUpperCase() + id.slice(1),
@@ -88,6 +129,10 @@ export function ConnectionsModal({ open, onOpenChange }: ConnectionsModalProps) 
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const popupRef = useRef<Window | null>(null);
+  // Token-mode (e.g. Slack): which provider's paste-token form is open + its value.
+  const [tokenFormProvider, setTokenFormProvider] = useState<string | null>(null);
+  const [tokenValue, setTokenValue] = useState("");
+  const [savingToken, setSavingToken] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -168,12 +213,45 @@ export function ConnectionsModal({ open, onOpenChange }: ConnectionsModalProps) 
     }
   }, []);
 
+  // Token mode: store a pasted token (no OAuth popup). For providers whose hosted
+  // MCP server is impractical to reach via OAuth (Slack).
+  const saveToken = useCallback(
+    async (provider: string) => {
+      const token = tokenValue.trim();
+      if (!token) return;
+      setSavingToken(true);
+      try {
+        const res = await fetch(`/api/connections/${provider}/token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error || "Couldn't save the token");
+        }
+        toast.success(`${metaFor(provider).label} connected`);
+        setTokenFormProvider(null);
+        setTokenValue("");
+        void load();
+      } catch (e) {
+        toast.error(
+          e instanceof Error ? e.message : "Couldn't connect — check the token"
+        );
+      } finally {
+        setSavingToken(false);
+      }
+    },
+    [tokenValue, load]
+  );
+
   const rows: ConnectionItem[] =
     items.length > 0
       ? items
       : FALLBACK_PROVIDERS.map((id) => ({
           provider: id,
           label: metaFor(id).label,
+          authMode: metaFor(id).authMode ?? "oauth",
           connected: false,
           accountName: null,
         }));
@@ -190,8 +268,8 @@ export function ConnectionsModal({ open, onOpenChange }: ConnectionsModalProps) 
           </DialogTitle>
           <DialogDescription>
             Connect your tools so the agent can use them while it builds — fetch a
-            Notion spec, pull a Linear ticket, and more. Connect once with OAuth;
-            it stays available until you disconnect.
+            Notion spec, pull a Linear ticket, post to Slack, and more. Connect
+            once; it stays available until you disconnect.
           </DialogDescription>
         </DialogHeader>
 
@@ -199,67 +277,138 @@ export function ConnectionsModal({ open, onOpenChange }: ConnectionsModalProps) 
           {rows.map((row) => {
             const meta = metaFor(row.provider);
             const isBusy = busy === row.provider;
+            const isToken = row.authMode === "token";
+            const formOpen = tokenFormProvider === row.provider;
             return (
               <div
                 key={row.provider}
-                className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-3"
+                className="rounded-xl border border-border/60 bg-muted/20"
               >
-                <span
-                  className={cn(
-                    "inline-flex size-9 shrink-0 items-center justify-center rounded-lg",
-                    meta.tile
-                  )}
-                >
-                  {meta.icon}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground">
-                      {row.label}
-                    </span>
-                    {row.connected && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                        <Check className="size-3" />
-                        Connected
+                <div className="flex items-center gap-3 p-3">
+                  <span
+                    className={cn(
+                      "inline-flex size-9 shrink-0 items-center justify-center rounded-lg",
+                      meta.tile
+                    )}
+                  >
+                    {meta.icon}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">
+                        {row.label}
                       </span>
-                    )}
+                      {row.connected && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                          <Check className="size-3" />
+                          Connected
+                        </span>
+                      )}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {row.connected && row.accountName
+                        ? row.accountName
+                        : meta.blurb}
+                    </div>
                   </div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {row.connected && row.accountName
-                      ? row.accountName
-                      : meta.blurb}
-                  </div>
+                  {row.connected ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      disabled={isBusy}
+                      onClick={() => disconnect(row.provider)}
+                    >
+                      {isBusy ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        "Disconnect"
+                      )}
+                    </Button>
+                  ) : isToken ? (
+                    <Button
+                      size="sm"
+                      variant={formOpen ? "outline" : "default"}
+                      className="shrink-0"
+                      onClick={() => {
+                        setTokenValue("");
+                        setTokenFormProvider(formOpen ? null : row.provider);
+                      }}
+                    >
+                      {formOpen ? (
+                        "Cancel"
+                      ) : (
+                        <>
+                          <Plug className="size-4" />
+                          Connect
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      className="shrink-0"
+                      disabled={isBusy}
+                      onClick={() => connect(row.provider)}
+                    >
+                      {isBusy ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Plug className="size-4" />
+                          Connect
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
-                {row.connected ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    disabled={isBusy}
-                    onClick={() => disconnect(row.provider)}
-                  >
-                    {isBusy ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      "Disconnect"
+
+                {isToken && formOpen && !row.connected && (
+                  <div className="space-y-3 border-t border-border/60 p-3">
+                    {meta.token?.steps?.length ? (
+                      <ol className="list-decimal space-y-1 pl-4 text-xs leading-relaxed text-muted-foreground">
+                        {meta.token.steps.map((s, i) => (
+                          <li key={i}>{s}</li>
+                        ))}
+                      </ol>
+                    ) : null}
+                    {meta.token?.docsUrl && (
+                      <a
+                        href={meta.token.docsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        Get your token
+                        <ExternalLink className="size-3" />
+                      </a>
                     )}
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    className="shrink-0"
-                    disabled={isBusy}
-                    onClick={() => connect(row.provider)}
-                  >
-                    {isBusy ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Plug className="size-4" />
-                        Connect
-                      </>
-                    )}
-                  </Button>
+                    <div className="flex gap-2">
+                      <Input
+                        value={tokenValue}
+                        onChange={(e) => setTokenValue(e.target.value)}
+                        placeholder={meta.token?.placeholder ?? "Paste your token"}
+                        type="password"
+                        autoComplete="off"
+                        className="h-9 font-mono text-xs"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveToken(row.provider);
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        className="shrink-0"
+                        disabled={savingToken || !tokenValue.trim()}
+                        onClick={() => saveToken(row.provider)}
+                      >
+                        {savingToken ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          "Save"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
             );
@@ -273,7 +422,7 @@ export function ConnectionsModal({ open, onOpenChange }: ConnectionsModalProps) 
             <div className="min-w-0 flex-1">
               <div className="font-medium text-foreground">More coming soon</div>
               <div className="truncate text-xs text-muted-foreground">
-                GitHub, Slack, Figma and more.
+                GitHub, Figma, Sentry and more.
               </div>
             </div>
           </div>

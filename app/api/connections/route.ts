@@ -20,6 +20,7 @@ export async function GET() {
       return {
         provider: p.id,
         label: p.label,
+        authMode: p.authMode ?? "oauth",
         connected: Boolean(c),
         accountName: c?.accountName ?? null,
         connectedAt: c?.connectedAt ?? null,

@@ -88,7 +88,11 @@ export async function GET(
       }
     );
     return res;
-  } catch {
+  } catch (err) {
+    // Surfaced in deploy logs — the popup only shows a generic message. The most
+    // common prod cause is a missing OAUTH_ENC_KEY (encryptSecret throws) or blocked
+    // egress to the provider's discovery/registration endpoints.
+    console.error(`[connections/${provider}/start] failed:`, err);
     return errorPage("Couldn't start the connection. Please try again.");
   }
 }

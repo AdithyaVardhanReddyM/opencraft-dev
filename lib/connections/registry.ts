@@ -16,6 +16,11 @@ export interface ProviderConfig {
   id: string; // registry id, also the route param: "notion" | "linear"
   label: string; // human label (also returned by GET /api/connections)
   mcpUrl: string; // hosted streamable-HTTP MCP endpoint
+  /** "oauth" (default) → the popup OAuth flow; "token" → the user pastes a token
+   *  (for servers where OAuth is impractical, e.g. Slack's no-DCR confidential app). */
+  authMode?: "oauth" | "token";
+  /** token mode: light validation hint for the pasted token, e.g. "xoxp-". */
+  tokenPrefix?: string;
   /** Static OAuth client (skips DCR) when set via env. */
   staticClientId?: string;
   staticClientSecret?: string;
@@ -39,6 +44,16 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
     mcpUrl: "https://mcp.linear.app/mcp",
     staticClientId: process.env.LINEAR_CLIENT_ID || undefined,
     staticClientSecret: process.env.LINEAR_CLIENT_SECRET || undefined,
+  },
+  slack: {
+    id: "slack",
+    label: "Slack",
+    // Slack's hosted MCP has no DCR and needs a confidential OAuth app, so instead
+    // of the OAuth popup we take a pasted user token (xoxp-…) — Slack's MCP server
+    // accepts it directly as a Bearer. The modal shows how to get one.
+    mcpUrl: "https://mcp.slack.com/mcp",
+    authMode: "token",
+    tokenPrefix: "xoxp-",
   },
 };
 
