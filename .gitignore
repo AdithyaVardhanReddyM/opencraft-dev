@@ -36,6 +36,13 @@ yarn-error.log*
 # private AWS infra journal (identifiers/configs, no secrets — keep local)
 AWS_INFRA.md
 
+BUILDER_POST.md
+MEDIUM_BLOG.md
+SUBMISSION.md
+
+# internal design docs (keep local)
+/docs/
+
 # vercel
 .vercel
 
